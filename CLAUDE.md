@@ -22,4 +22,10 @@ Budget: keep this file under ~500 tokens.
 - Model weights, venvs, rig art, voice references and audio caches stay out of git. Models go on F:.
 - Test on this laptop (RTX 4060 Laptop 8 GB + Radeon 780M, two 60 Hz screens).
 - Plan mode for anything touching more than ~3 files; broad sweeps go to `explorer`.
-- Once commands exist (build, run, test), add them here.
+
+## Commands
+- Run her: `python chibi.py` (agent starts Ollama, overlay, voice). One instance only (mutex).
+- Setup: `uv sync` in `shared/`, `agent/`, `overlay/`, `voice/` (each has its own venv).
+- Tests: `uv run pytest` in each package; `agent/tests/test_cases_live.py` needs Ollama.
+- Debug: `python -m chibi_agent --without voice|overlay`; `python -m chibi_overlay --debug-throw VX,VY`.
+- Processes started from the Claude app write AppData into `Packages\Claude_*\LocalCache` (MSIX); the user's real logs are in `%LOCALAPPDATA%\ChibiAgent\logs`.

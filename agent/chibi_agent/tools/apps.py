@@ -99,7 +99,7 @@ def focus_window(title: str) -> Result:
     return Result(f"Focused '{_title(hwnd)}'.")
 
 
-@tool("arrange_window", "Minimise, maximise, restore, or snap a window to the left or right half.",
+@tool("arrange_window", "Minimise, maximise, restore or snap a window left/right.",
       {"title": ("Part of the window title", True),
        "action": ("minimise, maximise, restore, left or right", True)},
       side_effect=True, summary=lambda a: f"{a.get('action')} {a.get('title')}")
@@ -132,7 +132,7 @@ def arrange_window(title: str, action: str) -> Result:
     return Result(f"{action} '{_title(hwnd)}'.")
 
 
-@tool("close_window", "Close an open window (the app may ask to save).",
+@tool("close_window", "Close a window.",
       {"title": ("Part of the window title", True)},
       side_effect=True, summary=lambda a: f"Close the window '{a.get('title')}'")
 def close_window(title: str) -> Result:

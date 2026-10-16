@@ -11,7 +11,7 @@ BLOCKED = re.compile(
     r"stop-computer|restart-computer|reg\s+delete|bcdedit|cipher\s+/w)\b|-verb\s+runas|sudo\b")
 
 
-@tool("run_shell", "Run a PowerShell command and return its output.",
+@tool("run_shell", "Run a PowerShell command.",
       {"command": ("The full command line", True)},
       side_effect=True, summary=lambda a: f"Run: {a.get('command')}", timeout_s=35)
 def run_shell(command: str) -> Result:

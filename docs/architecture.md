@@ -151,7 +151,7 @@ sequenceDiagram
   - **Audit:** every call goes to `audit.jsonl` (tool, args, confirmed, result status).
 - `memory/`:
   - SQLite (`%APPDATA%\ChibiAgent\memory.db`) + `sqlite-vec` for embeddings.
-  - Embeddings come from Ollama (`nomic-embed-text`, ~0.34 GB, 10/10 recall in spike 3, but ~0.46 s per query: run it in parallel with STT, or switch to an in-process ONNX embedder).
+  - Embeddings come from Ollama (`nomic-embed-text`, ~0.34 GB). A warm query embed takes ~17 ms (M4; spike 3's 0.46 s was model-switching contention), so recall runs inline before each turn; 10/10 on the spike's fact set at a 0.5 cosine threshold.
   - Tables:
     - `facts(id, text, kind, source_turn, created, last_used, embedding)`;
     - `conversations(id, started, summary, embedding)`;

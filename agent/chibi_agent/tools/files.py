@@ -89,7 +89,7 @@ def search_files(query: str, folder: str = "") -> Result:
     return Result("\n".join(str(h) for h in hits), untrusted=True)
 
 
-@tool("open_path", "Open a file or folder with its default application.",
+@tool("open_path", "Open a file or folder.",
       {"path": ("Full path", True)}, side_effect=True,
       summary=lambda a: f"Open {Path(a.get('path', '')).name or a.get('path')}")
 def open_path(path: str) -> Result:
@@ -105,7 +105,7 @@ def _target(source: Path, destination: str) -> Path:
     return d / source.name if d.is_dir() else d
 
 
-@tool("move_file", "Move or rename a file or folder. Never overwrites.",
+@tool("move_file", "Move or rename a file or folder.",
       {"source": ("Current full path", True), "destination": ("New full path or a folder", True)},
       side_effect=True, summary=lambda a: f"Move {a.get('source')} to {a.get('destination')}")
 def move_file(source: str, destination: str) -> Result:
@@ -119,7 +119,7 @@ def move_file(source: str, destination: str) -> Result:
     return Result(f"Moved to {t}.")
 
 
-@tool("copy_file", "Copy a file or folder. Never overwrites.",
+@tool("copy_file", "Copy a file or folder.",
       {"source": ("Full path", True), "destination": ("New full path or a folder", True)},
       side_effect=True, summary=lambda a: f"Copy {a.get('source')} to {a.get('destination')}")
 def copy_file(source: str, destination: str) -> Result:

@@ -14,7 +14,10 @@ from .hotkey import HoldHotkey
 from .tools import files
 from .tools.runner import Gate, Runner
 from .llm import Ollama
+from .memory import Memory
+from .memory.store import Store
 from .orchestrator import Orchestrator
+from .schedulers import Reminders
 from .server import Hub
 from .supervisor import Supervisor
 
@@ -34,7 +37,13 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
     asyncio.create_task(llm.warm())
     tools.load_all()
     files.configure(cfg.get("tools", {}))
-    orch = Orchestrator(hub, llm, Runner(Gate(hub)))
+    store = Store(paths.DATA / "memory.db")
+    memory = Memory(cfg["ollama"], store, llm=llm)
+    orch = Orchestrator(hub, llm, Runner(Gate(hub)), memory)
+    reminders = Reminders(store, orch.announce)
+    tools.CTX.memory, tools.CTX.reminders = memory, reminders
+    reminders.start()
+    miner = asyncio.create_task(_mine_memories(memory))
     hotkey = HoldHotkey(cfg["hotkeys"]["push_to_talk"], asyncio.get_running_loop(),
                         orch.ptt_down, orch.ptt_up)
     hotkey.start()
@@ -50,11 +59,28 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
     finally:
         log.info("shutting down")
         hotkey.stop()
+        reminders.stop()
+        miner.cancel()
+        try:  # close today's conversation into memory before leaving
+            await asyncio.wait_for(memory.extract_due(force=True), 30)
+        except Exception as e:
+            log.warning("memory extraction at exit skipped: %s", e)
+        await memory.close()
         await llm.close()
         for role in ("overlay", "voice"):
             await hub.send(role, Quit())
         await sup.stop()
         await hub.stop()
+
+
+async def _mine_memories(memory: Memory) -> None:
+    """Every minute, turn conversations that have gone quiet into facts and summaries."""
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await memory.extract_due()
+        except Exception:
+            log.exception("memory extraction failed")
 
 
 def single_instance() -> object | None:

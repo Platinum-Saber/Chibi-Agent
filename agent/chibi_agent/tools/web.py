@@ -16,7 +16,7 @@ def open_url(url: str) -> Result:
     return Result(f"Opened {url}.")
 
 
-@tool("web_search", "Search the web or YouTube in the browser.",
+@tool("web_search", "Search the web or YouTube.",
       {"query": ("What to search for", True), "site": ("'web' (default) or 'youtube'", False)},
       side_effect=True, summary=lambda a: f"Search {a.get('site') or 'the web'} for '{a.get('query')}'")
 def web_search(query: str, site: str = "web") -> Result:

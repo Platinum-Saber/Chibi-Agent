@@ -55,6 +55,16 @@ class Ollama:
                             stats={k: msg[k] for k in ("eval_count", "eval_duration",
                                                         "prompt_eval_count") if k in msg})
 
+    async def complete_json(self, prompt: str, schema: dict) -> dict:
+        """One non-streamed answer constrained to `schema` (background jobs, e.g. memory)."""
+        r = await self._client.post(f"{self.url}/api/chat", json={
+            "model": self.model, "stream": False, "think": False, "keep_alive": self.keep_alive,
+            "format": schema, "options": {**self.options, "temperature": 0.2},
+            "messages": [{"role": "user", "content": prompt}]})
+        if r.status_code != 200:
+            raise RuntimeError(f"Ollama {r.status_code}: {r.text}")
+        return json.loads(r.json()["message"]["content"])
+
     async def warm(self) -> None:
         """Load the model now, so the first question doesn't pay the cold load."""
         try:

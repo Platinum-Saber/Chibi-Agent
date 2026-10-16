@@ -13,7 +13,7 @@ from chibi_agent.tools.runner import Gate, Runner
 from chibi_shared import protocol as p
 
 REG = tools.load_all()
-NO_CONFIRM_OK = {"media", "set_volume"}  # harmless and frequent (scope.md)
+NO_CONFIRM_OK = {"media", "set_volume", "remember", "set_reminder", "cancel_reminder"}  # harmless, frequent
 
 
 def test_every_side_effect_tool_is_confirmed():
@@ -190,3 +190,20 @@ async def test_claimed_action_without_tool_gets_one_nudge(tmp_path):
     await o.turn
     assert "did not call a tool" in llm.calls[1][-1]["content"]
     assert llm.calls[2][-1]["role"] == "tool"
+
+
+async def test_failed_tool_result_is_flagged_to_the_model(tmp_path):
+    from chibi_agent.tools import REGISTRY, Tool
+
+    def boom():
+        raise RuntimeError("disk on fire")
+
+    REGISTRY["boom"] = Tool("boom", "test", {}, boom, False, False, lambda a: "boom", 5)
+    try:
+        llm = ToolLLM("boom")
+        o = Orchestrator(FakeHub(), llm, Runner(AutoGate(True), audit_file=tmp_path / "a.jsonl"))
+        o.start_turn("do the thing")
+        await o.turn
+        assert llm.calls[1][-1]["content"].startswith("THE TOOL FAILED")
+    finally:
+        REGISTRY.pop("boom")

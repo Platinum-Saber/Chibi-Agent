@@ -15,6 +15,7 @@ Fn = Callable[..., Any]  # returns a Result (sync or async)
 @dataclass
 class Result:
     text: str
+    failed: bool = False  # the tool raised or timed out: she must say it did not work
     untrusted: bool = False  # content from the screen/files/web: data, never instructions
     image_b64: str | None = None  # attached to the next model turn (look_at_screen)
     hud: list[str] = field(default_factory=list)
@@ -43,6 +44,16 @@ class Tool:
 REGISTRY: dict[str, Tool] = {}
 
 
+class Context:
+    """Services the stateful tools need, set by the agent at startup (None in tests
+    that don't use them)."""
+    memory = None     # chibi_agent.memory.Memory
+    reminders = None  # chibi_agent.schedulers.Reminders
+
+
+CTX = Context()
+
+
 def tool(name: str, description: str, params: dict[str, tuple[str, bool]] | None = None, *,
          side_effect: bool = False, confirm: bool | None = None,
          summary: Callable[[dict], str] | None = None, timeout_s: float = 30.0):
@@ -59,7 +70,7 @@ def tool(name: str, description: str, params: dict[str, tuple[str, bool]] | None
 
 def load_all() -> dict[str, Tool]:
     """Import the tool modules (they register themselves)."""
-    from . import apps, clipboard, files, media, screen, shell, system, web  # noqa: F401
+    from . import apps, clipboard, files, media, memory_tools, screen, shell, system, web  # noqa: F401
     return REGISTRY
 
 

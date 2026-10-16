@@ -93,10 +93,10 @@ class Runner:
                 res = await asyncio.wait_for(asyncio.to_thread(tool.fn, **args), tool.timeout_s)
             status = "ok"
         except asyncio.TimeoutError:
-            res, status = Result(f"Error: {name} timed out after {tool.timeout_s:.0f} s."), "timeout"
+            res, status = Result(f"{name} timed out after {tool.timeout_s:.0f} s.", failed=True), "timeout"
         except Exception as e:  # tools report failures to the model, they don't crash the turn
             log.exception("tool %s failed", name)
-            res, status = Result(f"Error: {e}"), "error"
+            res, status = Result(f"{type(e).__name__}: {e}", failed=True), "error"
         if not isinstance(res, Result):
             res = Result(str(res))
         if len(res.text) > MAX_RESULT_CHARS:

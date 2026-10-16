@@ -15,6 +15,8 @@ dependencies = [
     "pywin32>=312",
     "pycaw>=20260927",
     "comtypes>=1.4.17",
+    "sqlite-vec>=0.1.9",
+    "dateparser>=1.4.3",
 ]
 
 [tool.uv.sources]

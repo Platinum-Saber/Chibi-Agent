@@ -31,7 +31,7 @@ def get_time() -> Result:
     return Result(now.strftime("%A %d %B %Y, %H:%M"))
 
 
-@tool("system_info", "Battery, CPU, RAM, GPU memory and disk usage.",
+@tool("system_info", "Battery, CPU, RAM, GPU memory, disk.",
       {"what": ("battery, cpu, ram, vram, disk or all", False)})
 def system_info(what: str = "all") -> Result:
     what = (what or "all").lower()
@@ -64,13 +64,13 @@ def system_info(what: str = "all") -> Result:
     return Result("; ".join(out) or "Nothing to report.")
 
 
-@tool("focused_window", "Which application and window the user is using right now.")
+@tool("focused_window", "The app and window in front.")
 def focused_window() -> Result:
     title, exe = _fg_title()
     return Result(f"{exe}: {title}" if title else exe, untrusted=True)
 
 
-@tool("running_apps", "List the applications with open windows.")
+@tool("running_apps", "Apps with open windows.")
 def running_apps() -> Result:
     names: set[str] = set()
 
