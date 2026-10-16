@@ -22,6 +22,10 @@ PKG = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser(prog="chibi_overlay")
+    ap.add_argument("--debug-throw", metavar="VX,VY", help="throw her at VX,VY px/s 4 s after start")
+    args = ap.parse_args()
     paths.ensure()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     cfg = config.load()["overlay"]
@@ -43,13 +47,17 @@ def main() -> None:
     link = QtLink()
     stage = Stage(rigs, primary.devicePixelRatio(), link, own_windows=set())
     windows: list[MonitorWindow] = []
-    # v1: primary monitor only (see env.Ground); MonitorWindow already handles several.
+    # One window that follows her between monitors (see MonitorWindow._follow).
     windows.append(MonitorWindow(primary, stage, models, True, windows))
     link.received.connect(stage.on_message)
     stage._quit_cb = app.quit
     link.start()
     for w in windows:
         w.show()
+
+    if args.debug_throw:
+        vx, vy = (float(v) for v in args.debug_throw.split(","))
+        QTimer.singleShot(4000, lambda: stage.physics.throw_at(vx, vy))
 
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     tick = QTimer()

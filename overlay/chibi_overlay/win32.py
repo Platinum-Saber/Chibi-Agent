@@ -52,3 +52,4 @@ def set_click_through(hwnd: int, on: bool) -> None:
     ex = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
     ex = (ex | WS_EX_TRANSPARENT) if on else (ex & ~WS_EX_TRANSPARENT)
     user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex)
+

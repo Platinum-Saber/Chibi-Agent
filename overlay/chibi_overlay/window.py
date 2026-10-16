@@ -16,7 +16,8 @@ import time
 import live2d
 import numpy as np
 import OpenGL.GL as gl
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QPoint, Qt, QTimer
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
 from . import win32
@@ -94,8 +95,34 @@ class MonitorWindow(QOpenGLWidget):
             self.puppets[form] = Puppet(self.rig_paths[form], self.stage.rigs[form], self.dpr, self._fb())
 
     def resizeGL(self, w: int, h: int) -> None:
-        for p in self.puppets.values():
-            p.model.Resize(int(w * self.dpr), int(h * self.dpr))
+        # also runs after _follow() moved us to another monitor (its DPI may differ)
+        self.dpr = self.devicePixelRatioF()
+        for form, p in self.puppets.items():
+            p.dpr = self.dpr
+            if form in self.stage.geom:
+                p.configure(self.stage.geom[form], self._fb())
+            else:
+                p.model.Resize(*self._fb())
+        if self.hwnd:
+            self.rect_px = win32.window_rect(self.hwnd)
+        log.debug("resized: %dx%d logical, dpr %.2f, fb %s, rect %s, feet %s",
+                 w, h, self.dpr, self._fb(), self.rect_px, self.stage.feet)
+
+    def _follow(self) -> None:
+        """One GL window follows her across monitors (a second window's context drew
+        the rigs untextured). It hops when her feet cross into another monitor."""
+        x, y = self.stage.feet
+        mon = self.stage.ground.monitor_at(x, y - 1)
+        if tuple(mon) != tuple(self.rect_px):
+            cx, cy = (mon.left + mon.right) // 2, (mon.top + mon.bottom) // 2
+            scr = QGuiApplication.screenAt(QPoint(cx, cy)) or next(
+                (s for s in QGuiApplication.screens() if s.geometry().contains(QPoint(cx, cy))), None)
+            if scr is None:
+                return
+            log.info("following her to %s %s", scr.name(), tuple(mon))
+            self.scr = scr
+            self.rect_px = tuple(mon)  # until resizeGL reads the real rect
+            self.setGeometry(scr.geometry())
 
     def paintGL(self) -> None:
         live2d.clearBuffer()
@@ -106,6 +133,7 @@ class MonitorWindow(QOpenGLWidget):
         cx, cy = win32.cursor_pos()
         if self.primary:
             st.tick((cx, cy))
+            self._follow()
             for w in self.peers:
                 if w is not self:
                     w.wake()
