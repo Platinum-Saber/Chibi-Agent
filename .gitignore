@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+spikes/**/out/
+spikes/**/samples/
+spikes/**/recordings/
+*.gguf
+*.onnx
+*.safetensors
+assets/rigs/
+
+# spike 1 (overlay)
+spikes/overlay/.venv311/
+spikes/overlay/assets/

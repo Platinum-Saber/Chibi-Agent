@@ -1,5 +1,15 @@
 # Deviation from Saber-Theme
 
+> **Superseded in part (2026-10-16).** The project is now Python, and the
+> character is Raphael (see `docs/scope.md`, `docs/character.md`,
+> `docs/architecture.md`). The Kotlin/Compose direction, the Saber look,
+> the "Suggested shape" and the "First spikes" below no longer apply.
+>
+> Still useful here:
+> - the mascot behaviour logic to port (`MascotBrain`, `MascotPhysics`, the mood list, the pokes/sleep/throw rules);
+> - the Briefing design;
+> - the target machine specs.
+
 Chibi-Agent is the desktop version of the chibi Saber mascot from the
 Android launcher **Saber-Theme**. That project is the reference for how she looks, moves
 and behaves. This file lists what carries over, what changes on the desktop

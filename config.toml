@@ -1,0 +1,31 @@
+# Chibi-Agent defaults. Override any key in %APPDATA%\ChibiAgent\config.toml.
+
+[processes]
+overlay = true
+voice = true
+
+[ollama]
+url = "http://127.0.0.1:11434"
+exe = '%LOCALAPPDATA%\Programs\Ollama\ollama.exe'
+models_dir = 'F:\ChibiAgent\ollama'   # set for the child process only
+start_if_down = true
+model = "qwen3.5:4b"
+embed_model = "nomic-embed-text"
+num_ctx = 8192
+keep_alive = "120s"
+
+[voice]
+hf_home = 'F:\ChibiAgent\hf'
+reference = 'F:\ChibiAgent\voice\ref_06_vox.wav'
+reference_text = 'F:\ChibiAgent\voice\ref_06.txt'
+speed = 0.90
+nfe = 8
+stt_model = "small.en"
+
+[hotkeys]
+push_to_talk = "alt+1"
+look_at_screen = "ctrl+alt+s"
+
+[overlay]
+chibi_rig = 'F:\ChibiAgent\rigs\chibi\model3.json'
+serious_rig = 'F:\ChibiAgent\rigs\serious\model3.json'
