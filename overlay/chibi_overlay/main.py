@@ -1,9 +1,10 @@
-"""Overlay entry point: Qt app, the Live2D window on the primary monitor, agent link."""
+"""Overlay entry point: Qt app, one Live2D window per monitor, the stage, the agent link."""
 from __future__ import annotations
 
 import logging
 import signal
 import sys
+from pathlib import Path
 
 import live2d
 from PySide6.QtCore import QTimer
@@ -12,8 +13,12 @@ from PySide6.QtWidgets import QApplication
 
 from chibi_shared import config, paths
 
+from .body import motion
 from .link import QtLink
-from .window import Overlay
+from .stage import Stage
+from .window import MonitorWindow
+
+PKG = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
@@ -28,17 +33,26 @@ def main() -> None:
 
     live2d.init()
     app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(True)
+    rigs = {"chibi": motion.load(PKG / cfg["chibi_map"]), "serious": motion.load(PKG / cfg["serious_map"])}
+    models = {"chibi": cfg["chibi_rig"], "serious": cfg["serious_rig"]}
+    primary = QGuiApplication.primaryScreen()
+
     link = QtLink()
-    win = Overlay(QGuiApplication.primaryScreen(), cfg["chibi_rig"], cfg.get("height_dip", 360), link)
-    link.received.connect(win.on_message)
+    stage = Stage(rigs, primary.devicePixelRatio(), link, own_windows=set())
+    windows: list[MonitorWindow] = []
+    for scr in QGuiApplication.screens():
+        windows.append(MonitorWindow(scr, stage, models, scr is primary, windows))
+    link.received.connect(stage.on_message)
+    stage._quit_cb = app.quit
     link.start()
-    win.show()
+    for w in windows:
+        w.show()
 
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     tick = QTimer()
     tick.timeout.connect(lambda: None)  # lets Python see Ctrl+C
     tick.start(200)
     app.exec()
+    stage.media.stop()
     link.stop()
     live2d.dispose()

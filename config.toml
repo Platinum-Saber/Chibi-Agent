@@ -27,6 +27,8 @@ push_to_talk = "alt+1"
 look_at_screen = "ctrl+alt+s"
 
 [overlay]
-chibi_rig = 'F:\ChibiAgent\rigs\chibi\Haru.model3.json'    # placeholder: Live2D sample until her rig exists
-height_dip = 360
-serious_rig = 'F:\ChibiAgent\rigs\serious\model3.json'
+# Placeholders (Live2D samples) until her real rigs exist. *_map paths are relative to overlay/.
+chibi_rig = 'F:\ChibiAgent\rigs\chibi\Haru.model3.json'
+chibi_map = 'rigs/haru.toml'
+serious_rig = 'F:\ChibiAgent\rigs\serious\Mao.model3.json'
+serious_map = 'rigs/mao.toml'

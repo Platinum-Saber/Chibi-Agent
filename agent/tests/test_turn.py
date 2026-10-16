@@ -101,3 +101,14 @@ async def test_history_is_bounded():
         o.start_turn(f"q{i}")
         await o.turn
     assert len(o.history) == 24
+
+
+async def test_form_command_skips_the_llm():
+    hub, llm = FakeHub(), FakeLLM(["should not be called"])
+    o = Orchestrator(hub, llm)
+    o.start_turn("Raphael, serious mode please")
+    await asyncio.sleep(0.05)
+    forms = [m for r, m in hub.sent if isinstance(m, p.FormReq)]
+    assert forms and forms[0].form == "serious" and forms[0].sticky
+    assert llm.seen is None
+    assert any(isinstance(m, p.Speak) and m.clip == "Understood." for r, m in hub.sent)

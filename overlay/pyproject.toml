@@ -9,6 +9,10 @@ dependencies = [
     "live2d-py==1.0.0",
     "PyOpenGL>=3.1",
     "numpy>=2",
+    "winrt-windows-media-control>=3.2.1",
+    "winrt-windows-foundation>=3.2.1",
+    "winrt-windows-foundation-collections>=3.2.1",
+    "winrt-runtime>=3.2.1",
 ]
 
 [tool.uv.sources]

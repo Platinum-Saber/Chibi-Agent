@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 import uuid
 
-from chibi_shared.protocol import (Bubble, Message, MoodReq, Ptt, Role, Speak, SpeakState, Stop,
+from chibi_shared.protocol import (Bubble, FormReq, Message, MoodReq, Ptt, Role, Speak, SpeakState, Stop,
                                    TextInput, Transcript)
 
 from .llm import Ollama, SentenceSplitter
@@ -22,6 +23,7 @@ from .server import Hub
 
 log = logging.getLogger(__name__)
 HISTORY_TURNS = 12
+FORM_COMMAND = re.compile(r"\b(serious|chibi)\s+(?:mode|form)\b", re.I)
 
 
 class Orchestrator:
@@ -77,9 +79,18 @@ class Orchestrator:
         if not text:
             asyncio.create_task(self.hub.send("overlay", MoodReq(mood="idle")))
             return
+        m = FORM_COMMAND.search(text)
+        if m:  # "serious mode" / "chibi mode": no LLM round trip needed
+            asyncio.create_task(self._switch_form(m.group(1).lower()))
+            return
         if self.turn and not self.turn.done():
             self.turn.cancel()
         self.turn = asyncio.create_task(self._run_turn(text))
+
+    async def _switch_form(self, form: str) -> None:
+        await self.hub.send("overlay", FormReq(form=form, sticky=True))
+        await self.hub.send("overlay", Bubble(text="Understood.", done=True))
+        await self._say("Understood.", first=True)
 
     # --- the turn -------------------------------------------------------------
     async def _say(self, sentence: str, first: bool) -> None:
