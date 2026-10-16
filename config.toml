@@ -17,7 +17,7 @@ keep_alive = "120s"
 
 [voice]
 hf_home = 'F:\ChibiAgent\hf'
-reference = 'F:\ChibiAgent\voice\ref_06_vox.wav'
+reference = 'F:\ChibiAgent\voice\ref_06_clean.wav'   # variant B: noise-reduced + EQ (spikes/voice/tune_voice.py)
 reference_text = 'F:\ChibiAgent\voice\ref_06.txt'
 speed = 0.90
 nfe = 8

@@ -5,6 +5,7 @@ import contextlib
 import gc
 import io
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -13,6 +14,18 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 MODEL = "F5TTS_v1_Base"
+
+
+_CALM = [(re.compile(r"[!?]*!+[!?]*"), lambda m: "?" if "?" in m.group() else "."),
+         (re.compile(r"\.{2,}|…"), lambda m: "."), (re.compile(r"\s+"), lambda m: " ")]
+
+
+def calm(text: str) -> str:
+    """Raphael speaks evenly: F5 reads '!' as excitement (pitch jumps, a smeared ending
+    in the voice audition), so exclamations become full stops before synthesis."""
+    for pat, rep in _CALM:
+        text = pat.sub(rep, text)
+    return text.strip()
 
 
 class TtsUnloaded(RuntimeError):
@@ -69,6 +82,7 @@ class Tts:
         model = self.model
         if model is None:
             raise TtsUnloaded("tts is unloaded")
+        text = calm(text)
         # F5 print()s the reference and the text on every call; keep that out of the log.
         # (Logging holds its own stream, so log lines from other threads still get through.)
         with contextlib.redirect_stdout(io.StringIO()):
