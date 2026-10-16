@@ -64,7 +64,7 @@ def system_info(what: str = "all") -> Result:
     return Result("; ".join(out) or "Nothing to report.")
 
 
-@tool("focused_window", "Which application and window Master is using right now.")
+@tool("focused_window", "Which application and window the user is using right now.")
 def focused_window() -> Result:
     title, exe = _fg_title()
     return Result(f"{exe}: {title}" if title else exe, untrusted=True)

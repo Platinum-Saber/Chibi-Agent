@@ -1,7 +1,7 @@
 # Chibi-Agent v1 scope
 
-Raphael (*That Time I Got Reincarnated as a Slime*), the evolved form of
-Great Sage, lives on the Windows desktop as a local agent. She talks, remembers,
+Raphael, an agentic desktop companion (look and voice inspired by Raphael from
+*That Time I Got Reincarnated as a Slime*), lives on the Windows desktop as a local agent. She talks, remembers,
 acts on the PC (with your yes), briefs you and looks at your screen when you
 ask her to. She has two forms: a **chibi** form for idle time and chat, and a
 **serious** form for real work, urgent alerts and when you ask for it.
@@ -14,7 +14,7 @@ on an RTX 3060. Numbers marked *(spike N)* still need measuring here.
 ## 1. Companion
 - **Talk:** hold a global hotkey from any window (a game included), speak, then let go. faster-whisper turns it into text on this machine. Typing in her bubble also works.
 - **Reply:** each reply streams sentence by sentence into her voice and her text bubble. Her lips move with the audio.
-- **Persona:** she's precise and calm, calls you "Master", and opens with fixed markers: "Notice.", "Answer.", "Confirmed.", "Warning.". She never says "as an AI". The full persona is in `character.md`.
+- **Persona:** she's precise and calm, calls you "Kryo" (or "Sir" when it's serious or urgent), and opens with fixed markers: "Notice.", "Answer.", "Confirmed.", "Warning.". She never says "as an AI". The full persona is in `character.md`.
 - **Memory:** a local SQLite store keeps what she learns about you (facts, preferences, people, ongoing projects) and a summary of each conversation. She recalls the most relevant items by embedding similarity on each turn. You can say "forget that" or view and delete entries from the tray menu.
 - **Chats:** they persist across restarts, stored in `%APPDATA%`, never in the repo.
 

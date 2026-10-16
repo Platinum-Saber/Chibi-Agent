@@ -4,7 +4,7 @@ from pathlib import Path
 
 APP = "ChibiAgent"
 
-# Roaming: things Master would miss (memory, chats, reminders, audit log, config).
+# Roaming: things the user would miss (memory, chats, reminders, audit log, config).
 DATA = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")) / APP
 # Local: caches and runtime state (run.json, clip cache, logs).
 LOCAL = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / APP

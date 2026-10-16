@@ -56,16 +56,16 @@ class FakeLLM:
 
 
 async def test_turn_plays_opener_clip_then_synthesises():
-    hub, llm = FakeHub(), FakeLLM(["Answer.", " Tokyo is the", " capital, Master."])
+    hub, llm = FakeHub(), FakeLLM(["Answer.", " Tokyo is the", " capital, Kryo."])
     o = Orchestrator(hub, llm)
     o.start_turn("capital of Japan?")
     await o.turn
     speaks = [m for r, m in hub.sent if isinstance(m, p.Speak)]
     assert [(s.text, s.clip) for s in speaks] == [
-        ("Answer.", "Answer."), ("Tokyo is the capital, Master.", None)]
+        ("Answer.", "Answer."), ("Tokyo is the capital, Kryo.", None)]
     bubbles = [m for r, m in hub.sent if isinstance(m, p.Bubble)]
-    assert bubbles[-1].done and bubbles[-1].text == "Answer. Tokyo is the capital, Master."
-    assert o.history[-1] == {"role": "assistant", "content": "Answer. Tokyo is the capital, Master."}
+    assert bubbles[-1].done and bubbles[-1].text == "Answer. Tokyo is the capital, Kryo."
+    assert o.history[-1] == {"role": "assistant", "content": "Answer. Tokyo is the capital, Kryo."}
 
 
 async def test_marker_mid_reply_is_not_a_clip():

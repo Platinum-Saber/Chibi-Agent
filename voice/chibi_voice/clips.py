@@ -1,4 +1,4 @@
-"""Pre-rendered fixed lines ("Answer.", "Understood, Master.", ...) in the clip cache.
+"""Pre-rendered fixed lines ("Answer.", "Understood, Sir.", ...) in the clip cache.
 
 A clip is `<slug>-<hash>.wav` in %LOCALAPPDATA%\\ChibiAgent\\clips. The hash covers the
 voice (reference audio + transcript + F5 settings) and the text, so changing her
@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 LINES = [
     "Answer.", "Notice.", "Understood.", "Confirmed.", "Warning.", "Report.",
-    "End of report.", "Understood, Master.", "Good morning, Master.", "Yes, Master.",
+    "End of report.", "Understood, Sir.", "Good morning, Kryo.", "Yes, Sir.",
 ]
 
 

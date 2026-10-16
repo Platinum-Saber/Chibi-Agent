@@ -96,7 +96,7 @@ def open_path(path: str) -> Result:
     p = _allowed(Path(path))
     if not p.exists():
         return Result(f"{p} does not exist.")
-    os.startfile(p)  # noqa: S606 (confirmed by Master)
+    os.startfile(p)  # noqa: S606 (confirmed by the user)
     return Result(f"Opened {p}.")
 
 

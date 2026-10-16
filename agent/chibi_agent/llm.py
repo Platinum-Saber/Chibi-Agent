@@ -56,7 +56,7 @@ class Ollama:
                                                         "prompt_eval_count") if k in msg})
 
     async def warm(self) -> None:
-        """Load the model now, so Master's first question doesn't pay the cold load."""
+        """Load the model now, so the first question doesn't pay the cold load."""
         try:
             await self._client.post(f"{self.url}/api/generate", json={
                 "model": self.model, "keep_alive": self.keep_alive, "options": {"num_ctx": self.num_ctx}})

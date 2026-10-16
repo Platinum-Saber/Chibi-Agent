@@ -6,7 +6,7 @@ from chibi_voice.clips import LINES, ClipCache, clip_hash, slug, voice_id
 
 def test_slug():
     assert slug("Answer.") == "answer"
-    assert slug("Understood, Master.") == "understood-master"
+    assert slug("Understood, Sir.") == "understood-sir"
     assert slug("End of report.") == "end-of-report"
     assert len({slug(t) for t in LINES}) == len(LINES)
 
@@ -48,7 +48,7 @@ def test_ensure_renders_missing_then_lookup(tmp_path):
     assert sr == 24000 and len(data) == 240
     # Matched by slug, so case and punctuation don't matter; unknown lines miss.
     assert cache.lookup("answer") == p
-    assert cache.lookup("Understood, Master.") != cache.lookup("Understood.")
+    assert cache.lookup("Understood, Sir.") != cache.lookup("Understood.")
     assert cache.lookup("Hello there.") is None
     # Second start: nothing to render.
     calls.clear()
@@ -65,5 +65,5 @@ def test_voice_change_rerenders_and_drops_stale(tmp_path):
     assert calls == LINES
     new = {p.name for p in tmp_path.glob("*.wav")}
     assert len(new) == len(LINES) and not (old & new)
-    # "Understood." must not delete "Understood, Master." (shared slug prefix).
-    assert cache.lookup("Understood, Master.") is not None
+    # "Understood." must not delete "Understood, Sir." (shared slug prefix).
+    assert cache.lookup("Understood, Sir.") is not None

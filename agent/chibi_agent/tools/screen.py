@@ -1,4 +1,4 @@
-"""One screenshot of the monitor Master is working on, for the multimodal model.
+"""One screenshot of the monitor the user is working on, for the multimodal model.
 
 Never written to disk: the PNG goes straight into the next model turn and is
 dropped afterwards. Downscaled to 1280 px so it fits the fixed 8k context
@@ -34,7 +34,7 @@ def capture_b64(max_side: int = 1280) -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 
-@tool("look_at_screen", "Take a screenshot of the screen Master is using, to answer a question about it.",
+@tool("look_at_screen", "Take a screenshot of the screen the user is using, to answer a question about it.",
       {"question": ("What to look for", True)})
 def look_at_screen(question: str) -> Result:
     return Result(f"Screenshot attached for: {question}", untrusted=True, image_b64=capture_b64())

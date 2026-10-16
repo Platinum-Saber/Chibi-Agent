@@ -1,10 +1,11 @@
 # Chibi-Agent
 
-Raphael (Tensura, the evolved Great Sage) lives on the Windows desktop as a
-local agent: voice in and out, memory, desktop tools with confirmation,
+Raphael, an agentic desktop companion (look and voice inspired by Tensura's
+Raphael, not the Great Sage lore), lives on the Windows desktop as a local agent
+for Kryo (the user's nickname; "Sir" when serious): voice in and out, memory, desktop tools with confirmation,
 calendar/mail briefings and on-demand screen reading. She has two Live2D forms:
 chibi (idle/chat) and serious (work, alerts, on command). Python, all local.
-Nothing is built yet: docs and spikes come first. Budget: keep this file under ~500 tokens.
+Budget: keep this file under ~500 tokens.
 
 ## Read first
 - `docs/scope.md`: what v1 does and doesn't do, models, VRAM and latency budgets.

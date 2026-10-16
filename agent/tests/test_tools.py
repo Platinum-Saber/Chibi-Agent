@@ -131,7 +131,7 @@ class ToolLLM:
         if len(self.calls) == 1:
             yield Chunk(tool_calls=[{"function": {"name": self.tool, "arguments": self.args}}])
         else:
-            yield Chunk(text="Answer. It is noon, Master.")
+            yield Chunk(text="Answer. It is noon, Kryo.")
         yield Chunk(done=True)
 
 
@@ -177,7 +177,7 @@ async def test_claimed_action_without_tool_gets_one_nudge(tmp_path):
         async def chat(self, messages, tools=None, think=False):
             self.calls.append(list(messages))
             if len(self.calls) == 1:
-                yield Chunk(text="Answer. Music paused, Master.")
+                yield Chunk(text="Answer. Music paused, Kryo.")
             elif len(self.calls) == 2:
                 yield Chunk(tool_calls=[{"function": {"name": "get_time", "arguments": {}}}])
             else:
