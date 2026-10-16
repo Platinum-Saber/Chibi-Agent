@@ -57,11 +57,25 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
         await hub.stop()
 
 
+def single_instance() -> object | None:
+    """A named mutex: a second agent would fight the first for the mic, the speakers and
+    the hotkey (it happened during M3 testing). Returns the handle to keep, or None."""
+    import ctypes
+    k32 = ctypes.windll.kernel32
+    handle = k32.CreateMutexW(None, False, r"Local\ChibiAgent.agent")
+    if k32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        return None
+    return handle
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="chibi_agent")
     ap.add_argument("--without", action="append", choices=["overlay", "voice"], default=[],
                     help="don't start this child process (e.g. to drive it from a test client)")
     args = ap.parse_args()
+    lock = single_instance()
+    if lock is None:
+        raise SystemExit("Raphael is already running (another Chibi-Agent holds the lock).")
     paths.ensure()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s",

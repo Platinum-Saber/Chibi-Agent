@@ -32,6 +32,7 @@ NEAR_RADIUS = 220.0    # px at 96 dpi from her chest: the cursor counts as "near
 SERIOUS_HOLD_S = 10.0  # stay serious this long after the work ends
 TRANSFORM_S = 0.6
 BUBBLE_HOLD_S = 6.0
+BUBBLE_AFTER_SPEECH_S = 3.0
 CONFIRM_TIMEOUT_S = 60.0
 
 
@@ -246,6 +247,10 @@ class Stage:
         if isinstance(msg, Lip):
             self.lip_target = max(0.0, min(1.0, msg.rms))
             self.brain.talk(now, 1500)
+            # The voice sends lip levels at 60 Hz while audio plays: keep her words up until
+            # she has finished speaking them, not just until the text finished streaming.
+            if self.ov.bubble:
+                self.ov.bubble_until = max(self.ov.bubble_until, now_s + BUBBLE_AFTER_SPEECH_S)
         elif isinstance(msg, Bubble):
             self.ov.bubble = msg.text
             self.ov.bubble_until = now_s + (BUBBLE_HOLD_S if msg.done else 3600)
