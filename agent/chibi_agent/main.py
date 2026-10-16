@@ -8,6 +8,9 @@ import signal
 from chibi_shared import config, paths
 from chibi_shared.protocol import Quit
 
+from .hotkey import HoldHotkey
+from .llm import Ollama
+from .orchestrator import Orchestrator
 from .server import Hub
 from .supervisor import Supervisor
 
@@ -21,6 +24,12 @@ async def run(stop: asyncio.Event | None = None) -> None:
     await hub.start()
     sup = Supervisor(cfg)
     await sup.start()
+    llm = Ollama(cfg["ollama"])
+    asyncio.create_task(llm.warm())
+    orch = Orchestrator(hub, llm)
+    hotkey = HoldHotkey(cfg["hotkeys"]["push_to_talk"], asyncio.get_running_loop(),
+                        orch.ptt_down, orch.ptt_up)
+    hotkey.start()
     stop = stop or asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -32,6 +41,8 @@ async def run(stop: asyncio.Event | None = None) -> None:
         await stop.wait()
     finally:
         log.info("shutting down")
+        hotkey.stop()
+        await llm.close()
         for role in ("overlay", "voice"):
             await hub.send(role, Quit())
         await sup.stop()

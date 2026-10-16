@@ -27,5 +27,6 @@ push_to_talk = "alt+1"
 look_at_screen = "ctrl+alt+s"
 
 [overlay]
-chibi_rig = 'F:\ChibiAgent\rigs\chibi\model3.json'
+chibi_rig = 'F:\ChibiAgent\rigs\chibi\Haru.model3.json'    # placeholder: Live2D sample until her rig exists
+height_dip = 360
 serious_rig = 'F:\ChibiAgent\rigs\serious\model3.json'
