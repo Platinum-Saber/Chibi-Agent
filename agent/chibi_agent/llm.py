@@ -30,12 +30,15 @@ class Ollama:
         self.model = cfg["model"]
         self.num_ctx = cfg.get("num_ctx", 8192)
         self.keep_alive = cfg.get("keep_alive", "120s")
+        self.options = {"num_ctx": self.num_ctx}
+        if "temperature" in cfg:
+            self.options["temperature"] = cfg["temperature"]
         self._client = httpx.AsyncClient(timeout=httpx.Timeout(300, connect=5))
 
     async def chat(self, messages: list[dict], tools: list[dict] | None = None,
                    think: bool = False) -> AsyncIterator[Chunk]:
         body = {"model": self.model, "messages": messages, "stream": True, "think": think,
-                "keep_alive": self.keep_alive, "options": {"num_ctx": self.num_ctx}}
+                "keep_alive": self.keep_alive, "options": self.options}
         if tools:
             body["tools"] = tools
         async with self._client.stream("POST", f"{self.url}/api/chat", json=body) as r:

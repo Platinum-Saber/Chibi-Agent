@@ -18,7 +18,8 @@ def system_prompt(tools: list[tuple[str, str]] | None = None) -> str:
     if not tools:
         return _BASE + "\nYou have no tools yet: you can talk, but not act on the PC."
     listed = "\n".join(f"- {n}: {d}" for n, d in tools)
-    return (_BASE + "\n\nYou can act on the PC with these tools. Use a tool whenever the request needs it; "
-            "answer directly when it does not.\n" + listed +
-            "\nActions that change something are confirmed by Master before they run, so call the tool "
-            "directly; do not ask first.")
+    return (_BASE + "\n\nYou can act on the PC with these tools:\n" + listed +
+            "\nWhen a request needs a tool, call the tool immediately, before writing any words; speak only "
+            "after you have its result. Words alone change nothing on the PC: never say an action is done unless a tool result says so. "
+            "Actions that change something are confirmed by Master before they run, so call the tool "
+            "directly; do not ask first. Answer directly only when no tool is needed.")

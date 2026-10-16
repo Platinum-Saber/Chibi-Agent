@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 import live2d
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QCoreApplication, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QSurfaceFormat
 from PySide6.QtWidgets import QApplication
 
@@ -31,6 +31,9 @@ def main() -> None:
     fmt.setAlphaBufferSize(8)
     QSurfaceFormat.setDefaultFormat(fmt)
 
+    # One GL share group for all monitor windows: each live2d model's textures stay valid
+    # whichever window's context draws (without it, monitor 2 drew white quads).
+    QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     live2d.init()
     app = QApplication(sys.argv)
     rigs = {"chibi": motion.load(PKG / cfg["chibi_map"]), "serious": motion.load(PKG / cfg["serious_map"])}
@@ -40,8 +43,8 @@ def main() -> None:
     link = QtLink()
     stage = Stage(rigs, primary.devicePixelRatio(), link, own_windows=set())
     windows: list[MonitorWindow] = []
-    for scr in QGuiApplication.screens():
-        windows.append(MonitorWindow(scr, stage, models, scr is primary, windows))
+    # v1: primary monitor only (see env.Ground); MonitorWindow already handles several.
+    windows.append(MonitorWindow(primary, stage, models, True, windows))
     link.received.connect(stage.on_message)
     stage._quit_cb = app.quit
     link.start()

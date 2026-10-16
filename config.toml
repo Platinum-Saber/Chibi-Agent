@@ -12,6 +12,7 @@ start_if_down = true
 model = "qwen3.5:4b"
 embed_model = "nomic-embed-text"
 num_ctx = 8192
+temperature = 0.4        # qwen3.5 defaults to 1.0, which made tool choice erratic
 keep_alive = "120s"
 
 [voice]
@@ -32,3 +33,7 @@ chibi_rig = 'F:\ChibiAgent\rigs\chibi\Haru.model3.json'
 chibi_map = 'rigs/haru.toml'
 serious_rig = 'F:\ChibiAgent\rigs\serious\Mao.model3.json'
 serious_map = 'rigs/mao.toml'
+
+[tools]
+# Folders file tools may read and change (no deleting in v1).
+allowed_roots = ['~']

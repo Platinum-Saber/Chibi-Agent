@@ -50,8 +50,13 @@ class AgentLink:
                 log.info("connected to agent as %s", self.role)
                 async for raw in self._ws:
                     yield decode(raw)
-            except (OSError, ConnectionError, asyncio.TimeoutError, FileNotFoundError,
-                    websockets.ConnectionClosed) as e:
+            except websockets.ConnectionClosed as e:
+                if e.rcvd and e.rcvd.reason == "replaced":
+                    log.warning("another %s process took over the link; stopping", self.role)
+                    self._closed = True
+                    return
+                log.debug("agent link down (%s); retry in %.1fs", e, delay)
+            except (OSError, ConnectionError, asyncio.TimeoutError, FileNotFoundError) as e:
                 log.debug("agent link down (%s); retry in %.1fs", e, delay)
             self._ws = None
             if not self._closed:

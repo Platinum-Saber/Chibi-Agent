@@ -20,6 +20,7 @@ from chibi_shared import paths
 
 log = logging.getLogger(__name__)
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+BREAKAWAY = getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)  # Ollama is shared: it may outlive us
 
 
 @dataclass
@@ -30,6 +31,24 @@ class Child:
     cwd: Path | None = None
     proc: asyncio.subprocess.Process | None = None
     stopping: bool = False
+
+
+class KillOnExitJob:
+    """Puts the agent itself in a Windows job object. Every child it starts lands
+    in the job too, so when the agent dies (even by TerminateProcess) Windows
+    kills them all; in M3 an overlay outlived its agent. Adding children one by
+    one doesn't work: the venv python.exe is a launcher that has already spawned
+    the real interpreter by then."""
+
+    def __init__(self):
+        import win32api
+        import win32job
+        self._job = win32job.CreateJobObject(None, "")
+        info = win32job.QueryInformationJobObject(self._job, win32job.JobObjectExtendedLimitInformation)
+        info["BasicLimitInformation"]["LimitFlags"] |= (win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                                                        | win32job.JOB_OBJECT_LIMIT_BREAKAWAY_OK)
+        win32job.SetInformationJobObject(self._job, win32job.JobObjectExtendedLimitInformation, info)
+        win32job.AssignProcessToJobObject(self._job, win32api.GetCurrentProcess())
 
 
 def venv_python(package_dir: Path) -> Path:
@@ -49,6 +68,11 @@ class Supervisor:
         self.cfg = cfg
         self.children: list[Child] = []
         self._tasks: list[asyncio.Task] = []
+        try:
+            self.job: KillOnExitJob | None = KillOnExitJob()
+        except Exception as e:  # pragma: no cover
+            log.warning("no job object (%s): children may outlive a crashed agent", e)
+            self.job = None
 
     def plan(self) -> list[Child]:
         out = []
@@ -82,7 +106,7 @@ class Supervisor:
         logf = open(paths.LOGS / f"{child.name}.log", "ab")
         child.proc = await asyncio.create_subprocess_exec(
             *child.argv, cwd=child.cwd, env=env, stdout=logf, stderr=subprocess.STDOUT,
-            creationflags=NO_WINDOW)
+            creationflags=NO_WINDOW | (BREAKAWAY if child.name == "ollama" else 0))
         log.info("started %s (pid %d)", child.name, child.proc.pid)
 
     async def _keep_alive(self, child: Child) -> None:

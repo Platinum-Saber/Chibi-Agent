@@ -269,6 +269,9 @@ class Stage:
         elif isinstance(msg, Confirm):
             self.ov.confirm = msg
             self.ov.confirm_until = now_s + CONFIRM_TIMEOUT_S
+        elif isinstance(msg, ConfirmResult):  # answered elsewhere (voice/timeout): drop the panel
+            if self.ov.confirm and self.ov.confirm.call_id == msg.call_id:
+                self.ov.confirm = None
         elif isinstance(msg, Visibility):
             self.hidden = msg.hidden
         elif isinstance(msg, Quit) and self._quit_cb:

@@ -73,9 +73,11 @@ class Ground:
     """floor_y(x) for the physics: the work-area bottom (taskbar top) of the
     monitor under x, or the focused window's top edge when she's above it."""
 
-    def __init__(self, own: set[int]):
+    def __init__(self, own: set[int], primary_only: bool = True):
         self.own = own
-        self.mons = monitors()
+        # v1 draws her on the primary monitor only: a second GL window drew the
+        # rigs untextured (separate contexts), so the walls are the primary's edges.
+        self.mons = [m for m in monitors() if m[2] or not primary_only]
         self.window: Rect | None = None
         self.feet_y = 0.0  # set by the stage each frame (where her feet are now)
 
