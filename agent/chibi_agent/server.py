@@ -31,10 +31,15 @@ class Hub:
         self.clients: dict[Role, websockets.ServerConnection] = {}
         self.connected: dict[Role, asyncio.Event] = {"overlay": asyncio.Event(), "voice": asyncio.Event()}
         self._handlers: list[Handler] = []
+        self._on_connect: list = []
         self._server = None
 
     def on_message(self, handler: Handler) -> None:
         self._handlers.append(handler)
+
+    def on_connect(self, cb) -> None:
+        """`async cb(role)` after a client completes the handshake."""
+        self._on_connect.append(cb)
 
     async def start(self) -> None:
         self._server = await websockets.serve(self._serve, "127.0.0.1", 0, max_size=8 * 2**20)
@@ -78,6 +83,8 @@ class Hub:
         self.connected[role].set()
         await ws.send(encode(Welcome()))
         log.info("%s connected", role)
+        for cb in self._on_connect:
+            asyncio.create_task(cb(role))
         try:
             async for raw in ws:
                 try:

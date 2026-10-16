@@ -140,3 +140,45 @@ class MediaWatcher:
                 await asyncio.sleep(2)
 
         asyncio.run(poll())
+
+
+kernel32 = ctypes.windll.kernel32
+
+
+def _exe_name(hwnd: int) -> str:
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    h = kernel32.OpenProcess(0x1000, False, pid.value)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return ""
+    try:
+        buf = ctypes.create_unicode_buffer(520)
+        size = wintypes.DWORD(520)
+        if kernel32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(size)):
+            return buf.value.rsplit("\\", 1)[-1]
+        return ""
+    finally:
+        kernel32.CloseHandle(h)
+
+
+def fullscreen_app(own: set[int]) -> str | None:
+    """The exe of a fullscreen app in front (a game, a video, a presentation), else None.
+
+    Fullscreen = the focused top-level window covers its whole monitor, taskbar
+    included. The desktop and shell windows also cover the monitor, so they don't count.
+    """
+    hwnd = user32.GetForegroundWindow()
+    if not hwnd or hwnd in own:
+        return None
+    buf = ctypes.create_unicode_buffer(64)
+    user32.GetClassNameW(hwnd, buf, 64)
+    if buf.value in _SKIP_CLASSES:
+        return None
+    rc = wintypes.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(rc))
+    mi = _MONITORINFO(cbSize=ctypes.sizeof(_MONITORINFO))
+    user32.GetMonitorInfoW(user32.MonitorFromWindow(hwnd, 2), ctypes.byref(mi))
+    m = mi.rcMonitor
+    if rc.left <= m.left and rc.top <= m.top and rc.right >= m.right and rc.bottom >= m.bottom:
+        return _exe_name(hwnd) or "?"
+    return None

@@ -14,6 +14,8 @@ SAMPLES = [
     p.MoodAck(req_id="r", accepted=False), p.ConfirmResult(call_id="c1", ok=True),
     p.Touch(t="poke", x=1, y=2), p.Touch(t="drop", x=1, y=2, speed=900),
     p.TextInput(text="hi"), p.FileDrop(paths=["C:/a.txt"]), p.Fullscreen(active=True, exe="game.exe"),
+    p.Command(name="memory_delete", arg="3"), p.State(muted=True, gaming=False, autostart=True),
+    p.MemoryItems(items=[(1, "Kryo likes tea.")]),
     p.Ptt(down=True), p.Transcript(text="hello", ms=180), p.Speak(utt_id="u", text="Hi.", clip="answer"),
     p.SpeakState(utt_id="u", state="end"), p.Stop(), p.Load(t="unload", what="tts"), p.Lip(rms=0.3),
 ]

@@ -10,6 +10,7 @@ from chibi_shared import config, paths
 from chibi_shared.protocol import Quit
 
 from . import tools
+from .control import Controller
 from .hotkey import HoldHotkey
 from .tools import files
 from .tools.runner import Gate, Runner
@@ -18,6 +19,7 @@ from .memory import Memory
 from .memory.store import Store
 from .orchestrator import Orchestrator
 from .schedulers import Reminders
+from .vram import VramManager
 from .server import Hub
 from .supervisor import Supervisor
 
@@ -39,15 +41,17 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
     files.configure(cfg.get("tools", {}))
     store = Store(paths.DATA / "memory.db")
     memory = Memory(cfg["ollama"], store, llm=llm)
-    orch = Orchestrator(hub, llm, Runner(Gate(hub)), memory)
+    vram = VramManager(hub, llm)
+    orch = Orchestrator(hub, llm, Runner(Gate(hub)), memory, vram)
     reminders = Reminders(store, orch.announce)
     tools.CTX.memory, tools.CTX.reminders = memory, reminders
     reminders.start()
     miner = asyncio.create_task(_mine_memories(memory))
+    stop = stop or asyncio.Event()
+    Controller(hub, orch, vram, memory, stop.set)
     hotkey = HoldHotkey(cfg["hotkeys"]["push_to_talk"], asyncio.get_running_loop(),
                         orch.ptt_down, orch.ptt_up)
     hotkey.start()
-    stop = stop or asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:

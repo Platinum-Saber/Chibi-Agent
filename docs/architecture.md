@@ -203,7 +203,7 @@ sequenceDiagram
 | active | loaded | loaded | a turn in the last 120 s |
 | idle | unloaded (keep-alive expiry) | loaded (~1 GB) | 120 s without a turn |
 | gaming | unloaded (`keep_alive: 0`) | unloaded; STT on CPU | a fullscreen app in front, or a manual toggle |
-| battery saver | loaded on demand | TTS on CPU (Kokoro) | on battery + under 30 % |
+| battery saver (not built in v1) | loaded on demand | TTS on CPU (Kokoro) | on battery + under 30 % |
 
 - **Before loading the LLM:** check free VRAM with NVML (`pynvml`). If less than 4.2 GB is free, she says so ("Insufficient memory, Master. Close …") instead of spilling into RAM.
 

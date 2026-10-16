@@ -167,3 +167,22 @@ Left open (only if the budget gets tight): the Graphics "Power saving" setting (
   - your voice pick;
   - NFE 4–6 quality by ear;
   - Whisper on real mic recordings.
+
+## M6: perf pass and gaming mode (2026-10-17)
+
+Measured on this laptop with the real app (agent + overlay + voice + Ollama), idle after loading, 30 s sample.
+
+| Process | CPU (whole machine) | RAM |
+|---|---|---|
+| overlay (60 fps Live2D) | 1.44 % | 264 MB |
+| voice (F5 + Whisper loaded) | 0.24 % | 1.28 GB |
+| agent | ~0 % | 56 MB |
+| Ollama + llama-server | ~0.2 % | ~1.1 GB |
+
+- **VRAM, everything loaded:** 6,238–6,406 MB in use, against a 1,430 MB desktop baseline: about 4.9 GB for overlay + qwen3.5:4b + nomic + F5 + Whisper. Spike 3 peaked at 7,081 MB with a busier baseline. Within the ≤ 7.6 GB criterion.
+- **Gaming mode** (a fullscreen app in front, or the tray toggle):
+  - Entering it frees VRAM to 2,005 MB within **0.3 s**, and to 1,235 MB once the overlay hides (≤ 5 s criterion ✅).
+  - A question while gaming: VRAM is checked (needs 4.8 GB free), F5 and the LLM reload, and the answer comes in **~16 s** because both loads are cold. Afterwards VRAM drops back to 1,235 MB.
+  - Leaving it reloads everything (6,227 MB within 25 s).
+- **First audio** (from M1/M3 runs on Kryo's machine): 1.1–1.6 s after releasing push-to-talk with a warm model; 5.1 s for a turn that waited on a confirm.
+- **Not done:** the battery-saver state (30 fps cap, Kokoro on CPU) from `architecture.md`. She runs the same on battery.

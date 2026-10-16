@@ -12,7 +12,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
-VERSION = 1
+VERSION = 2  # 2: tray commands, state, memory items (M6)
 
 Role = Literal["overlay", "voice"]
 Form = Literal["chibi", "serious"]
@@ -131,6 +131,33 @@ class Fullscreen(Msg):
     exe: str = ""
 
 
+CommandName = Literal[
+    "toggle_visible", "mute", "unmute", "gaming_on", "gaming_off", "memory_list", "memory_delete",
+    "open_settings", "autostart_on", "autostart_off", "quit",
+]
+
+
+class Command(Msg):
+    """A tray-menu action (overlay -> agent)."""
+    t: Literal["command"] = "command"
+    name: CommandName
+    arg: str = ""
+
+
+# --- agent -> overlay: tray support -------------------------------------------------
+class State(Msg):
+    """What the tray's check marks show; sent on connect and on every change."""
+    t: Literal["state"] = "state"
+    muted: bool = False
+    gaming: bool = False
+    autostart: bool = False
+
+
+class MemoryItems(Msg):
+    t: Literal["memory_items"] = "memory_items"
+    items: list[tuple[int, str]] = []
+
+
 # --- agent <-> voice ------------------------------------------------------------
 class Ptt(Msg):
     t: Literal["ptt"] = "ptt"
@@ -173,7 +200,7 @@ class Lip(Msg):
 
 Message = Annotated[
     Union[Hello, Welcome, Quit, MoodReq, FormReq, Bubble, Hud, Confirm, Cloud, Visibility,
-          MoodAck, ConfirmResult, Touch, TextInput, FileDrop, Fullscreen,
+          MoodAck, ConfirmResult, Touch, TextInput, FileDrop, Fullscreen, Command, State, MemoryItems,
           Ptt, Transcript, Speak, SpeakState, Stop, Load, Lip],
     Field(discriminator="t"),
 ]

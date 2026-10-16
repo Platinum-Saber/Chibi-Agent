@@ -13,9 +13,13 @@ from PySide6.QtWidgets import QApplication
 
 from chibi_shared import config, paths
 
+from chibi_shared.protocol import Fullscreen
+
+from . import env
 from .body import motion
 from .link import QtLink
 from .stage import Stage
+from .tray import Tray
 from .window import MonitorWindow
 
 PKG = Path(__file__).resolve().parents[1]
@@ -49,11 +53,36 @@ def main() -> None:
     windows: list[MonitorWindow] = []
     # One window that follows her between monitors (see MonitorWindow._follow).
     windows.append(MonitorWindow(primary, stage, models, True, windows))
+    app.setQuitOnLastWindowClosed(False)  # the tray keeps her alive while hidden
+    win = windows[0]
+    fullscreen = {"exe": None}
+
+    def update_visibility() -> None:
+        hidden = tray.user_hidden or stage.hidden or fullscreen["exe"] is not None
+        if hidden and win.isVisible():
+            win.hide()  # no frames at all while hidden: nothing drawn, no GPU work
+        elif not hidden and not win.isVisible():
+            win.show()
+            win.update()
+
+    def watch_fullscreen() -> None:
+        exe = env.fullscreen_app(stage.ground.own)
+        if exe != fullscreen["exe"]:
+            fullscreen["exe"] = exe
+            link.send(Fullscreen(active=exe is not None, exe=exe or ""))
+        update_visibility()
+
+    tray = Tray(link, stage, update_visibility)
     link.received.connect(stage.on_message)
+    link.received.connect(tray.on_message)
+    link.received.connect(lambda _m: update_visibility())
     stage._quit_cb = app.quit
     link.start()
     for w in windows:
         w.show()
+    fs_timer = QTimer()
+    fs_timer.timeout.connect(watch_fullscreen)
+    fs_timer.start(500)
 
     if args.debug_throw:
         vx, vy = (float(v) for v in args.debug_throw.split(","))
