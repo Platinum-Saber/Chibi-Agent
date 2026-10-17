@@ -49,8 +49,9 @@
 - **Kryo's setup:** Google Cloud project "Chibi-Agent", Calendar + Gmail APIs, External app in **Testing** with the three accounts as test users, Desktop client JSON at `%APPDATA%\ChibiAgent\google_client.json`. Testing means a 7-day sign-in expiry. Production needs a public home page and privacy-policy URL (Branding), so it is deferred; a GitHub Pages site would do.
 - **Verified by Kryo (2026-10-17):** all three accounts signed in (the university one too); "exams on November 2nd and 3rd" found both from `sansikasuhan5`. Fetches now run accounts and calendars in parallel over one client (was ~10 s per call; not re-timed live yet).
 - **Ollama gotcha:** the Ollama tray app's server (started at login) uses the default model folder; Kryo set user env `OLLAMA_MODELS=F:\ChibiAgent\ollama`. The agent now logs missing models at startup and says "Ollama cannot find my model" on that failure. Snipping Tool no longer triggers gaming mode.
-- **Watch:** the persona with the tool list is 2,894 / 3,000 characters; Gmail tools will need shorter descriptions or a raised limit.
-- **Next:** Gmail tool (read-only, LLM labels single mails), 5-min mail polling, the briefing composer.
+- **Part 2 done (uncommitted):** `tools/gmail.py`: `mail_list` (default: unread inbox, no promotions/social/updates/forums, last 3 days; `about` = Gmail search over 30 days; numbered, newest first, sender names only, Gmail's IMPORTANT label shown) and `read_mail` (by number from the last list; plain text preferred, HTML stripped, quotes dropped, 1,500 chars, attachment names). Shared helper `tools/_google.py`. Untrusted tool results are logged as a length only. 86 agent tests pass. Not yet tried on Kryo's real mail.
+- **Watch:** the real prompt is 2,953 / 3,000 characters (a test now checks it). Part 3 tools must replace or shorten existing descriptions.
+- **Next (part 3):** single-mail LLM labeller (code rules first: newsletters, GitHub, noreply), 5-min mail polling with an announcement for urgent mail, the `briefing.py` composer and the morning briefing.
 
 ## Next step
 Ask Kryo to try the tray (`python chibi.py`, then right-click the "R" tray icon) and report back. Then plan M5 in plan mode, starting with the Calendar tool and the OAuth flow, and give Kryo exact Google Cloud console steps to create a Desktop OAuth client.

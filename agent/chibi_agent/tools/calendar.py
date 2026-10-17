@@ -11,13 +11,12 @@ from urllib.parse import quote
 import dateparser
 import httpx
 
-from ..google_auth import NotConnected, short
-from . import CTX, Result, tool
+from ..google_auth import short
+from . import Result, _google, tool
 
 API = "https://www.googleapis.com/calendar/v3"
 MAX_LINES = 25
 TRANSPORT: httpx.AsyncBaseTransport | None = None  # tests swap in httpx.MockTransport
-NOT_CONNECTED = "Google Calendar is not connected. Kryo can choose 'Sign in to Google' in the tray."
 _WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "ten": 10, "fourteen": 14}
 _N_DAYS = re.compile(r"(?:next|coming)?\s*(\d+|" + "|".join(_WORDS) + r")\s+days?")
 
@@ -94,11 +93,10 @@ def format_events(events: list[tuple[str, dict]], label: str, many_calendars: bo
     return f"Events {label}:\n" + "\n".join(lines)
 
 
-async def fetch_events(c: httpx.AsyncClient, token: str, start: dt.datetime,
+async def fetch_events(c: httpx.AsyncClient, auth: dict, start: dt.datetime,
                        end: dt.datetime) -> tuple[list[tuple[str, dict]], int]:
     """Events from every calendar one account shows in Google Calendar, and how many calendars.
     The calendars are read at the same time."""
-    auth = {"Authorization": f"Bearer {token}"}
     r = await c.get("/users/me/calendarList", params={"minAccessRole": "reader"}, headers=auth)
     r.raise_for_status()
     cals = [x for x in r.json().get("items", []) if x.get("selected") or x.get("primary")]
@@ -116,46 +114,23 @@ async def fetch_events(c: httpx.AsyncClient, token: str, start: dt.datetime,
     return [x for lst in lists for x in lst], len(cals)
 
 
-def _reason(e: Exception) -> str:
-    if isinstance(e, httpx.HTTPStatusError):
-        code = e.response.status_code
-        if code == 403:
-            return "Google refused access (an admin may block this app)"
-        if code == 401:
-            return "Google rejected the sign-in"
-        return f"Google answered {code}"
-    if isinstance(e, NotConnected):
-        return str(e)
-    return f"Google could not be reached ({type(e).__name__})"
-
-
-@tool("calendar_events", "List Kryo's Google Calendar events.",
+@tool("calendar_events", "List Kryo's calendar events.",
       {"when": ("'today', 'tomorrow', 'this week', 'next week', 'the weekend', 'next 3 days' or a date", False)},
       summary=lambda a: f"Calendar: {a.get('when') or 'today'}")
 async def calendar_events(when: str = "today") -> Result:
-    accounts = CTX.google.accounts() if CTX.google is not None else []
-    if not accounts:
-        return Result(NOT_CONNECTED)
+    emails = _google.accounts()
+    if not emails:
+        return Result(_google.not_connected("Calendar"))
     rng = day_range(when, dt.datetime.now())
     if rng is None:
         return Result(f"I could not understand '{when}' as a day. Ask Kryo which day.")
     start, end, label = rng
     # All accounts at once over one pooled client: one by one took ~10 s for three accounts.
-    async with httpx.AsyncClient(base_url=API, transport=TRANSPORT, timeout=15,
-                                 limits=httpx.Limits(max_connections=12)) as c:
-        async def account(email: str):
-            return await fetch_events(c, await CTX.google.token(email), start, end)
-        results = await asyncio.gather(*(account(e) for e in accounts), return_exceptions=True)
-    events, n_cals, problems = [], 0, []
-    for email, res in zip(accounts, results):
-        if isinstance(res, (NotConnected, httpx.HTTPError)):
-            problems.append(f"Could not read {short(email)}: {_reason(res)}. Kryo can sign in again from the tray.")
-        elif isinstance(res, BaseException):
-            raise res
-        else:
-            events += res[0]
-            n_cals += res[1]
-    if len(problems) == len(accounts):
+    done, problems = await _google.each_account(
+        API, TRANSPORT, lambda c, auth, _email: fetch_events(c, auth, start, end), emails)
+    if not done:
         return Result("\n".join(problems), failed=True)
+    events = [ev for _, (got, _n) in done for ev in got]
+    n_cals = sum(n for _, (_got, n) in done)
     text = format_events(events, label, n_cals > 1)
     return Result("\n".join([text, *problems]), untrusted=True)

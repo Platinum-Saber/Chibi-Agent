@@ -279,7 +279,10 @@ class Orchestrator:
             await self.hub.send("overlay", Hud(title=label, items=["Working…"], progress=i / len(calls)))
             log.info("tool %s %s", name, args)
             res = await self.runner.run(name, args)
-            log.info("tool %s -> %s", name, res.text[:200].replace("\n", " | "))
+            if res.untrusted:  # mail, screen, files, web: never in the log (architecture.md -> Logs)
+                log.info("tool %s -> <%d chars of untrusted data>", name, len(res.text))
+            else:
+                log.info("tool %s -> %s", name, res.text[:200].replace("\n", " | "))
             content = UNTRUSTED_NOTE + res.text if res.untrusted else res.text
             if res.failed:  # a 4B model will happily claim success over an error string
                 content = (f"THE TOOL FAILED. Nothing was done. Tell Kryo plainly that it did not work. "

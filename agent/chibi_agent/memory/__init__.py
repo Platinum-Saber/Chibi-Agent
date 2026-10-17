@@ -69,7 +69,8 @@ class Memory:
         try:
             (vec,) = await asyncio.wait_for(self.embed([query], query=True), 2.0)
         except Exception as e:
-            log.warning("recall skipped: %s", e)
+            log.warning("recall skipped: %s", "embedding took over 2 s (model cold?)"
+                        if isinstance(e, asyncio.TimeoutError) else repr(e))
             return ""
         facts = self.store.search_facts(vec, 5, FACT_MIN_SIM)
         convs = self.store.search_summaries(vec, 2, SUMMARY_MIN_SIM)

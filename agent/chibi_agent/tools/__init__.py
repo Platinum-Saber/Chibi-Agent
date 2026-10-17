@@ -71,7 +71,7 @@ def tool(name: str, description: str, params: dict[str, tuple[str, bool]] | None
 
 def load_all() -> dict[str, Tool]:
     """Import the tool modules (they register themselves)."""
-    from . import apps, calendar, clipboard, files, media, memory_tools, screen, shell, system, web  # noqa: F401
+    from . import apps, calendar, clipboard, files, gmail, media, memory_tools, screen, shell, system, web  # noqa: F401
     return REGISTRY
 
 

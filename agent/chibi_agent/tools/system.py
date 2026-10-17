@@ -25,7 +25,7 @@ def _fg_title() -> tuple[str, str]:
     return buf.value, exe
 
 
-@tool("get_time", "The current date and time (you do not know it without this tool).")
+@tool("get_time", "The exact current date and time.")
 def get_time() -> Result:
     now = dt.datetime.now()
     return Result(now.strftime("%A %d %B %Y, %H:%M"))

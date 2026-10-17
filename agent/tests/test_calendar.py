@@ -128,7 +128,7 @@ async def test_all_accounts_failing_is_a_failure(monkeypatch):
 async def test_calendar_not_connected(monkeypatch):
     monkeypatch.setattr(tools.CTX, "google", FakeGoogle(accounts=()))
     res = await cal.calendar_events()
-    assert "Sign in to Google" in res.text and not res.failed
+    assert "Add Google account" in res.text and not res.failed
 
 
 def test_calendar_tool_is_read_only():

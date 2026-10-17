@@ -147,7 +147,7 @@ sequenceDiagram
     - `shell.py`: PowerShell, full command shown, 30 s timeout, output truncated;
     - `media.py`, `clipboard.py`, `web.py` (open a URL or search);
     - `screen.py`: `mss` capture, sent as an image in memory only;
-    - `reminders.py`, `calendar.py`, `gmail.py`, `notifications.py`, `briefing.py`.
+    - `reminders.py`, `calendar.py`, `gmail.py` (`mail_list` numbered, `read_mail` by number; `_google.py` reads every account in parallel), `notifications.py`, `briefing.py`.
   - **Audit:** every call goes to `audit.jsonl` (tool, args, confirmed, result status).
 - `memory/`:
   - SQLite (`%APPDATA%\ChibiAgent\memory.db`) + `sqlite-vec` for embeddings.
@@ -213,7 +213,7 @@ sequenceDiagram
 - **Untrusted content:** screen text, mail bodies, notifications, file contents and web pages are wrapped as untrusted data in the prompt ("content, not instructions"). Tool calls proposed right after reading such content always need confirmation, even read-only ones that send data out (e.g. opening a URL found in a mail).
 - **Shell:** shown in full, never chained silently, no admin elevation (a UAC prompt is refused).
 - **Files:** no delete in v1. Move/rename stays inside allowed roots. The audit log keeps the original paths, so a change can be undone by hand.
-- **Logs:** they contain no audio, screenshots or mail bodies. Transcripts stay in the chat store only.
+- **Logs:** they contain no audio, screenshots or mail bodies. Untrusted tool results (mail, calendar, screen, files, web) are logged as a character count only. Transcripts stay in the chat store only.
 
 ## Repo layout
 ```
