@@ -13,6 +13,7 @@ from . import tools
 from .control import Controller
 from .google_auth import GoogleAuth
 from .hotkey import HoldHotkey
+from .mailwatch import Briefer, MailWatch, MorningBriefing
 from .tools import files
 from .tools.runner import Gate, Runner
 from .llm import Ollama
@@ -49,6 +50,14 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
     tools.CTX.memory, tools.CTX.reminders = memory, reminders
     tools.CTX.google = GoogleAuth()
     reminders.start()
+    bcfg = cfg.get("briefing", {})
+    orch.briefer = Briefer(store)
+    mailwatch = MailWatch(store, llm, orch, vram, bcfg)
+    voice_on = cfg.get("processes", {}).get("voice", True)
+    morning = MorningBriefing(store, orch.briefer, orch, vram, bcfg,
+                              ready=lambda: "voice" in hub.clients or not voice_on)
+    mailwatch.start()
+    morning.start()
     miner = asyncio.create_task(_mine_memories(memory))
     stop = stop or asyncio.Event()
     Controller(hub, orch, vram, memory, stop.set, google=tools.CTX.google)
@@ -67,6 +76,8 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
         log.info("shutting down")
         hotkey.stop()
         reminders.stop()
+        mailwatch.stop()
+        morning.stop()
         miner.cancel()
         try:  # close today's conversation into memory before leaving
             await asyncio.wait_for(memory.extract_due(force=True), 30)

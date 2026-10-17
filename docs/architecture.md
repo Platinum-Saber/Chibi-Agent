@@ -159,7 +159,8 @@ sequenceDiagram
   - **Write path:** after each conversation goes idle for 5 min, a small extraction prompt pulls out new facts and a summary.
   - **Recall:** the top 5 facts + top 2 summaries by similarity, above a threshold, go into the prompt.
   - **Control:** "forget …" deletes the matches (after confirming), and the tray lets you browse and delete.
-- `schedulers.py`: reminders (persisted, fired via the asyncio clock), morning briefing, and mail/calendar polling (5 min).
+- `schedulers.py`: reminders (persisted, fired via the asyncio clock).
+- `mailwatch.py` (M5): `MailWatch` polls every account's inbox every 5 min (paused in gaming mode), labels each new mail with `mail_labels.py` (sender rules, then the model on ONE mail, else fallback rules) and stores sender name, subject and label only (`mail` table, pruned after 7 days). A new urgent mail is announced once ("Warning. Urgent mail from …") between 07:00 and 23:00, not while gaming or mid-turn, and only while under 2 h old. `Briefer` gathers 72 h of calendar, labelled mail and today's reminders for `briefing.py` (pure composer, a port of Saber's `BriefingComposer`: urgency order, 72 h deadline window, no module codes or addresses, 4 facts / 50 words, "End of report."). `MorningBriefing` speaks it once a day: first start after 06:00, or 07:30 if already running (`[briefing]` in config.toml). Saying "briefing" / "what needs my attention" runs it without the model.
 - `vram.py`: the VRAM manager (below).
 - `hotkey.py`:
   - global push-to-talk through a low-level keyboard hook (pynput / `SetWindowsHookEx`), default `Alt+1` hold, configurable;

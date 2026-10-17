@@ -37,3 +37,12 @@ serious_map = 'rigs/mao.toml'
 [tools]
 # Folders file tools may read and change (no deleting in v1).
 allowed_roots = ['~']
+
+[briefing]
+# Morning briefing: the first start after morning_after, or at morning_at if she was already running.
+morning_after = "06:00"
+morning_at = "07:30"
+# No unasked urgent-mail warnings between quiet_from and quiet_to (they wait for the briefing).
+quiet_from = "23:00"
+quiet_to = "07:00"
+poll_minutes = 5

@@ -83,7 +83,7 @@ async def test_new_mail_is_merged_newest_first_without_addresses(api):
     assert lines[0] == "New mail:"
     assert lines[1].startswith("[1] ") and "Dr Perera: EN4554 exam hall changed  (kryo, important)" in lines[1]
     assert "hall B & starts" in lines[1]
-    assert "Registrar: Fees  (kryo.22)" in lines[2] and "noreply: CI failed" in lines[3]
+    assert "Registrar: Fees  (kryo.22)" in lines[2] and "github: CI failed" in lines[3]
     assert "@" not in res.text
     q = api[0].url.params["q"]
     assert "is:unread" in q and "-category:promotions" in q and "newer_than:3d" in q
@@ -153,6 +153,8 @@ def test_sender_name():
     assert gmail.sender_name('"Dr Perera" <perera@uni.lk>') == "Dr Perera"
     assert gmail.sender_name("perera@uni.lk") == "perera"
     assert gmail.sender_name("perera@uni.lk <perera@uni.lk>") == "perera"
+    assert gmail.sender_name("noreply@github.com") == "github"
+    assert gmail.sender_addr("\"Dr P\" <Perera@Uni.lk>") == "perera@uni.lk"
 
 
 def test_mail_tools_are_read_only_and_the_prompt_fits():

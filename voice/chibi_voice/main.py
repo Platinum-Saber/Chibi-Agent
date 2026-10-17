@@ -102,7 +102,12 @@ class VoiceApp:
     async def _ptt_up(self) -> None:
         audio = await asyncio.to_thread(self.recorder.stop)
         text, ms = await self.transcribe(audio)
-        log.info("transcript (%.1fs audio, %d ms): %r", audio.size / 16000, ms, text)
+        peak = float(np.abs(audio).max()) if audio.size else 0.0
+        db = 20 * np.log10(max(float(np.sqrt(np.mean(audio ** 2))) if audio.size else 0.0, 1e-9))
+        # Loudness and mic name: an empty transcript from 2 s of audio means the mic was silent
+        # (peak near 0: muted, or another app holds it) or too quiet (rms below ~-50 dBFS).
+        log.info("transcript (%.1fs audio, peak %.3f, rms %.0f dBFS, mic %s, %d ms): %r",
+                 audio.size / 16000, peak, db, getattr(self.recorder, "device", "?"), ms, text)
         await self._send(Transcript(text=text, ms=ms))
 
     # --- messages -------------------------------------------------------------------

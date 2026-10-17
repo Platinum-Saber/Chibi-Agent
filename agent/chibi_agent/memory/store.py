@@ -30,6 +30,12 @@ CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY, text TEXT NOT NULL, due REAL NOT NULL, created REAL NOT NULL,
     state TEXT NOT NULL DEFAULT 'pending');  -- pending | fired | cancelled
 CREATE INDEX IF NOT EXISTS reminders_due ON reminders(state, due);
+CREATE TABLE IF NOT EXISTS mail (  -- labels for the briefing; never bodies or snippets
+    key TEXT PRIMARY KEY, account TEXT NOT NULL, sender TEXT NOT NULL, subject TEXT NOT NULL,
+    received REAL NOT NULL, label TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT 'new', seen REAL NOT NULL);  -- new | announced | briefed
+CREATE INDEX IF NOT EXISTS mail_received ON mail(received);
+CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
 
@@ -50,6 +56,18 @@ class Reminder:
     text: str
     due: float
     state: str
+
+
+@dataclass
+class MailRow:
+    key: str       # "<account>:<message id>"
+    account: str
+    sender: str    # a name, never an address
+    subject: str
+    received: float
+    label: str     # urgent | reply | bill | info | promo
+    reason: str = ""
+    state: str = "new"  # new | announced | briefed
 
 
 class Store:
@@ -145,4 +163,42 @@ class Store:
 
     def set_reminder_state(self, rid: int, state: str) -> None:
         self.db.execute("UPDATE reminders SET state=? WHERE id=?", (state, rid))
+        self.db.commit()
+
+    # --- mail labels (M5) --------------------------------------------------------------------------
+    def known_mail_keys(self, keys: list[str]) -> set[str]:
+        if not keys:
+            return set()
+        marks = ",".join("?" * len(keys))
+        return {r[0] for r in self.db.execute(f"SELECT key FROM mail WHERE key IN ({marks})", keys)}
+
+    def add_mail(self, m: MailRow) -> None:
+        self.db.execute("INSERT OR IGNORE INTO mail(key, account, sender, subject, received, label, reason, "
+                        "state, seen) VALUES (?,?,?,?,?,?,?,?,?)",
+                        (m.key, m.account, m.sender, m.subject, m.received, m.label, m.reason, m.state,
+                         time.time()))
+        self.db.commit()
+
+    def mail_since(self, since: float, labels: tuple[str, ...], states: tuple[str, ...]) -> list[MailRow]:
+        q = (f"SELECT key, account, sender, subject, received, label, reason, state FROM mail "
+             f"WHERE received >= ? AND label IN ({','.join('?' * len(labels))}) "
+             f"AND state IN ({','.join('?' * len(states))}) ORDER BY received")
+        return [MailRow(*r) for r in self.db.execute(q, (since, *labels, *states))]
+
+    def set_mail_state(self, keys: list[str], state: str) -> None:
+        self.db.executemany("UPDATE mail SET state=? WHERE key=?", [(state, k) for k in keys])
+        self.db.commit()
+
+    def prune_mail(self, before: float) -> None:
+        self.db.execute("DELETE FROM mail WHERE received < ?", (before,))
+        self.db.commit()
+
+    # --- small settings ----------------------------------------------------------------------------
+    def get_kv(self, key: str, default: str = "") -> str:
+        row = self.db.execute("SELECT value FROM kv WHERE key=?", (key,)).fetchone()
+        return row[0] if row else default
+
+    def set_kv(self, key: str, value: str) -> None:
+        self.db.execute("INSERT INTO kv(key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                        (key, value))
         self.db.commit()

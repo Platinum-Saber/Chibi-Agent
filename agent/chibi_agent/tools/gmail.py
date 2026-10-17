@@ -30,13 +30,32 @@ _NUMBERS = {w: i for i, w in enumerate(
 _NUMBERS.update({"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "last": -1})
 
 
+_AUTOMATED = re.compile(r"^(no-?reply|do-?not-?reply|notifications?|info|mailer|support|alerts?)\b", re.I)
+
+
 def sender_name(from_header: str) -> str:
-    """'Dr Perera <perera@uni.lk>' -> 'Dr Perera'; a bare address -> its local part."""
+    """'Dr Perera <perera@uni.lk>' -> 'Dr Perera'; a bare address -> its local part,
+    or its domain's name for automated senders ('noreply@github.com' -> 'github')."""
     name, addr = parseaddr(from_header)
     name = name.strip().strip('"')
     if name and "@" not in name:
         return name
-    return (addr or from_header).split("@", 1)[0] or "someone"
+    local, _, domain = (addr or from_header).partition("@")
+    if _AUTOMATED.match(local) and domain:
+        return domain.split(".")[0]
+    return local or "someone"
+
+
+def sender_addr(from_header: str) -> str:
+    """For the label rules only; never shown or spoken."""
+    return parseaddr(from_header)[1].lower()
+
+
+async def fetch_new(query: str, emails: list[str]) -> tuple[list[tuple[str, dict]], list[str]]:
+    """[(account, message metadata)] for a query over the given accounts, and problem lines."""
+    done, problems = await _google.each_account(
+        API, TRANSPORT, lambda c, auth, _e: _list_account(c, auth, query), emails)
+    return [(email, m) for email, msgs in done for m in msgs], problems
 
 
 def _headers(msg: dict) -> dict[str, str]:

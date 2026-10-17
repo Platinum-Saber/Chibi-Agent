@@ -32,6 +32,10 @@ log = logging.getLogger(__name__)
 HISTORY_TURNS = 12
 MAX_TOOL_STEPS = 5
 FORM_COMMAND = re.compile(r"\b(serious|chibi)\s+(?:mode|form)\b", re.I)
+# The briefing is composed in code (briefing.py), so it skips the model entirely.
+BRIEFING = re.compile(r"^\W*(?:raphael\W*)?(?:(?:give me|start|read|do)\s+)?(?:the |my |a |your )?"
+                      r"(?:morning )?(?:briefing|report)\W*(?:please\W*)?$"
+                      r"|\bwhat needs my attention\b|\banything (?:important|i should know)\b", re.I)
 YES = re.compile(r"^\W*(yes|yeah|yep|do it|go ahead|confirm(ed)?|proceed|ok(ay)?|sure)\b", re.I)
 NO = re.compile(r"^\W*(no|nope|cancel|stop|don'?t|abort|never mind)\b", re.I)
 CLAIM = re.compile(r"\b(paused|resumed|opened|launched|started|moved|renamed|copied|closed|muted|unmuted|"
@@ -64,7 +68,14 @@ class Orchestrator:
         self.pending_utts: set[str] = set()
         self.listening = False
         self.t_release = 0.0
+        self.briefer = None  # mailwatch.Briefer, set by main
         hub.on_message(self.on_message)
+
+    @property
+    def busy(self) -> bool:
+        """Kryo is talking to her, or she is still speaking: unasked news waits."""
+        return bool(self.listening or self.pending_utts or self._confirming
+                    or (self.turn and not self.turn.done()))
 
     # --- inputs ---------------------------------------------------------------
     def ptt_down(self) -> None:
@@ -90,9 +101,12 @@ class Orchestrator:
         if down:
             await self.hub.send("voice", Stop())
             self.pending_utts.clear()
-        await self.hub.send("voice", Ptt(down=down))
+        # The mood goes out BEFORE the Ptt: an empty transcript can come back within
+        # ~10 ms, and its "idle" must not be overtaken by a late "thinking" (she stayed
+        # stuck thinking).
         if not self._confirming:
             await self.hub.send("overlay", MoodReq(mood="listening" if down else "thinking"))
+        await self.hub.send("voice", Ptt(down=down))
 
     async def on_message(self, role: Role, msg: Message) -> None:
         if isinstance(msg, Transcript):
@@ -138,7 +152,34 @@ class Orchestrator:
             return
         if self.turn and not self.turn.done():
             self.turn.cancel()
+        if self.briefer is not None and BRIEFING.search(text):
+            self.turn = asyncio.create_task(self._briefing())
+            return
         self.turn = asyncio.create_task(self._run_turn(text))
+
+    async def _briefing(self) -> None:
+        try:
+            b = await self.briefer.run()
+            await self.report(b.sentences, "Briefing", [i.title for i in b.items])
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("briefing failed")
+            await self.report(["Warning.", "I could not compile the briefing, Sir."], "", [], alert=True)
+
+    async def report(self, sentences: list[str], title: str, items: list[str], alert: bool = False) -> None:
+        """Speak composed sentences (briefing, urgent mail): marker from its clip, HUD lists the items."""
+        if not sentences:
+            return
+        await self.hub.send("overlay", MoodReq(mood="alert" if alert else "working", ttl_ms=8000))
+        if items:
+            await self.hub.send("overlay", Hud(title=title, items=items[:6]))
+        await self.hub.send("overlay", Bubble(text=" ".join(sentences), done=True))
+        for i, s in enumerate(sentences):
+            await self._say(s, first=i == 0)
+        if items:
+            asyncio.get_running_loop().call_later(12, lambda: asyncio.create_task(
+                self.hub.send("overlay", Hud(title="", items=[]))))
 
     async def _switch_form(self, form: str) -> None:
         await self.hub.send("overlay", FormReq(form=form, sticky=True))

@@ -41,6 +41,10 @@ class Recorder:
         self._stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
                                       callback=callback)
         self._stream.start()
+        try:  # which mic: Windows may switch the default input under us
+            self.device = sd.query_devices(self._stream.device)["name"]
+        except Exception:
+            self.device = "?"
 
     def stop(self) -> np.ndarray:
         stream, self._stream = self._stream, None
