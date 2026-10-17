@@ -34,7 +34,7 @@ def capture_b64(max_side: int = 1280) -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 
-@tool("look_at_screen", "Look at Kryo's screen to answer a question about it.",
+@tool("look_at_screen", "See Kryo's screen: for 'look at this', 'what's this' or a question about it.",
       {"question": ("What to look for", True)})
 def look_at_screen(question: str) -> Result:
     return Result(f"Screenshot attached for: {question}", untrusted=True, image_b64=capture_b64())

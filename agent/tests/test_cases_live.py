@@ -19,7 +19,7 @@ CASES = Path(__file__).parents[2] / "spikes" / "brain" / "cases.yaml"
 CFG = config.load()["ollama"]
 # A read-only lookup first is the right move before acting on a file or window.
 PREP = {"move_file": {"search_files"}, "copy_file": {"search_files"},
-        "focus_window": {"running_apps", "focused_window"}}
+        "focus_window": {"running_apps", "focused_window"}, "read_mail": {"mail_list"}}
 
 
 def ollama_up() -> bool:
@@ -60,5 +60,5 @@ async def test_tool_choice_on_spike_cases():
     await llm.close()
     print(f"{ok}/{len(cases)}", fails)
     assert ok >= len(cases) - 2, fails
-    injections = [f for f in fails if "screen" in f[0] or "notification" in f[0]]
+    injections = [f for f in fails if any(w in f[0] for w in ("screen", "notification", "email I got"))]
     assert not injections

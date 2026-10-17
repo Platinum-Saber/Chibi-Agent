@@ -18,15 +18,22 @@
 - `agent/chibi_agent/persona.py`: the prompt is **2,953/3,000** characters (a test in `test_gmail.py` checks it); a new tool needs shorter descriptions elsewhere.
 - `handoffs/m5-and-m6-followups.md`: M5 and M6 details.
 
-## State (branch `v1` at dca3d88, pushed)
+## State (branch `v1` at 405e062; Kryo pushes)
 - **Works and tested:** M1–M6; Calendar and Gmail across 3 accounts; labelling, urgent warnings, the briefing on demand and in the morning. Tests: 158 agent, 32 shared, 74 overlay, 18 voice.
 - **Left for v1:**
   1. ~~Windows notifications~~: done (`notifywatch.py`, Spike 4 in `docs/spikes.md`). Kryo tested it live 2026-10-17. The overlay ignores `cloud` until item 2. The spoken command is now **"status report"** (Whisper heard "briefing" as "breathing"); "report" and "briefing" still work.
   2. The thought cloud on the overlay (not started).
   3. Her own Live2D rigs: the overlay still uses the Haru/Mao samples (`[overlay]` in config; pipeline in `docs/character.md`). This is art work Kryo drives.
-  4. Acceptance pass against scope.md's success criteria: add calendar and mail cases to `spikes/brain/cases.yaml`, run 10 warm latency turns, check next-day memory recall.
+  4. Acceptance pass against scope.md's success criteria (started 2026-10-17):
+     - **Voice commands ✅** (by text, model only): "Open Spotify", "What's on today?" and "Look at this." each went 10/10. "Look at this" was 1/10 until the `look_at_screen` description named the phrase (prompt now 2,977/3,000). `cases.yaml` has calendar, mail, reminder and a mail-injection case, and scores 30/30 (`test_cases_live.py`).
+     - **Confirmation ✅ with a note:** registry and gate tests pass, but `media`, `set_volume`, `remember`, `set_reminder` and `cancel_reminder` skip the yes on purpose. scope.md only exempts media and volume, so Kryo should decide whether to document the other three or gate them.
+     - **Kryo by hand:**
+       - **Latency:** 10 warm voice turns. Count the "first audio X s after release" lines in `agent.log`; the target is ≤ 1.5 s in 8/10.
+       - **Memory:** tell her a fact today, then check tomorrow that she brings it up unprompted when it's relevant.
+       - **Overlay:** 60 fps, clicks pass through next to her, no stolen focus. Spike 1 / M6 numbers exist; re-check with the real app.
+       - **Gaming mode:** measured in M6 (0.3 s); one spot check with a real game is enough.
   5. Untested by hand: drag and throw onto a title bar and onto monitor 2.
 - **Optional:** Moodle deadlines; Spotify playlists (Web API + Premium); battery saver; re-time a calendar question and a gaming-mode turn; watch whether Moodle notices get labelled `promo`.
 
 ## Next step
-The acceptance pass (item 4), then the thought cloud (item 2).
+Finish item 4's by-hand checks (memory recall needs a second day), then the thought cloud (item 2).
