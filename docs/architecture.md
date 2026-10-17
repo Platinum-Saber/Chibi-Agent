@@ -54,7 +54,7 @@ Overlay → agent:
 | type | payload |
 |---|---|
 | `confirm_result` | `{call_id, ok: bool}` |
-| `poke` / `hold` / `drop` | `{x, y, speed}`: so she can comment ("Master, please refrain.") |
+| `poke` / `hold` / `drop` | `{x, y, speed}`: so she can comment ("Kryo, please refrain.") |
 | `text_input` | `{text}`: typed in the bubble |
 | `file_drop` | `{paths[]}`: files dropped on her ("what is this?") |
 | `fullscreen` | `{active: bool, exe}`: the overlay watches the foreground window |
@@ -77,7 +77,7 @@ smooths it and maps it to `ParamMouthOpenY` (form-aware gain).
 
 ```mermaid
 sequenceDiagram
-  participant U as Master
+  participant U as Kryo
   participant A as agent
   participant V as voice
   participant L as Ollama
@@ -203,9 +203,9 @@ sequenceDiagram
 | active | loaded | loaded | a turn in the last 120 s |
 | idle | unloaded (keep-alive expiry) | loaded (~1 GB) | 120 s without a turn |
 | gaming | unloaded (`keep_alive: 0`) | unloaded; STT on CPU | a fullscreen app in front, or a manual toggle |
-| battery saver (not built in v1) | loaded on demand | TTS on CPU (Kokoro) | on battery + under 30 % |
+| battery saver (not built in v1; only the 30 fps overlay cap on battery is) | loaded on demand | TTS on CPU (Kokoro) | on battery + under 30 % |
 
-- **Before loading the LLM:** check free VRAM with NVML (`pynvml`). If less than 4.2 GB is free, she says so ("Insufficient memory, Master. Close …") instead of spilling into RAM.
+- **Before loading the LLM:** check free VRAM with NVML (`pynvml`). If less than 4.2 GB is free, she says so ("Warning. Insufficient memory, Sir. Close …") instead of spilling into RAM.
 
 ## Safety and privacy
 - **Network:** nothing leaves the machine except Google APIs (Calendar/Gmail, read-only scopes), web searches you ask for, and model downloads.

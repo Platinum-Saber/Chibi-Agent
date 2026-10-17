@@ -30,11 +30,17 @@
 - **Untested by hand:**
   - the tray menu (every item, including memory viewer, settings and Start with Windows);
   - drag/throw onto a title bar and onto monitor 2 with the real mouse.
+- **Closed after d92aaff :**
+  - the overlay caps at 30 fps on battery (`env.on_battery`, polled every 10 s);
+  - danger reports (burning, smoke, sparks, gas, …: `orchestrator.URGENT`) open with "Warning." from code, and the model's own opener is dropped;
+  - gaming mode reloads the LLM and F5 at PTT down, while Kryo speaks (`VramManager.on_ptt`); the new latency is not measured yet;
+  - stale "Master" lines in `docs/architecture.md`;
+  - Quit unloads her model from Ollama (Ollama itself is the Ollama app's server and stays).
+- **Tray tested by Kryo (2026-10-17):** works. Start with Windows makes the Startup-folder shortcut; Task Manager lists it as "pythonw".
 - **Known gaps:**
-  - battery-saver state not built (30 fps cap, Kokoro on CPU);
-  - a turn during gaming mode takes ~16 s (cold LLM + F5 reload);
+  - battery-saver state (Kokoro on CPU under 30 %) not built, as planned for v1;
   - Spotify can't play a named playlist (needs the Web API in M5, Premium for playback);
-  - the burning-smell style safety case doesn't reliably open with "Warning.".
+  - `test_cases_live.py` can't find `qwen3.5:4b` when run from the Claude app (Ollama there doesn't see the F: models).
 - **Testing gotcha:** processes started from the Claude app get MSIX-virtualized AppData, and their hotkey hook also catches Kryo's Alt+1. Never run a test instance while Kryo's is running.
 
 ## Next step

@@ -108,3 +108,22 @@ async def test_fullscreen_message_routes_to_vram():
     await hub.handlers[0]("overlay", p.Fullscreen(active=True, exe="game.exe"))
     assert v.gaming
     await asyncio.sleep(0)
+
+
+async def test_ptt_in_gaming_mode_reloads_while_kryo_speaks():
+    hub, llm = FakeHub(), FakeLLM()
+    free = {"mb": TURN_NEEDS_MB + 500}
+    v = VramManager(hub, llm, free_mb=lambda: free["mb"])
+    await v.on_ptt()
+    assert not v.preloaded  # not gaming: nothing to do
+    await v.set_fullscreen("game.exe")
+    n = len(loads(hub))
+    await v.on_ptt()
+    await asyncio.sleep(0)
+    assert loads(hub)[n:] == [("load", "tts")] and llm.calls[-1] == "warm"
+    free["mb"] = 0  # the game grew meanwhile: the turn already has its models
+    assert await v.before_turn() and loads(hub)[n:] == [("load", "tts")]
+    await v.after_speech()
+    assert not v.preloaded and loads(hub)[-1] == ("unload", "tts")
+    await v.on_ptt()
+    assert not v.preloaded  # doesn't fit now

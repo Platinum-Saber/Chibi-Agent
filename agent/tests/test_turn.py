@@ -112,3 +112,31 @@ async def test_form_command_skips_the_llm():
     assert forms and forms[0].form == "serious" and forms[0].sticky
     assert llm.seen is None
     assert any(isinstance(m, p.Speak) and m.clip == "Understood." for r, m in hub.sent)
+
+
+async def test_danger_opens_with_warning_and_drops_the_models_marker():
+    hub = FakeHub()
+    o = Orchestrator(hub, FakeLLM(["Ans", "wer. Unplug the", " charger now, Sir."]))
+    o.start_turn("I smell something burning near my laptop")
+    await o.turn
+    speaks = [(m.text, m.clip) for r, m in hub.sent if isinstance(m, p.Speak)]
+    assert speaks == [("Warning.", "Warning."), ("Unplug the charger now, Sir.", None)]
+    bubbles = [m.text for r, m in hub.sent if isinstance(m, p.Bubble)]
+    assert all(not b.startswith("Warning. Answer") for b in bubbles)
+    assert bubbles[-1] == "Warning. Unplug the charger now, Sir."
+
+
+async def test_danger_keeps_a_reply_without_marker():
+    hub = FakeHub()
+    o = Orchestrator(hub, FakeLLM(["Get out"]))
+    o.start_turn("there's smoke coming from the PC")
+    await o.turn
+    assert [m.text for r, m in hub.sent if isinstance(m, p.Speak)] == ["Warning.", "Get out"]
+
+
+async def test_ordinary_question_is_not_urgent():
+    hub = FakeHub()
+    o = Orchestrator(hub, FakeLLM(["Answer. Yes."]))
+    o.start_turn("run a smoke test on the build and fire up Firefox")
+    await o.turn
+    assert [m.text for r, m in hub.sent if isinstance(m, p.Speak)][0] == "Answer."

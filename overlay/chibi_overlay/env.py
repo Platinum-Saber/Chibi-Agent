@@ -182,3 +182,17 @@ def fullscreen_app(own: set[int]) -> str | None:
     if rc.left <= m.left and rc.top <= m.top and rc.right >= m.right and rc.bottom >= m.bottom:
         return _exe_name(hwnd) or "?"
     return None
+
+
+class _POWER_STATUS(ctypes.Structure):
+    _fields_ = [("ACLineStatus", ctypes.c_ubyte), ("BatteryFlag", ctypes.c_ubyte),
+                ("BatteryLifePercent", ctypes.c_ubyte), ("SystemStatusFlag", ctypes.c_ubyte),
+                ("BatteryLifeTime", wintypes.DWORD), ("BatteryFullLifeTime", wintypes.DWORD)]
+
+
+def on_battery() -> bool:
+    """True when the laptop runs on battery (GetSystemPowerStatus; unknown counts as AC)."""
+    ps = _POWER_STATUS()
+    if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(ps)):
+        return False
+    return ps.ACLineStatus == 0

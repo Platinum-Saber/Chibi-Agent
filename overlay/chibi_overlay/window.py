@@ -45,6 +45,8 @@ class MonitorWindow(QOpenGLWidget):
         self.puppets: dict[str, Puppet] = {}
         self.calibrating = list(FORMS)
         self.drew_last = True
+        self.min_frame_s = 0.0  # 1/30 on battery (main.py), else every vsync
+        self._t_frame = 0.0
         self.transparent: bool | None = None
         self.cursor_here = False
         self.poll = QTimer(self)
@@ -82,7 +84,13 @@ class MonitorWindow(QOpenGLWidget):
 
     def _next_frame(self) -> None:
         if self.primary or self.calibrating or self._near_me() or self.drew_last:
-            self.update()
+            now = time.monotonic()
+            wait = self.min_frame_s - (now - self._t_frame)
+            if wait > 0.002:
+                QTimer.singleShot(int(wait * 1000), self.update)  # battery: skip a vsync
+            else:
+                self.update()
+            self._t_frame = now + max(wait, 0.0)
 
     def wake(self) -> None:
         if not self.calibrating and self._near_me():

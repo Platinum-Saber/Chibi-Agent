@@ -70,6 +70,10 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
         except Exception as e:
             log.warning("memory extraction at exit skipped: %s", e)
         await memory.close()
+        try:  # Ollama is shared (often the Ollama app's server), so it stays; her model doesn't
+            await asyncio.wait_for(llm.unload(), 5)
+        except Exception as e:
+            log.warning("could not unload the LLM at exit: %s", e)
         await llm.close()
         for role in ("overlay", "voice"):
             await hub.send(role, Quit())

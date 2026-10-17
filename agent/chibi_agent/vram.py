@@ -2,12 +2,15 @@
 
 A fullscreen app in front (or the tray toggle) puts her in gaming mode: the
 overlay hides itself, the LLM is unloaded (keep_alive 0) and the voice process
-drops F5 and Whisper (STT falls back to CPU). Push-to-talk still works: before
-a turn the manager checks free VRAM with NVML, reloads TTS if it fits, and
-unloads everything again once she has finished speaking.
+drops F5 and Whisper (STT falls back to CPU). Push-to-talk still works: the
+moment PTT goes down the manager checks free VRAM with NVML and, if a turn
+fits, starts reloading the LLM and TTS while Kryo is still speaking (the cold
+reload was most of a ~16 s gaming-mode turn). It unloads everything again once
+she has finished speaking.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from chibi_shared.protocol import Load, Visibility
@@ -31,6 +34,7 @@ class VramManager:
         self.fullscreen = ""  # exe of the fullscreen app in front, "" if none
         self.manual = False   # the tray's "Gaming mode"
         self.gaming = False
+        self.preloaded = False  # gaming mode: models reloaded for the turn under way
         self.on_change = None  # async callback after gaming flips (State to the tray)
 
     async def set_fullscreen(self, exe: str) -> None:
@@ -60,19 +64,32 @@ class VramManager:
         if self.on_change:
             await self.on_change()
 
+    def _fits(self) -> bool:
+        free = self.free_mb()
+        return free is None or free >= TURN_NEEDS_MB
+
+    async def on_ptt(self) -> None:
+        """PTT went down: in gaming mode, reload the models while Kryo speaks."""
+        if not self.gaming or self.preloaded or not self._fits():
+            return  # a turn that doesn't fit is refused in before_turn
+        self.preloaded = True
+        await self.hub.send("voice", Load(t="load", what="tts"))
+        asyncio.create_task(self.llm.warm())
+
     async def before_turn(self) -> bool:
         """In gaming mode: True if a turn fits in free VRAM now (TTS reloaded for it)."""
-        if not self.gaming:
+        if not self.gaming or self.preloaded:
             return True
-        free = self.free_mb()
-        if free is not None and free < TURN_NEEDS_MB:
-            log.warning("gaming mode: only %d MB free, need %d; skipping the turn", free, TURN_NEEDS_MB)
+        if not self._fits():
+            log.warning("gaming mode: only %s MB free, need %d; skipping the turn", self.free_mb(), TURN_NEEDS_MB)
             return False
+        self.preloaded = True
         await self.hub.send("voice", Load(t="load", what="tts"))
         return True
 
     async def after_speech(self) -> None:
         """She's done talking: in gaming mode, hand the VRAM back to the game."""
+        self.preloaded = False
         if self.gaming:
             await self.llm.unload()
             await self.hub.send("voice", Load(t="unload", what="tts"))

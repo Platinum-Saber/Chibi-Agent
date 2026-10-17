@@ -23,6 +23,7 @@ from .tray import Tray
 from .window import MonitorWindow
 
 PKG = Path(__file__).resolve().parents[1]
+log = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -83,6 +84,16 @@ def main() -> None:
     fs_timer = QTimer()
     fs_timer.timeout.connect(watch_fullscreen)
     fs_timer.start(500)
+
+    def watch_power() -> None:
+        cap = 1 / 30 if env.on_battery() else 0.0
+        if cap != win.min_frame_s:
+            log.info("on %s: %s fps", "battery" if cap else "AC power", 30 if cap else "vsync")
+            win.min_frame_s = cap
+    power_timer = QTimer()
+    power_timer.timeout.connect(watch_power)
+    power_timer.start(10_000)
+    watch_power()
 
     if args.debug_throw:
         vx, vy = (float(v) for v in args.debug_throw.split(","))
