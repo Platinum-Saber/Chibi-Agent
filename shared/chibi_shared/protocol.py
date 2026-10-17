@@ -12,7 +12,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
-VERSION = 2  # 2: tray commands, state, memory items (M6)
+VERSION = 3  # 2: tray commands, state, memory items (M6); 3: Google sign-in (M5)
 
 Role = Literal["overlay", "voice"]
 Form = Literal["chibi", "serious"]
@@ -133,7 +133,7 @@ class Fullscreen(Msg):
 
 CommandName = Literal[
     "toggle_visible", "mute", "unmute", "gaming_on", "gaming_off", "memory_list", "memory_delete",
-    "open_settings", "autostart_on", "autostart_off", "quit",
+    "open_settings", "autostart_on", "autostart_off", "google_signin", "google_signout", "quit",
 ]
 
 
@@ -151,6 +151,7 @@ class State(Msg):
     muted: bool = False
     gaming: bool = False
     autostart: bool = False
+    google_accounts: list[str] = []  # signed-in Google accounts (M5)
 
 
 class MemoryItems(Msg):

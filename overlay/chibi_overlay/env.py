@@ -45,6 +45,8 @@ def monitors() -> list[tuple[Rect, Rect, bool]]:
 
 _SKIP_CLASSES = {"Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
                  "Windows.UI.Core.CoreWindow", "XamlExplorerHostIslandWindow"}
+# Fullscreen, but not a game: the screen-snip overlay must not trigger gaming mode.
+_SKIP_EXES = {"snippingtool.exe", "screenclippinghost.exe", "screensketch.exe"}
 
 
 def foreground_rect(own: set[int]) -> Rect | None:
@@ -180,7 +182,8 @@ def fullscreen_app(own: set[int]) -> str | None:
     user32.GetMonitorInfoW(user32.MonitorFromWindow(hwnd, 2), ctypes.byref(mi))
     m = mi.rcMonitor
     if rc.left <= m.left and rc.top <= m.top and rc.right >= m.right and rc.bottom >= m.bottom:
-        return _exe_name(hwnd) or "?"
+        exe = _exe_name(hwnd)
+        return None if exe.lower() in _SKIP_EXES else exe or "?"
     return None
 
 

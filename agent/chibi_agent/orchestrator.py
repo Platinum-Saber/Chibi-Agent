@@ -235,9 +235,12 @@ class Orchestrator:
         except asyncio.CancelledError:
             log.info("turn interrupted")
             raise
-        except Exception:
+        except Exception as e:
             log.exception("turn failed")
-            reply = "Warning. My reasoning core is unavailable, Sir."
+            if "model" in str(e) and "not found" in str(e):
+                reply = "Warning. Ollama cannot find my model, Sir. It is not using my model folder."
+            else:
+                reply = "Warning. My reasoning core is unavailable, Sir."
             await self._say(reply, False)
             await self.hub.send("overlay", MoodReq(mood="alert"))
         finally:

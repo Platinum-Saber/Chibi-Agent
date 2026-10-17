@@ -11,6 +11,7 @@ from chibi_shared.protocol import Quit
 
 from . import tools
 from .control import Controller
+from .google_auth import GoogleAuth
 from .hotkey import HoldHotkey
 from .tools import files
 from .tools.runner import Gate, Runner
@@ -37,6 +38,7 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
     await sup.start()
     llm = Ollama(cfg["ollama"])
     asyncio.create_task(llm.warm())
+    asyncio.create_task(_check_models(llm, cfg["ollama"]))
     tools.load_all()
     files.configure(cfg.get("tools", {}))
     store = Store(paths.DATA / "memory.db")
@@ -45,10 +47,11 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
     orch = Orchestrator(hub, llm, Runner(Gate(hub)), memory, vram)
     reminders = Reminders(store, orch.announce)
     tools.CTX.memory, tools.CTX.reminders = memory, reminders
+    tools.CTX.google = GoogleAuth()
     reminders.start()
     miner = asyncio.create_task(_mine_memories(memory))
     stop = stop or asyncio.Event()
-    Controller(hub, orch, vram, memory, stop.set)
+    Controller(hub, orch, vram, memory, stop.set, google=tools.CTX.google)
     hotkey = HoldHotkey(cfg["hotkeys"]["push_to_talk"], asyncio.get_running_loop(),
                         orch.ptt_down, orch.ptt_up)
     hotkey.start()
@@ -79,6 +82,25 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
             await hub.send(role, Quit())
         await sup.stop()
         await hub.stop()
+
+
+async def _check_models(llm: Ollama, ocfg: dict) -> None:
+    """Say so in the log if the Ollama answering on our port can't see her models."""
+    wanted = [ocfg["model"], ocfg.get("embed_model", "")]
+    for _ in range(30):  # a server the supervisor just spawned needs a moment
+        try:
+            missing = await llm.missing_models([w for w in wanted if w])
+            break
+        except Exception:
+            await asyncio.sleep(1)
+    else:
+        log.error("Ollama did not answer at %s", ocfg["url"])
+        return
+    if missing:
+        log.error("Ollama at %s can't see %s. Another Ollama (likely the Ollama app) is serving "
+                  "without OLLAMA_MODELS=%s: set that user environment variable and restart the "
+                  "Ollama app, or quit it so Raphael starts her own.", ocfg["url"], ", ".join(missing),
+                  ocfg.get("models_dir", ""))
 
 
 async def _mine_memories(memory: Memory) -> None:

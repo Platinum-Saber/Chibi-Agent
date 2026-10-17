@@ -49,6 +49,7 @@ class Context:
     that don't use them)."""
     memory = None     # chibi_agent.memory.Memory
     reminders = None  # chibi_agent.schedulers.Reminders
+    google = None     # chibi_agent.google_auth.GoogleAuth
 
 
 CTX = Context()
@@ -70,7 +71,7 @@ def tool(name: str, description: str, params: dict[str, tuple[str, bool]] | None
 
 def load_all() -> dict[str, Tool]:
     """Import the tool modules (they register themselves)."""
-    from . import apps, clipboard, files, media, memory_tools, screen, shell, system, web  # noqa: F401
+    from . import apps, calendar, clipboard, files, media, memory_tools, screen, shell, system, web  # noqa: F401
     return REGISTRY
 
 

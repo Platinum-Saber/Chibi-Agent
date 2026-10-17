@@ -68,11 +68,23 @@ class Ollama:
     async def warm(self) -> None:
         """Load the model now, so the first question doesn't pay the cold load."""
         try:
-            await self._client.post(f"{self.url}/api/generate", json={
+            r = await self._client.post(f"{self.url}/api/generate", json={
                 "model": self.model, "keep_alive": self.keep_alive, "options": {"num_ctx": self.num_ctx}})
-            log.info("%s loaded", self.model)
+            if r.status_code == 200:
+                log.info("%s loaded", self.model)
+            else:
+                log.warning("could not warm %s: Ollama %s %s", self.model, r.status_code, r.text[:200])
         except httpx.HTTPError as e:
             log.warning("could not warm %s: %s", self.model, e)
+
+    async def missing_models(self, wanted: list[str]) -> list[str]:
+        """Which of `wanted` this Ollama server can't see (e.g. the Ollama app's own
+        server, started without OLLAMA_MODELS, answering on our port)."""
+        r = await self._client.get(f"{self.url}/api/tags")
+        r.raise_for_status()
+        have = {m["name"] for m in r.json().get("models", [])}
+        have |= {n.removesuffix(":latest") for n in have}
+        return [w for w in wanted if w not in have and w.removesuffix(":latest") not in have]
 
     async def unload(self) -> None:
         await self._client.post(f"{self.url}/api/generate", json={"model": self.model, "keep_alive": 0})

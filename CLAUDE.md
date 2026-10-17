@@ -27,5 +27,6 @@ Budget: keep this file under ~500 tokens.
 - Run her: `python chibi.py` (agent starts Ollama, overlay, voice). One instance only (mutex).
 - Setup: `uv sync` in `shared/`, `agent/`, `overlay/`, `voice/` (each has its own venv).
 - Tests: `uv run pytest` in each package; `agent/tests/test_cases_live.py` needs Ollama.
+- Google (M5): Kryo saves the Desktop OAuth client JSON as `%APPDATA%\ChibiAgent\google_client.json`, then tray → Google accounts → Add Google account… once per account. Refresh tokens in Credential Manager (`ChibiAgent`, `google:<email>` + `google:accounts`).
 - Debug: `python -m chibi_agent --without voice|overlay`; `python -m chibi_overlay --debug-throw VX,VY`.
 - Processes started from the Claude app write AppData into `Packages\Claude_*\LocalCache` (MSIX); the user's real logs are in `%LOCALAPPDATA%\ChibiAgent\logs`.

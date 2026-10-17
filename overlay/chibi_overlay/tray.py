@@ -1,4 +1,5 @@
-"""Tray icon and menu: show/hide, mute, gaming mode, memory, settings, autostart, quit.
+"""Tray icon and menu: show/hide, mute, gaming mode, memory, settings, Google accounts,
+autostart, quit.
 
 Show/hide is handled here (it's only about the window); everything else is a
 `Command` to the agent, which owns the state and echoes it back as `State` so
@@ -84,6 +85,8 @@ class Tray:
         m.addSeparator()
         self._action(m, "Memory…", lambda: self._cmd("memory_list"))
         self._action(m, "Settings (config.toml)…", lambda: self._cmd("open_settings"))
+        self.google_menu = m.addMenu("Google accounts")
+        self._google_items([])
         self.a_auto = self._action(m, "Start with Windows",
                                    lambda on: self._cmd("autostart_on" if on else "autostart_off"), True)
         m.addSeparator()
@@ -99,6 +102,17 @@ class Tray:
         (a.toggled if checkable else a.triggered).connect(fn)
         menu.addAction(a)
         return a
+
+    def _google_items(self, accounts: list[str]) -> None:
+        g = self.google_menu
+        g.clear()
+        for email in accounts:
+            self._action(g, f"Sign out {email}", lambda _=False, e=email: self._cmd("google_signout", e))
+        if accounts:
+            g.addSeparator()
+        self._action(g, "Add Google account…", lambda: self._cmd("google_signin"))
+        if len(accounts) > 1:
+            self._action(g, "Sign out of all", lambda: self._cmd("google_signout"))
 
     def _cmd(self, name: str, arg: str = "") -> None:
         self.link.send(Command(name=name, arg=arg))
@@ -118,5 +132,6 @@ class Tray:
                 a.blockSignals(True)
                 a.setChecked(on)
                 a.blockSignals(False)
+            self._google_items(msg.google_accounts)
         elif isinstance(msg, MemoryItems):
             self.memory.show_items(msg.items)

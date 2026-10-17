@@ -17,6 +17,9 @@ dependencies = [
     "comtypes>=1.4.17",
     "sqlite-vec>=0.1.9",
     "dateparser>=1.4.3",
+    "google-auth>=2.62.0",
+    "google-auth-oauthlib>=1.5.0",
+    "keyring>=25.7.0",
 ]
 
 [tool.uv.sources]

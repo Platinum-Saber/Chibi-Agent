@@ -140,3 +140,13 @@ async def test_ordinary_question_is_not_urgent():
     o.start_turn("run a smoke test on the build and fire up Firefox")
     await o.turn
     assert [m.text for r, m in hub.sent if isinstance(m, p.Speak)][0] == "Answer."
+
+
+async def test_missing_models_reads_ollama_tags():
+    import httpx
+    from chibi_agent.llm import Ollama
+    llm = Ollama({"url": "http://ollama", "model": "qwen3.5:4b"})
+    llm._client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(
+        200, json={"models": [{"name": "nomic-embed-text:latest"}]})))
+    assert await llm.missing_models(["qwen3.5:4b", "nomic-embed-text"]) == ["qwen3.5:4b"]
+    await llm.close()

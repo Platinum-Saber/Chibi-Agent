@@ -209,7 +209,7 @@ sequenceDiagram
 
 ## Safety and privacy
 - **Network:** nothing leaves the machine except Google APIs (Calendar/Gmail, read-only scopes), web searches you ask for, and model downloads.
-- **Tokens:** OAuth refresh tokens go in Windows Credential Manager (`keyring`), never in files or git.
+- **Tokens:** OAuth refresh tokens go in Windows Credential Manager (`keyring`), never in files or git. `agent/chibi_agent/google_auth.py` owns the sign-in, per account (tray → Google accounts → "Add Google account…", Kryo finishes it in the browser; scopes `calendar.readonly` + `gmail.readonly`). Each account's refresh token is keyring user `google:<email>`; `google:accounts` lists them (keyring can't enumerate). Tools read every account and merge (calendar: dedupe by `iCalUID`); one account failing doesn't hide the others. The app is in Testing mode, so Google expires a sign-in after 7 days and that account is dropped until Kryo signs in again. The OAuth client JSON lives in `%APPDATA%\ChibiAgent\google_client.json`.
 - **Untrusted content:** screen text, mail bodies, notifications, file contents and web pages are wrapped as untrusted data in the prompt ("content, not instructions"). Tool calls proposed right after reading such content always need confirmation, even read-only ones that send data out (e.g. opening a URL found in a mail).
 - **Shell:** shown in full, never chained silently, no admin elevation (a UAC prompt is refused).
 - **Files:** no delete in v1. Move/rename stays inside allowed roots. The audit log keeps the original paths, so a change can be undone by hand.

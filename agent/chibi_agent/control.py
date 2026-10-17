@@ -1,10 +1,12 @@
-"""Tray commands and app state: mute, gaming mode, memory viewer, settings, autostart, quit.
+"""Tray commands and app state: mute, gaming mode, memory viewer, settings, autostart,
+Google sign-in, quit.
 
 The agent owns this state and sends `State` to the overlay whenever it changes
 (and when the overlay connects) so the tray's check marks stay true.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import sys
@@ -12,7 +14,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 from chibi_shared import paths
-from chibi_shared.protocol import Command, Fullscreen, MemoryItems, Message, Role, State
+from chibi_shared.protocol import Bubble, Command, Fullscreen, MemoryItems, Message, Role, State
+
+from .google_auth import short
 
 log = logging.getLogger(__name__)
 STARTUP = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
@@ -23,8 +27,10 @@ USER_CONFIG_HEADER = """# Your Chibi-Agent settings. Anything here overrides the
 
 
 class Controller:
-    def __init__(self, hub, orch, vram, memory, quit_cb: Callable[[], None]):
+    def __init__(self, hub, orch, vram, memory, quit_cb: Callable[[], None], google=None):
         self.hub, self.orch, self.vram, self.memory, self.quit_cb = hub, orch, vram, memory, quit_cb
+        self.google = google  # chibi_agent.google_auth.GoogleAuth
+        self._signing_in: asyncio.Task | None = None
         vram.on_change = self.push_state
         hub.on_message(self.on_message)
         hub.on_connect(self._connected)
@@ -35,7 +41,8 @@ class Controller:
 
     async def push_state(self) -> None:
         await self.hub.send("overlay", State(muted=self.orch.muted, gaming=self.vram.gaming,
-                                             autostart=SHORTCUT.exists()))
+                                             autostart=SHORTCUT.exists(),
+                                             google_accounts=self.google.accounts() if self.google else []))
 
     async def on_message(self, role: Role, msg: Message) -> None:
         if isinstance(msg, Fullscreen):
@@ -63,10 +70,31 @@ class Controller:
             return
         elif name in ("autostart_on", "autostart_off"):
             set_autostart(name == "autostart_on")
+        elif name == "google_signin" and self.google:
+            if not (self._signing_in and not self._signing_in.done()):
+                self._signing_in = asyncio.create_task(self._sign_in())
+            return
+        elif name == "google_signout" and self.google:
+            self.google.sign_out(arg or None)
         elif name == "quit":
             self.quit_cb()
             return
         await self.push_state()
+
+    async def _sign_in(self) -> None:
+        """Kryo finishes the sign-in in the browser; she says how it went."""
+        try:
+            email = await self.google.sign_in()
+            await self._tell("Confirmed.", f"{short(email)} is connected, Kryo.")
+        except Exception as e:
+            log.warning("google sign-in failed: %s", e)
+            await self._tell("Warning.", f"The Google sign-in did not work. {e}")
+        await self.push_state()
+
+    async def _tell(self, marker: str, line: str) -> None:
+        await self.hub.send("overlay", Bubble(text=f"{marker} {line}", done=True))
+        await self.orch._say(marker, first=True)
+        await self.orch._say(line, first=False)
 
 
 def open_user_config() -> None:

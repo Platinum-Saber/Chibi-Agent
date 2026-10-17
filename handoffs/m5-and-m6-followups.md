@@ -11,7 +11,7 @@
 - **Untrusted text is data:** screen, file, web and mail content is wrapped as data. Memory extraction only reads Kryo's words and her replies.
 - **Gaming mode:** a fullscreen app or the tray toggle unloads the LLM and voice models; push-to-talk reloads them if NVML reports 4.8 GB free.
 - **M5 rules** (from `docs/scope.md`):
-  - Google OAuth is read-only. **Kryo creates the Google Cloud OAuth client and signs in himself**; never automate the sign-in.
+  - Google OAuth is read-only. **Kryo creates the Google Cloud OAuth client and signs in themselves**; never automate the sign-in.
   - The refresh token goes in Windows Credential Manager (`keyring`).
   - Mail is polled every 5 min.
   - The briefing composer is code (urgency rules, 72 h deadline window, names not addresses, "Notice. … End of report."). The LLM only labels single mails.
@@ -42,6 +42,15 @@
   - Spotify can't play a named playlist (needs the Web API in M5, Premium for playback);
   - `test_cases_live.py` can't find `qwen3.5:4b` when run from the Claude app (Ollama there doesn't see the F: models).
 - **Testing gotcha:** processes started from the Claude app get MSIX-virtualized AppData, and their hotkey hook also catches Kryo's Alt+1. Never run a test instance while Kryo's is running.
+
+## M5 progress
+- **Part 1 done:** `google_auth.py` with several accounts (InstalledAppFlow with the account chooser in Kryo's browser; email from `calendars/primary`; keyring `google:<email>` + `google:accounts`; `invalid_grant` drops only that account), the tray's Google accounts submenu (protocol v3, `State.google_accounts`, `google_signout` arg = email or empty for all), and the read-only `calendar_events` tool (`tools/calendar.py`: code-built ranges and lines, every account's selected calendars merged, dedupe by `iCalUID`, per-account error lines, untrusted). 73 agent tests pass.
+- **Accounts to connect:** sansikasuhan5@gmail.com, sansikawaduge@gmail.com, sansika.22@cse.mrt.ac.lk. The university one is Workspace: its admin may block unverified apps or Gmail scopes ("Access blocked"); only the university can lift that.
+- **Kryo's setup:** Google Cloud project "Chibi-Agent", Calendar + Gmail APIs, External app in **Testing** with the three accounts as test users, Desktop client JSON at `%APPDATA%\ChibiAgent\google_client.json`. Testing means a 7-day sign-in expiry. Production needs a public home page and privacy-policy URL (Branding), so it is deferred; a GitHub Pages site would do.
+- **Verified by Kryo (2026-10-17):** all three accounts signed in (the university one too); "exams on November 2nd and 3rd" found both from `sansikasuhan5`. Fetches now run accounts and calendars in parallel over one client (was ~10 s per call; not re-timed live yet).
+- **Ollama gotcha:** the Ollama tray app's server (started at login) uses the default model folder; Kryo set user env `OLLAMA_MODELS=F:\ChibiAgent\ollama`. The agent now logs missing models at startup and says "Ollama cannot find my model" on that failure. Snipping Tool no longer triggers gaming mode.
+- **Watch:** the persona with the tool list is 2,894 / 3,000 characters; Gmail tools will need shorter descriptions or a raised limit.
+- **Next:** Gmail tool (read-only, LLM labels single mails), 5-min mail polling, the briefing composer.
 
 ## Next step
 Ask Kryo to try the tray (`python chibi.py`, then right-click the "R" tray icon) and report back. Then plan M5 in plan mode, starting with the Calendar tool and the OAuth flow, and give Kryo exact Google Cloud console steps to create a Desktop OAuth client.
