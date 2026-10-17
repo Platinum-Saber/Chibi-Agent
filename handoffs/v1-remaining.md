@@ -23,16 +23,16 @@
 - **Left for v1:**
   1. ~~Windows notifications~~: done (`notifywatch.py`, Spike 4 in `docs/spikes.md`). Kryo tested it live 2026-10-17. The overlay ignores `cloud` until item 2. The spoken command is now **"status report"** (Whisper heard "briefing" as "breathing"); "report" and "briefing" still work.
   2. The thought cloud on the overlay (not started).
-  3. Her own Live2D rigs: the overlay still uses the Haru/Mao samples (`[overlay]` in config; pipeline in `docs/character.md`). This is art work Kryo drives.
+  3. Her own Live2D rigs: the overlay still uses the Haru/Mao samples (`[overlay]` in config; pipeline in `docs/character.md`). This is art work Kryo drives; see `handoffs/live2d-rigs.md`.
   4. Acceptance pass against scope.md's success criteria (started 2026-10-17):
      - **Voice commands ✅** (by text, model only): "Open Spotify", "What's on today?" and "Look at this." each went 10/10. "Look at this" was 1/10 until the `look_at_screen` description named the phrase (prompt now 2,977/3,000). `cases.yaml` has calendar, mail, reminder and a mail-injection case, and scores 30/30 (`test_cases_live.py`).
-     - **Confirmation ✅ with a note:** registry and gate tests pass, but `media`, `set_volume`, `remember`, `set_reminder` and `cancel_reminder` skip the yes on purpose. scope.md only exempts media and volume, so Kryo should decide whether to document the other three or gate them.
+     - **Confirmation ✅:** registry and gate tests pass. Only `media` and `set_volume` skip the yes, as scope.md says; `remember`, `set_reminder` and `cancel_reminder` ask first now (Kryo's call).
      - **Kryo by hand:**
        - **Latency:** 10 warm voice turns. Count the "first audio X s after release" lines in `agent.log`; the target is ≤ 1.5 s in 8/10.
        - **Memory:** tell her a fact today, then check tomorrow that she brings it up unprompted when it's relevant.
        - **Overlay:** 60 fps, clicks pass through next to her, no stolen focus. Spike 1 / M6 numbers exist; re-check with the real app.
        - **Gaming mode:** measured in M6 (0.3 s); one spot check with a real game is enough.
-  5. Untested by hand: drag and throw onto a title bar and onto monitor 2.
+  5. ~~Drag and throw onto a title bar and monitor 2~~: Kryo tested every case, 2026-10-17.
 - **Optional:** Moodle deadlines; Spotify playlists (Web API + Premium); battery saver; re-time a calendar question and a gaming-mode turn; watch whether Moodle notices get labelled `promo`.
 
 ## Next step

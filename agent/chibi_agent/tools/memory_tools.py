@@ -1,6 +1,6 @@
 """Tools over her memory and reminders. All async: they run on the agent's loop,
-which owns the SQLite connection (worker threads may not use it). Remembering and reminders are harmless and
-frequent (no confirmation); forgetting is confirmed (scope.md)."""
+which owns the SQLite connection (worker threads may not use it). Remembering, reminders and forgetting are all
+confirmed first (Kryo's call, 2026-10-17)."""
 from __future__ import annotations
 
 import time
@@ -11,7 +11,7 @@ from . import CTX, Result, tool
 
 @tool("remember", "Store a lasting fact about Kryo.",
       {"fact": ("One short sentence, e.g. 'Kryo's sister is called Nimi'", True)},
-      side_effect=True, confirm=False)
+      side_effect=True)
 async def remember(fact: str) -> Result:
     if CTX.memory is None:
         return Result("Memory is unavailable.")
@@ -42,7 +42,7 @@ async def forget_memory(topic: str) -> Result:
 @tool("set_reminder", "Set a reminder or timer.",
       {"text": ("What to remind about", True),
        "when": ("When, in Kryo's words: 'in 20 minutes', 'at 6 pm', 'tomorrow 9am'", True)},
-      side_effect=True, confirm=False)
+      side_effect=True)
 async def set_reminder(text: str, when: str) -> Result:
     if CTX.reminders is None:
         return Result("Reminders are unavailable.")
@@ -66,7 +66,7 @@ async def list_reminders() -> Result:
 
 @tool("cancel_reminder", "Cancel a pending reminder.",
       {"which": ("Its number from list_reminders, or words from its text", True)},
-      side_effect=True, confirm=False)
+      side_effect=True)
 async def cancel_reminder(which: str) -> Result:
     if CTX.reminders is None:
         return Result("Reminders are unavailable.")

@@ -13,7 +13,7 @@ from chibi_agent.tools.runner import Gate, Runner
 from chibi_shared import protocol as p
 
 REG = tools.load_all()
-NO_CONFIRM_OK = {"media", "set_volume", "remember", "set_reminder", "cancel_reminder"}  # harmless, frequent
+NO_CONFIRM_OK = {"media", "set_volume"}  # harmless and frequent (scope.md)
 
 
 def test_every_side_effect_tool_is_confirmed():
