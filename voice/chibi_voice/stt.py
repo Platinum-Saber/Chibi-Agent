@@ -15,6 +15,8 @@ import sounddevice as sd
 log = logging.getLogger(__name__)
 
 SR = 16000
+# Words she must hear right ("status report" runs the briefing; Whisper heard "briefing" as "breathing").
+HOTWORDS = "Raphael, Kryo, status report"
 
 
 class Recorder:
@@ -98,5 +100,5 @@ class Stt:
             raise RuntimeError("stt not loaded")
         if audio.size < SR // 10:
             return ""
-        segs, _ = self.model.transcribe(audio, language="en", beam_size=1, vad_filter=True)
+        segs, _ = self.model.transcribe(audio, language="en", beam_size=1, vad_filter=True, hotwords=HOTWORDS)
         return " ".join(s.text.strip() for s in segs).strip()

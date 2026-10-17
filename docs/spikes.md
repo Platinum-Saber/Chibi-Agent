@@ -186,3 +186,13 @@ Measured on this laptop with the real app (agent + overlay + voice + Ollama), id
   - Leaving it reloads everything (6,227 MB within 25 s).
 - **First audio** (from M1/M3 runs on Kryo's machine): 1.1–1.6 s after releasing push-to-talk with a warm model; 5.1 s for a turn that waited on a confirm.
 - **Not done:** the battery-saver state (30 fps cap, Kokoro on CPU) from `architecture.md`. She runs the same on battery.
+
+## Spike 4: Windows notifications (2026-10-17)
+
+`spikes/notifications/listen.py` (pywinrt `winrt-windows-ui-notifications-management`), run from Kryo's own terminal; `send_toast.ps1` makes a test toast.
+
+- **Access:** `request_access_async` returns Allowed (1) with no prompt; it was already allowed in Settings → Privacy → Notifications.
+- **`NotificationChanged`:** fails with "Element not found" (it needs package identity). So she polls and compares IDs. IDs don't always arrive in order, so she tracks the whole set.
+- **Content:** every toast has an app display name and a `ToastGeneric` binding with 2 texts (title, body). Bodies reach about 5,000 characters (ChatGPT), so the 600-character cut before labelling matters. A new toast from `send_toast.ps1` appeared on the next poll. Discord made no toast for Kryo's own messages.
+- **Cost:** one poll of 71–75 toasts takes **6.4–8.6 s**. A 100 ms asyncio ticker stalled for up to **1.56 s**, so the poll runs on its own thread, every 60 s.
+- **What's there:** about 75 toasts going back 2 days, mostly noise (Flow.Launcher, NVIDIA App, Claude, ChatGPT, Windows Security scans). Hence an ignore list, and the backlog from before she starts is skipped.

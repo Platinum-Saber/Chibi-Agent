@@ -46,3 +46,13 @@ morning_at = "07:30"
 quiet_from = "23:00"
 quiet_to = "07:00"
 poll_minutes = 5
+
+[notifications]
+# Windows toasts (tray -> Allow notification access). Polled, because the change event needs
+# package identity; one listing takes 6-9 s (Spike 4), so not more often than this.
+poll_seconds = 60
+# The model labels at most this many new toasts per poll; the rest get the rule labels.
+max_labels_per_poll = 5
+# Display names as Windows shows them. Mail apps are here because the mail watch covers mail.
+ignore_apps = ["Flow.Launcher", "NVIDIA App", "Claude", "ChatGPT", "Snipping Tool", "Camera",
+               "PowerToys (Preview)", "Notification Suggestions", "Outlook", "Mail", "Thunderbird"]

@@ -35,6 +35,11 @@ CREATE TABLE IF NOT EXISTS mail (  -- labels for the briefing; never bodies or s
     received REAL NOT NULL, label TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
     state TEXT NOT NULL DEFAULT 'new', seen REAL NOT NULL);  -- new | announced | briefed
 CREATE INDEX IF NOT EXISTS mail_received ON mail(received);
+CREATE TABLE IF NOT EXISTS notif (  -- Windows toasts for the briefing; app and title only, never the body
+    key TEXT PRIMARY KEY, app TEXT NOT NULL, title TEXT NOT NULL, received REAL NOT NULL,
+    label TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT 'new', seen REAL NOT NULL);  -- new | briefed
+CREATE INDEX IF NOT EXISTS notif_received ON notif(received);
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
@@ -68,6 +73,17 @@ class MailRow:
     label: str     # urgent | reply | bill | info | promo
     reason: str = ""
     state: str = "new"  # new | announced | briefed
+
+
+@dataclass
+class NotifRow:
+    key: str       # "<notification id>:<created, unix s>"
+    app: str
+    title: str     # the toast's first line; the body is never stored
+    received: float
+    label: str     # urgent | reply | bill | info | promo
+    reason: str = ""
+    state: str = "new"  # new | briefed
 
 
 class Store:
@@ -191,6 +207,33 @@ class Store:
 
     def prune_mail(self, before: float) -> None:
         self.db.execute("DELETE FROM mail WHERE received < ?", (before,))
+        self.db.commit()
+
+    # --- Windows notifications ---------------------------------------------------------------------
+    def known_notif_keys(self, keys: list[str]) -> set[str]:
+        if not keys:
+            return set()
+        marks = ",".join("?" * len(keys))
+        return {r[0] for r in self.db.execute(f"SELECT key FROM notif WHERE key IN ({marks})", keys)}
+
+    def add_notif(self, n: NotifRow) -> None:
+        self.db.execute("INSERT OR IGNORE INTO notif(key, app, title, received, label, reason, state, seen) "
+                        "VALUES (?,?,?,?,?,?,?,?)",
+                        (n.key, n.app, n.title, n.received, n.label, n.reason, n.state, time.time()))
+        self.db.commit()
+
+    def notif_since(self, since: float, labels: tuple[str, ...], states: tuple[str, ...]) -> list[NotifRow]:
+        q = (f"SELECT key, app, title, received, label, reason, state FROM notif "
+             f"WHERE received >= ? AND label IN ({','.join('?' * len(labels))}) "
+             f"AND state IN ({','.join('?' * len(states))}) ORDER BY received")
+        return [NotifRow(*r) for r in self.db.execute(q, (since, *labels, *states))]
+
+    def set_notif_state(self, keys: list[str], state: str) -> None:
+        self.db.executemany("UPDATE notif SET state=? WHERE key=?", [(state, k) for k in keys])
+        self.db.commit()
+
+    def prune_notif(self, before: float) -> None:
+        self.db.execute("DELETE FROM notif WHERE received < ?", (before,))
         self.db.commit()
 
     # --- small settings ----------------------------------------------------------------------------

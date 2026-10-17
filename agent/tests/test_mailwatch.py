@@ -233,10 +233,11 @@ async def test_morning_waits_while_gaming():
 
 
 def test_briefing_command_regex():
-    for s in ("Briefing.", "Give me the briefing", "Raphael, morning report please", "What needs my attention?",
+    for s in ("Briefing.", "Status report.", "Raphael, give me a status report please", "Give me the briefing", "Raphael, morning report please", "What needs my attention?",
               "anything important?"):
         assert BRIEFING.search(s), s
-    for s in ("report a bug in this code", "write a report about Rome", "is the briefing room free"):
+    for s in ("report a bug in this code", "write a report about Rome", "is the briefing room free", "Breathing.",
+              "write a status report for my supervisor"):
         assert not BRIEFING.search(s), s
 
 

@@ -6,8 +6,9 @@
   gaming or mid-turn, and only while it is under 2 hours old; otherwise it waits
   for the briefing. Polling pauses in gaming mode, so the 4 GB model never loads
   next to a game; the next poll catches up.
-- Briefer: gathers calendar events (72 h), labelled mail and today's reminders,
-  and lets briefing.compose word them.
+- Briefer: gathers calendar events (72 h), labelled mail, labelled Windows
+  notifications (notifywatch) and today's reminders, and lets briefing.compose
+  word them.
 - MorningBriefing: once a day, on the first start after 06:00, or at 07:30 if
   she was already running.
 """
@@ -27,6 +28,7 @@ log = logging.getLogger(__name__)
 WATCH_QUERY = "in:inbox newer_than:1d -category:promotions -category:social -category:forums"
 ANNOUNCE_WITHIN_S = 2 * 3600
 BRIEF_LABELS = ("urgent", "reply", "bill")
+NOTICE_LABELS = ("urgent", "reply")
 
 
 def _hm(s: str) -> dt.time:
@@ -126,7 +128,7 @@ class MailWatch:
 
 
 class Briefer:
-    """What the briefing reads: 72 h of calendar, labelled mail, today's reminders."""
+    """What the briefing reads: 72 h of calendar, labelled mail and toasts, today's reminders."""
 
     def __init__(self, store: Store):
         self.store = store
@@ -167,8 +169,11 @@ class Briefer:
                  for r in rows]
         reminders = [briefing.Reminder(str(r.id), r.text, dt.datetime.fromtimestamp(r.due))
                      for r in self.store.pending_reminders()]
-        b = briefing.compose(now, events, mails, reminders, seed=int(now.timestamp()) // 60)
+        notices = [briefing.Notice(r.key, r.app, r.title, r.label, dt.datetime.fromtimestamp(r.received))
+                   for r in self.store.notif_since(now.timestamp() - 86400, NOTICE_LABELS, ("new",))]
+        b = briefing.compose(now, events, mails, reminders, seed=int(now.timestamp()) // 60, notices=notices)
         self.store.set_mail_state(b.mail_keys, "briefed")
+        self.store.set_notif_state(b.notice_keys, "briefed")
         log.info("briefing: %d items", len(b.items))
         return b
 
@@ -210,7 +215,7 @@ class MorningBriefing:
     async def fire(self) -> None:
         self.store.set_kv(self.KEY, dt.datetime.fromtimestamp(self.clock()).date().isoformat())
         b = await self.briefer.run(dt.datetime.fromtimestamp(self.clock()))
-        await self.orch.report(b.sentences, "Morning briefing", [i.title for i in b.items])
+        await self.orch.report(b.sentences, "Morning status report", [i.title for i in b.items])
 
     async def _run(self) -> None:
         while True:

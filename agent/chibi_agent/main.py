@@ -14,6 +14,7 @@ from .control import Controller
 from .google_auth import GoogleAuth
 from .hotkey import HoldHotkey
 from .mailwatch import Briefer, MailWatch, MorningBriefing
+from .notifywatch import NotifyWatch
 from .tools import files
 from .tools.runner import Gate, Runner
 from .llm import Ollama
@@ -56,11 +57,13 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
     voice_on = cfg.get("processes", {}).get("voice", True)
     morning = MorningBriefing(store, orch.briefer, orch, vram, bcfg,
                               ready=lambda: "voice" in hub.clients or not voice_on)
+    notifywatch = NotifyWatch(store, llm, orch, vram, hub, cfg.get("notifications", {}))
     mailwatch.start()
     morning.start()
+    notifywatch.start()
     miner = asyncio.create_task(_mine_memories(memory))
     stop = stop or asyncio.Event()
-    Controller(hub, orch, vram, memory, stop.set, google=tools.CTX.google)
+    Controller(hub, orch, vram, memory, stop.set, google=tools.CTX.google, notify=notifywatch)
     hotkey = HoldHotkey(cfg["hotkeys"]["push_to_talk"], asyncio.get_running_loop(),
                         orch.ptt_down, orch.ptt_up)
     hotkey.start()
@@ -78,6 +81,7 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
         reminders.stop()
         mailwatch.stop()
         morning.stop()
+        notifywatch.stop()
         miner.cancel()
         try:  # close today's conversation into memory before leaving
             await asyncio.wait_for(memory.extract_due(force=True), 30)

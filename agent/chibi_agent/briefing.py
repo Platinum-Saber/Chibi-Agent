@@ -51,6 +51,15 @@ class Mail:
 
 
 @dataclass
+class Notice:
+    key: str
+    app: str     # the Windows app that raised the toast
+    title: str   # the toast's first line (a chat sender, often)
+    label: str   # urgent | reply | bill | info | promo
+    at: dt.datetime
+
+
+@dataclass
 class Reminder:
     key: str
     text: str
@@ -60,7 +69,7 @@ class Reminder:
 @dataclass
 class Item:
     key: str
-    kind: str     # deadline | mail | event | reminder
+    kind: str     # deadline | mail | notice | event | reminder
     title: str    # for the HUD
     urgency: Urgency
     at: dt.datetime | None
@@ -72,6 +81,7 @@ class Briefing:
     items: list[Item]
     sentences: list[str]  # marker first: it plays from a clip
     mail_keys: list[str] = field(default_factory=list)
+    notice_keys: list[str] = field(default_factory=list)
 
     @property
     def text(self) -> str:
@@ -173,6 +183,17 @@ def _mail(m: Mail) -> Item | None:
     return Item(m.key, "mail", f"{sender}: {subject}", urgency, m.at, speech)
 
 
+def _notice(n: Notice) -> Item | None:
+    app, title = speak_name(n.app), strip_codes(n.title)
+    if n.label == "urgent":
+        speech = f"urgent notice from {app}: {title}" if title else f"an urgent notice from {app}"
+    elif n.label == "reply":
+        speech = f"{title} awaits your reply on {app}" if title else f"a message on {app} awaits your reply"
+    else:
+        return None  # toasts only surface when they need Kryo
+    return Item(n.key, "notice", f"{app}: {title}" if title else app, Urgency.TODAY, n.at, speech)
+
+
 def _reminder(r: Reminder, now: dt.datetime) -> Item | None:
     if r.due.date() != now.date() or r.due < now:
         return None
@@ -181,13 +202,19 @@ def _reminder(r: Reminder, now: dt.datetime) -> Item | None:
 
 
 def compose(now: dt.datetime, events: list[Event] = (), mails: list[Mail] = (),
-            reminders: list[Reminder] = (), seed: int = 0) -> Briefing:
+            reminders: list[Reminder] = (), seed: int = 0, notices: list[Notice] = ()) -> Briefing:
     items: list[Item] = []
     for e in events:  # an exam or due date is a deadline (72 h window), never also an event
         item = _deadline(e, now) if _DEADLINE.search(e.title) else _event(e, now)
         if item:
             items.append(item)
     items += [i for i in (_mail(m) for m in mails) if i]
+    notice_keys, by_title = [], {}
+    for n in sorted(notices, key=lambda n: n.at):  # a chat sends a toast per message: one line per sender
+        if item := _notice(n):
+            notice_keys.append(n.key)
+            by_title[(n.app, item.title)] = item  # the newest wins
+    items += by_title.values()
     items += [i for i in (_reminder(r, now) for r in reminders) if i]
     far = dt.datetime.max.replace(tzinfo=now.tzinfo)
     items.sort(key=lambda i: (i.urgency, i.at or far))
@@ -205,7 +232,7 @@ def compose(now: dt.datetime, events: list[Event] = (), mails: list[Mail] = (),
             break
         sentences.append(fact)
         words += _words(fact)
-    return Briefing(items, sentences + [CLOSER], mail_keys)
+    return Briefing(items, sentences + [CLOSER], mail_keys, notice_keys)
 
 
 def urgent_sentences(mails: list[Mail]) -> list[str]:

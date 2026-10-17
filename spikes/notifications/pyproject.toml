@@ -1,0 +1,16 @@
+[project]
+name = "notifications-spike"
+version = "0.0.0"
+description = "Spike 4: Windows notifications through UserNotificationListener (throwaway)"
+requires-python = "==3.12.*"
+dependencies = [
+    "winrt-runtime>=3.2.1",
+    "winrt-windows-foundation>=3.2.1",
+    "winrt-windows-foundation-collections>=3.2.1",
+    "winrt-windows-ui-notifications>=3.2.1",
+    "winrt-windows-ui-notifications-management>=3.2.1",
+    "winrt-windows-applicationmodel>=3.2.1",
+]
+
+[tool.uv]
+package = false

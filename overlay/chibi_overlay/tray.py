@@ -1,5 +1,5 @@
 """Tray icon and menu: show/hide, mute, gaming mode, memory, settings, Google accounts,
-autostart, quit.
+notification access, autostart, quit.
 
 Show/hide is handled here (it's only about the window); everything else is a
 `Command` to the agent, which owns the state and echoes it back as `State` so
@@ -87,6 +87,7 @@ class Tray:
         self._action(m, "Settings (config.toml)…", lambda: self._cmd("open_settings"))
         self.google_menu = m.addMenu("Google accounts")
         self._google_items([])
+        self.a_notif = self._action(m, "Allow notification access…", lambda: self._cmd("notif_access"))
         self.a_auto = self._action(m, "Start with Windows",
                                    lambda on: self._cmd("autostart_on" if on else "autostart_off"), True)
         m.addSeparator()
@@ -133,5 +134,8 @@ class Tray:
                 a.setChecked(on)
                 a.blockSignals(False)
             self._google_items(msg.google_accounts)
+            allowed = msg.notif_access == "allowed"
+            self.a_notif.setText("Notifications: allowed" if allowed else "Allow notification access…")
+            self.a_notif.setEnabled(not allowed)
         elif isinstance(msg, MemoryItems):
             self.memory.show_items(msg.items)

@@ -46,7 +46,7 @@ Agent → overlay:
 | `bubble` | `{text, stream: bool, done: bool}`: streamed reply text |
 | `hud` | `{title, items[], progress?}`: serious-form panel |
 | `confirm` | `{call_id, tool, summary, detail}`: Yes / No buttons on the HUD |
-| `cloud` | `{items[]}`: thought cloud (notifications, reminders) |
+| `cloud` | `{items[]}`: thought cloud, newest first; for now the ≤3 unbriefed urgent/reply notifications as "App: title" (`notifywatch.py`), `[]` clears it |
 | `visibility` | `{hidden: bool, reason}`: gaming mode / fullscreen |
 
 Overlay → agent:
@@ -147,7 +147,7 @@ sequenceDiagram
     - `shell.py`: PowerShell, full command shown, 30 s timeout, output truncated;
     - `media.py`, `clipboard.py`, `web.py` (open a URL or search);
     - `screen.py`: `mss` capture, sent as an image in memory only;
-    - `reminders.py`, `calendar.py`, `gmail.py` (`mail_list` numbered, `read_mail` by number; `_google.py` reads every account in parallel), `notifications.py`, `briefing.py`.
+    - `reminders.py`, `calendar.py`, `gmail.py` (`mail_list` numbered, `read_mail` by number; `_google.py` reads every account in parallel), `briefing.py`. Windows notifications have no tool in v1 (the prompt budget); `notifywatch.py` feeds them to the briefing.
   - **Audit:** every call goes to `audit.jsonl` (tool, args, confirmed, result status).
 - `memory/`:
   - SQLite (`%APPDATA%\ChibiAgent\memory.db`) + `sqlite-vec` for embeddings.
@@ -160,7 +160,8 @@ sequenceDiagram
   - **Recall:** the top 5 facts + top 2 summaries by similarity, above a threshold, go into the prompt.
   - **Control:** "forget …" deletes the matches (after confirming), and the tray lets you browse and delete.
 - `schedulers.py`: reminders (persisted, fired via the asyncio clock).
-- `mailwatch.py` (M5): `MailWatch` polls every account's inbox every 5 min (paused in gaming mode), labels each new mail with `mail_labels.py` (sender rules, then the model on ONE mail, else fallback rules) and stores sender name, subject and label only (`mail` table, pruned after 7 days). A new urgent mail is announced once ("Warning. Urgent mail from …") between 07:00 and 23:00, not while gaming or mid-turn, and only while under 2 h old. `Briefer` gathers 72 h of calendar, labelled mail and today's reminders for `briefing.py` (pure composer, a port of Saber's `BriefingComposer`: urgency order, 72 h deadline window, no module codes or addresses, 4 facts / 50 words, "End of report."). `MorningBriefing` speaks it once a day: first start after 06:00, or 07:30 if already running (`[briefing]` in config.toml). Saying "briefing" / "what needs my attention" runs it without the model.
+- `mailwatch.py` (M5): `MailWatch` polls every account's inbox every 5 min (paused in gaming mode), labels each new mail with `mail_labels.py` (sender rules, then the model on ONE mail, else fallback rules) and stores sender name, subject and label only (`mail` table, pruned after 7 days). A new urgent mail is announced once ("Warning. Urgent mail from …") between 07:00 and 23:00, not while gaming or mid-turn, and only while under 2 h old. `Briefer` gathers 72 h of calendar, labelled mail and today's reminders for `briefing.py` (pure composer, a port of Saber's `BriefingComposer`: urgency order, 72 h deadline window, no module codes or addresses, 4 facts / 50 words, "End of report."). `MorningBriefing` speaks it once a day: first start after 06:00, or 07:30 if already running (`[briefing]` in config.toml). Saying "status report" (or "report", "briefing", "what needs my attention") runs it without the model; the HUD calls it a status report.
+- `notifywatch.py`: `NotifyWatch` reads Windows toasts with WinRT `UserNotificationListener` once Kryo allows it (tray → Allow notification access; denied opens `ms-settings:privacy-notifications`). The change event needs package identity, so it polls every 60 s on a worker thread: a listing takes 6–9 s (Spike 4). It skips `ignore_apps`, toasts from before start − 2 h, and gaming/mid-turn. It labels like mail (`mail_labels`, kind "notification", ≤5 by the model per poll, then rules) and stores app, first line and label only (`notif` table, 2 days). It never speaks unasked; urgent/reply toasts go to the `cloud` message and the briefing (`[notifications]` in config.toml).
 - `vram.py`: the VRAM manager (below).
 - `hotkey.py`:
   - global push-to-talk through a low-level keyboard hook (pynput / `SetWindowsHookEx`), default `Alt+1` hold, configurable;

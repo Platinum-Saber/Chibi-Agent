@@ -133,7 +133,7 @@ class Fullscreen(Msg):
 
 CommandName = Literal[
     "toggle_visible", "mute", "unmute", "gaming_on", "gaming_off", "memory_list", "memory_delete",
-    "open_settings", "autostart_on", "autostart_off", "google_signin", "google_signout", "quit",
+    "open_settings", "autostart_on", "autostart_off", "google_signin", "google_signout", "notif_access", "quit",
 ]
 
 
@@ -152,6 +152,7 @@ class State(Msg):
     gaming: bool = False
     autostart: bool = False
     google_accounts: list[str] = []  # signed-in Google accounts (M5)
+    notif_access: str = "unknown"  # Windows notification access: allowed | denied | unspecified | unknown
 
 
 class MemoryItems(Msg):

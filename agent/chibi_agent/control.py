@@ -1,5 +1,5 @@
 """Tray commands and app state: mute, gaming mode, memory viewer, settings, autostart,
-Google sign-in, quit.
+Google sign-in, notification access, quit.
 
 The agent owns this state and sends `State` to the overlay whenever it changes
 (and when the overlay connects) so the tray's check marks stay true.
@@ -27,9 +27,12 @@ USER_CONFIG_HEADER = """# Your Chibi-Agent settings. Anything here overrides the
 
 
 class Controller:
-    def __init__(self, hub, orch, vram, memory, quit_cb: Callable[[], None], google=None):
+    def __init__(self, hub, orch, vram, memory, quit_cb: Callable[[], None], google=None, notify=None):
         self.hub, self.orch, self.vram, self.memory, self.quit_cb = hub, orch, vram, memory, quit_cb
         self.google = google  # chibi_agent.google_auth.GoogleAuth
+        self.notify = notify  # chibi_agent.notifywatch.NotifyWatch
+        if notify:
+            notify.on_access = self.push_state
         self._signing_in: asyncio.Task | None = None
         vram.on_change = self.push_state
         hub.on_message(self.on_message)
@@ -42,7 +45,8 @@ class Controller:
     async def push_state(self) -> None:
         await self.hub.send("overlay", State(muted=self.orch.muted, gaming=self.vram.gaming,
                                              autostart=SHORTCUT.exists(),
-                                             google_accounts=self.google.accounts() if self.google else []))
+                                             google_accounts=self.google.accounts() if self.google else [],
+                                             notif_access=self.notify.access if self.notify else "unknown"))
 
     async def on_message(self, role: Role, msg: Message) -> None:
         if isinstance(msg, Fullscreen):
@@ -76,6 +80,9 @@ class Controller:
             return
         elif name == "google_signout" and self.google:
             self.google.sign_out(arg or None)
+        elif name == "notif_access" and self.notify:
+            if await self.notify.refresh_access(ask=True) != "allowed":
+                os.startfile("ms-settings:privacy-notifications")  # noqa: S606 (Kryo clicked it; Windows asks no more)
         elif name == "quit":
             self.quit_cb()
             return

@@ -34,7 +34,7 @@ MAX_TOOL_STEPS = 5
 FORM_COMMAND = re.compile(r"\b(serious|chibi)\s+(?:mode|form)\b", re.I)
 # The briefing is composed in code (briefing.py), so it skips the model entirely.
 BRIEFING = re.compile(r"^\W*(?:raphael\W*)?(?:(?:give me|start|read|do)\s+)?(?:the |my |a |your )?"
-                      r"(?:morning )?(?:briefing|report)\W*(?:please\W*)?$"
+                      r"(?:morning |status )?(?:briefing|report)\W*(?:please\W*)?$"  # Kryo calls it the "status report"
                       r"|\bwhat needs my attention\b|\banything (?:important|i should know)\b", re.I)
 YES = re.compile(r"^\W*(yes|yeah|yep|do it|go ahead|confirm(ed)?|proceed|ok(ay)?|sure)\b", re.I)
 NO = re.compile(r"^\W*(no|nope|cancel|stop|don'?t|abort|never mind)\b", re.I)
@@ -160,12 +160,12 @@ class Orchestrator:
     async def _briefing(self) -> None:
         try:
             b = await self.briefer.run()
-            await self.report(b.sentences, "Briefing", [i.title for i in b.items])
+            await self.report(b.sentences, "Status report", [i.title for i in b.items])
         except asyncio.CancelledError:
             raise
         except Exception:
             log.exception("briefing failed")
-            await self.report(["Warning.", "I could not compile the briefing, Sir."], "", [], alert=True)
+            await self.report(["Warning.", "I could not compile the status report, Sir."], "", [], alert=True)
 
     async def report(self, sentences: list[str], title: str, items: list[str], alert: bool = False) -> None:
         """Speak composed sentences (briefing, urgent mail): marker from its clip, HUD lists the items."""
