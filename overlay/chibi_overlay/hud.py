@@ -41,7 +41,8 @@ class Painter:
             self._bubble(p, st.ov.bubble, fx, fy - h)
         else:
             st.ov.rects.pop("bubble", None)
-        if st.form == "serious" and (st.ov.hud or st.ov.confirm) and not st.hidden:
+        # chibi_only keeps the panel (task HUD, confirm buttons) on the chibi form
+        if (st.form == "serious" or st.chibi_only) and (st.ov.hud or st.ov.confirm) and not st.hidden:
             self._panel(p, st, fx, fy - h)
         else:
             for k in ("hud", "yes", "no"):

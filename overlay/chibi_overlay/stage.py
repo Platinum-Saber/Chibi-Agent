@@ -79,6 +79,7 @@ class Stage:
         self.media = MediaWatcher()
         self.form = "chibi"
         self.form_target = "chibi"
+        self.chibi_only = False  # [overlay] chibi_only: never switch to the serious form
         self.sticky = False
         self.serious_until = 0.0
         self.transform_t0: float | None = None
@@ -204,7 +205,7 @@ class Stage:
         # form
         if b.mood in motion.SERIOUS_MOODS:
             self.serious_until = now_s + SERIOUS_HOLD_S
-        want = self.form_target if self.sticky else (
+        want = "chibi" if self.chibi_only else self.form_target if self.sticky else (
             "serious" if now_s < self.serious_until or self.ov.confirm else "chibi")
         if (want != self.form or self._outfit_next) and self.transform_t0 is None and not self.dragging:
             self._outfit_to, self._outfit_next = self._outfit_next, None  # a pending outfit rides along

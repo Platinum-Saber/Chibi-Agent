@@ -142,3 +142,19 @@ def test_switch_keeps_the_serious_form(st):
     st.request_outfit("coat")
     _run_puff(st)
     assert st.form == "serious" and st.outfit == "coat"
+
+
+def test_chibi_only_never_turns_serious(st):
+    st.chibi_only = True
+    st.brain.mood = Mood.WORKING
+    st.serious_until = 1e12
+    st.on_message(FormReq(form="serious", sticky=True))
+    st.tick((0, 0))
+    assert st.transform_t0 is None and st.form == "chibi"
+
+
+def test_serious_moods_still_switch_without_chibi_only(st):
+    st.brain.mood = Mood.WORKING
+    st.serious_until = 1e12
+    st.tick((0, 0))
+    assert st.transform_t0 is not None

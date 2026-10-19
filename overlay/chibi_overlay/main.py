@@ -50,6 +50,9 @@ def main() -> None:
 
     link = QtLink()
     stage = Stage(wardrobe, PKG, primary.devicePixelRatio(), link, own_windows=set())
+    stage.chibi_only = bool(cfg.get("chibi_only", False))
+    if stage.chibi_only:
+        log.info("chibi_only: the serious form is off")
     link.connected.connect(stage.send_outfit_state)
     windows: list[MonitorWindow] = []
     # One window that follows her between monitors (see MonitorWindow._follow).

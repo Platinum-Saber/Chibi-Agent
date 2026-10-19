@@ -30,6 +30,9 @@ look_at_screen = "ctrl+alt+s"
 [overlay]
 # The outfit she wears (one of [overlay.outfits.*]); the agent can change it while she runs.
 outfit = "robe"
+# Stay in the chibi form (no switch to serious while working/alerting); the HUD and
+# confirm buttons then show beside the chibi. Off by default; on for now (Kryo, 2026-10-19).
+chibi_only = true
 # Shared mood maps (relative to overlay/); an outfit may set its own chibi_map / serious_map.
 chibi_map = 'rigs/haru.toml'
 serious_map = 'rigs/mao.toml'
