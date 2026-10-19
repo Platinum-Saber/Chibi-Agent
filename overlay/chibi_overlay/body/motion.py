@@ -5,6 +5,7 @@ real rigs swap without code changes. Pure Python; the window applies the clip.
 """
 from __future__ import annotations
 
+import json
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +39,25 @@ def _clips(table: dict) -> dict[str, Clip]:
 def load(path: str | Path) -> RigMap:
     d = tomllib.loads(Path(path).read_text(encoding="utf-8"))
     return RigMap(d.get("height_dip", 300), _clips(d.get("moods", {})), _clips(d.get("moments", {})))
+
+
+def looping_groups(model_json: str | Path) -> frozenset[str]:
+    """Motion groups whose first motion3 sets Meta.Loop. live2d-py ignores the flag
+    (only Idle restarts, by the SDK's idle fallback), so the puppet restarts these."""
+    model = Path(model_json)
+    try:
+        groups = json.loads(model.read_text(encoding="utf-8-sig"))["FileReferences"].get("Motions", {})
+    except (OSError, ValueError, KeyError):
+        return frozenset()
+    out = set()
+    for name, entries in groups.items():
+        try:
+            meta = json.loads((model.parent / entries[0]["File"]).read_text(encoding="utf-8-sig"))["Meta"]
+        except (OSError, ValueError, KeyError, IndexError):
+            continue
+        if meta.get("Loop"):
+            out.add(name)
+    return frozenset(out)
 
 
 # Agent mood names (chibi_shared.protocol.Mood) -> brain moods and the form they want.

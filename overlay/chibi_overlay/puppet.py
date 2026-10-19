@@ -15,7 +15,7 @@ import live2d
 import numpy as np
 import OpenGL.GL as gl
 
-from .body.motion import Clip, RigMap
+from .body.motion import Clip, RigMap, looping_groups
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ class Puppet:
         self.height = 0.0  # px, feet to head top
         self.half_width = 0.0
         self.clip: Clip | None = None
+        self.loops = looping_groups(model_json)
         self.flip = False
         self.ready = False
 
@@ -81,17 +82,23 @@ class Puppet:
 
     def play(self, clip: Clip) -> None:
         if clip == self.clip:
+            # live2d-py ignores motion3 Meta.Loop, so a looping clip is restarted here
+            if clip.motion in self.loops and self.model.IsMotionFinished():
+                self._start(clip)
             return
         self.clip = clip
         if clip.motion:
-            if clip.index is None:
-                self.model.StartRandomMotion(clip.motion, live2d.MotionPriority.FORCE)
-            else:
-                self.model.StartMotion(clip.motion, clip.index, live2d.MotionPriority.FORCE)
+            self._start(clip)
         if clip.expression:
             self.model.SetExpression(clip.expression)
         else:
             self.model.ResetExpression()
+
+    def _start(self, clip: Clip) -> None:
+        if clip.index is None:
+            self.model.StartRandomMotion(clip.motion, live2d.MotionPriority.FORCE)
+        else:
+            self.model.StartMotion(clip.motion, clip.index, live2d.MotionPriority.FORCE)
 
     def set_param(self, pid: str, value: float) -> None:
         self.model.SetSaveParamById(pid, value, 1.0)  # survives Update()

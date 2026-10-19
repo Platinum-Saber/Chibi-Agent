@@ -32,6 +32,35 @@ def test_every_brain_mood_has_a_clip_on_the_chibi_rig():
     assert missing == []
 
 
+def test_looping_groups_reads_meta_loop(tmp_path):
+    import json
+    (tmp_path / "m").mkdir()
+    (tmp_path / "m" / "a.motion3.json").write_text(json.dumps({"Meta": {"Loop": True}}))
+    (tmp_path / "m" / "b.motion3.json").write_text(json.dumps({"Meta": {"Loop": False}}))
+    model = tmp_path / "x.model3.json"
+    model.write_text(json.dumps({"FileReferences": {"Motions": {
+        "Walk": [{"File": "m/a.motion3.json"}], "Wave": [{"File": "m/b.motion3.json"}],
+        "Gone": [{"File": "m/missing.motion3.json"}]}}}))
+    assert motion.looping_groups(model) == {"Walk"}
+    assert motion.looping_groups(tmp_path / "nope.model3.json") == frozenset()
+
+
+def test_raphael_chibi_map_names_exist_in_its_rig():
+    """Every motion group and expression the map asks for exists in the configured rig."""
+    import json
+    from chibi_shared import config
+    from chibi_overlay import outfits
+    rig = outfits.parse(config.load()["overlay"]).outfits["robe"].rigs["chibi"]
+    if not Path(rig).exists():
+        pytest.skip("rig export not on this machine")
+    refs = json.loads(Path(rig).read_text(encoding="utf-8-sig"))["FileReferences"]
+    groups, exps = set(refs.get("Motions", {})), {e["Name"] for e in refs.get("Expressions", [])}
+    m = motion.load(RIGS / "raphael_chibi.toml")
+    clips = list(m.moods.values()) + list(m.moments.values())
+    assert {c.motion for c in clips if c.motion} <= groups
+    assert {c.expression for c in clips if c.expression} <= exps
+
+
 def test_agent_moods_map_to_requestable_brain_moods():
     from chibi_overlay.body.brain import AGENT_MOODS
     assert set(motion.AGENT_TO_BRAIN.values()) <= AGENT_MOODS
