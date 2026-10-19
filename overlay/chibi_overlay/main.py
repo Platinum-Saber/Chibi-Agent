@@ -15,8 +15,7 @@ from chibi_shared import config, paths
 
 from chibi_shared.protocol import Fullscreen
 
-from . import env
-from .body import motion
+from . import env, outfits
 from .link import QtLink
 from .stage import Stage
 from .tray import Tray
@@ -45,15 +44,16 @@ def main() -> None:
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     live2d.init()
     app = QApplication(sys.argv)
-    rigs = {"chibi": motion.load(PKG / cfg["chibi_map"]), "serious": motion.load(PKG / cfg["serious_map"])}
-    models = {"chibi": cfg["chibi_rig"], "serious": cfg["serious_rig"]}
+    wardrobe = outfits.parse(cfg)
+    log.info("outfits: %s; wearing %s", ", ".join(wardrobe.names), wardrobe.current)
     primary = QGuiApplication.primaryScreen()
 
     link = QtLink()
-    stage = Stage(rigs, primary.devicePixelRatio(), link, own_windows=set())
+    stage = Stage(wardrobe, PKG, primary.devicePixelRatio(), link, own_windows=set())
+    link.connected.connect(stage.send_outfit_state)
     windows: list[MonitorWindow] = []
     # One window that follows her between monitors (see MonitorWindow._follow).
-    windows.append(MonitorWindow(primary, stage, models, True, windows))
+    windows.append(MonitorWindow(primary, stage, True, windows))
     app.setQuitOnLastWindowClosed(False)  # the tray keeps her alive while hidden
     win = windows[0]
     fullscreen = {"exe": None}

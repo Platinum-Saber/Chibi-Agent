@@ -12,7 +12,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
-VERSION = 3  # 2: tray commands, state, memory items (M6); 3: Google sign-in (M5)
+VERSION = 4  # 2: tray commands, state, memory items (M6); 3: Google sign-in (M5); 4: outfits
 
 Role = Literal["overlay", "voice"]
 Form = Literal["chibi", "serious"]
@@ -60,6 +60,12 @@ class FormReq(Msg):
     t: Literal["form"] = "form"
     form: Form
     sticky: bool = False
+
+
+class OutfitReq(Msg):
+    """Change into another outfit (a name from `outfit_state.outfits`); she keeps form and mood."""
+    t: Literal["outfit"] = "outfit"
+    outfit: str
 
 
 class Bubble(Msg):
@@ -129,6 +135,15 @@ class Fullscreen(Msg):
     t: Literal["fullscreen"] = "fullscreen"
     active: bool
     exe: str = ""
+
+
+class OutfitState(Msg):
+    """What she wears and can wear: on connect, after each change, and as a refusal (ok=False)."""
+    t: Literal["outfit_state"] = "outfit_state"
+    outfit: str
+    outfits: list[str] = []
+    ok: bool = True
+    error: str = ""
 
 
 CommandName = Literal[
@@ -201,8 +216,9 @@ class Lip(Msg):
 
 
 Message = Annotated[
-    Union[Hello, Welcome, Quit, MoodReq, FormReq, Bubble, Hud, Confirm, Cloud, Visibility,
-          MoodAck, ConfirmResult, Touch, TextInput, FileDrop, Fullscreen, Command, State, MemoryItems,
+    Union[Hello, Welcome, Quit, MoodReq, FormReq, OutfitReq, Bubble, Hud, Confirm, Cloud, Visibility,
+          MoodAck, ConfirmResult, Touch, TextInput, FileDrop, Fullscreen, OutfitState, Command, State,
+          MemoryItems,
           Ptt, Transcript, Speak, SpeakState, Stop, Load, Lip],
     Field(discriminator="t"),
 ]

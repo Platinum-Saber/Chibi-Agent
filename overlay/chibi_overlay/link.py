@@ -12,11 +12,12 @@ from chibi_shared.wsclient import AgentLink
 
 class QtLink(QObject):
     received = Signal(object)  # a chibi_shared.protocol message
+    connected = Signal()  # after each handshake with the agent
 
     def __init__(self):
         super().__init__()
         self._loop = asyncio.new_event_loop()
-        self._link = AgentLink("overlay")
+        self._link = AgentLink("overlay", on_connect=self.connected.emit)
         self._thread = threading.Thread(target=self._run, name="agent-link", daemon=True)
 
     def start(self) -> None:

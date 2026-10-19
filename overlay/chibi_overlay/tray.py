@@ -1,7 +1,7 @@
-"""Tray icon and menu: show/hide, mute, gaming mode, memory, settings, Google accounts,
+"""Tray icon and menu: show/hide, mute, gaming mode, outfit, memory, settings, Google accounts,
 notification access, autostart, quit.
 
-Show/hide is handled here (it's only about the window); everything else is a
+Show/hide and the outfit are handled here (they're only about her look); everything else is a
 `Command` to the agent, which owns the state and echoes it back as `State` so
 the check marks always match what is really happening.
 """
@@ -82,6 +82,8 @@ class Tray:
         self.a_mute = self._action(m, "Mute voice", lambda on: self._cmd("mute" if on else "unmute"), True)
         self.a_gaming = self._action(m, "Gaming mode (free GPU memory)",
                                      lambda on: self._cmd("gaming_on" if on else "gaming_off"), True)
+        self.outfit_menu = m.addMenu("Outfit")
+        self.outfit_menu.aboutToShow.connect(self._outfit_items)
         m.addSeparator()
         self._action(m, "Memory…", lambda: self._cmd("memory_list"))
         self._action(m, "Settings (config.toml)…", lambda: self._cmd("open_settings"))
@@ -114,6 +116,16 @@ class Tray:
         self._action(g, "Add Google account…", lambda: self._cmd("google_signin"))
         if len(accounts) > 1:
             self._action(g, "Sign out of all", lambda: self._cmd("google_signout"))
+
+    def _outfit_items(self) -> None:
+        """Changing clothes is local (Kryo clicked it); the stage tells the agent."""
+        o = self.outfit_menu
+        o.clear()
+        for name in self.stage.wardrobe.names:
+            a = self._action(o, name.capitalize(), lambda _=False, n=name: self.stage.request_outfit(n), True)
+            a.blockSignals(True)
+            a.setChecked(name == self.stage.outfit)
+            a.blockSignals(False)
 
     def _cmd(self, name: str, arg: str = "") -> None:
         self.link.send(Command(name=name, arg=arg))

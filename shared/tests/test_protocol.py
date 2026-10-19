@@ -18,6 +18,8 @@ SAMPLES = [
     p.Command(name="notif_access"),
     p.Command(name="google_signout", arg="a@x.com"),
     p.MemoryItems(items=[(1, "Kryo likes tea.")]),
+    p.OutfitReq(outfit="coat"), p.OutfitState(outfit="robe", outfits=["robe", "coat"]),
+    p.OutfitState(outfit="robe", outfits=["robe"], ok=False, error="no outfit 'cape'"),
     p.Ptt(down=True), p.Transcript(text="hello", ms=180), p.Speak(utt_id="u", text="Hi.", clip="answer"),
     p.SpeakState(utt_id="u", state="end"), p.Stop(), p.Load(t="unload", what="tts"), p.Lip(rms=0.3),
 ]

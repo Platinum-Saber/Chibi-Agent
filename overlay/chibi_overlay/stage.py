@@ -12,15 +12,17 @@ import random
 import time
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from chibi_shared.protocol import (Bubble, Confirm, ConfirmResult, FormReq, Hud, Lip, MoodAck,
-                                   MoodReq, Quit, Touch, Visibility)
+                                   MoodReq, OutfitReq, OutfitState, Quit, Touch, Visibility)
 
 from .body import motion
 from .body.brain import Brain, Mood
 from .body.motion import Clip, RigMap
 from .body.physics import Physics, Rect
 from .env import Ground, MediaWatcher
+from .outfits import Wardrobe
 
 log = logging.getLogger(__name__)
 
@@ -58,8 +60,14 @@ class Overlays:
 
 
 class Stage:
-    def __init__(self, rigs: dict[str, RigMap], scale: float, link, own_windows: set[int]):
-        self.rigs = rigs
+    def __init__(self, wardrobe: Wardrobe, pkg: Path, scale: float, link, own_windows: set[int]):
+        self.wardrobe, self.pkg = wardrobe, pkg
+        self.outfit = wardrobe.current
+        self.rigs: dict[str, RigMap] = wardrobe.outfits[self.outfit].load_maps(pkg)
+        self.rig_paths: dict[str, str] = dict(wardrobe.outfits[self.outfit].rigs)  # form -> model3.json
+        self.outfit_gen = 0  # bumped on each change; the windows reload their puppets
+        self._outfit_next: tuple[str, dict[str, RigMap]] | None = None  # waiting for its puff
+        self._outfit_to: tuple[str, dict[str, RigMap]] | None = None    # puffing now
         self.scale = scale
         self.link = link
         self.brain = Brain()
@@ -198,7 +206,8 @@ class Stage:
             self.serious_until = now_s + SERIOUS_HOLD_S
         want = self.form_target if self.sticky else (
             "serious" if now_s < self.serious_until or self.ov.confirm else "chibi")
-        if want != self.form and self.transform_t0 is None and not self.dragging:
+        if (want != self.form or self._outfit_next) and self.transform_t0 is None and not self.dragging:
+            self._outfit_to, self._outfit_next = self._outfit_next, None  # a pending outfit rides along
             self._start_transform(want, now_s)
         self._step_transform(now_s, dt)
 
@@ -227,6 +236,9 @@ class Stage:
         if age >= TRANSFORM_S / 2 and self.form != self._to:
             self.form = self._to
             log.info("form -> %s", self.form)
+        if age >= TRANSFORM_S / 2 and self._outfit_to:
+            self._wear(*self._outfit_to)
+            self._outfit_to = None
         for p in self.particles:  # spiral up
             p.phase += dt * 6
             p.x += (p.vx + 80 * math.sin(p.phase)) * dt * self.scale
@@ -234,6 +246,43 @@ class Stage:
         if age >= TRANSFORM_S:
             self.transform_t0 = None
             self.particles = []
+
+    # --- outfits -----------------------------------------------------------------------------
+    def request_outfit(self, name: str) -> None:
+        """Queue a change of outfit; `tick` plays it behind the puff. Bad names and missing
+        files are refused here, so the windows never try to load a broken model."""
+        outfit = self.wardrobe.outfits.get(name)
+        if outfit is None:
+            self.send_outfit_state(f"no outfit {name!r}")
+            return
+        heading_to = self._outfit_to[0] if self._outfit_to else self.outfit
+        if name == heading_to:
+            self._outfit_next = None
+            self.send_outfit_state()
+            return
+        missing = outfit.missing_models()
+        if missing:
+            self.send_outfit_state(f"{name}: model not found: {', '.join(missing)}")
+            return
+        try:
+            maps = outfit.load_maps(self.pkg)
+        except (OSError, ValueError) as e:  # tomllib.TOMLDecodeError is a ValueError
+            self.send_outfit_state(f"{name}: bad rig map: {e}")
+            return
+        self._outfit_next = (name, maps)
+
+    def _wear(self, name: str, maps: dict[str, RigMap]) -> None:
+        """Midway through the puff: swap the maps and model paths; the windows reload."""
+        self.outfit, self.rigs = name, maps
+        self.rig_paths = dict(self.wardrobe.outfits[name].rigs)
+        self.geom = {}
+        self.outfit_gen += 1
+        log.info("outfit -> %s", name)
+        self.send_outfit_state()
+
+    def send_outfit_state(self, error: str = "") -> None:
+        self.link.send(OutfitState(outfit=self.outfit, outfits=self.wardrobe.names,
+                                   ok=not error, error=error))
 
     def transform_progress(self) -> float | None:
         if self.transform_t0 is None:
@@ -269,6 +318,8 @@ class Stage:
             self.form_target = msg.form
             if not msg.sticky:
                 self.serious_until = now_s + SERIOUS_HOLD_S if msg.form == "serious" else 0.0
+        elif isinstance(msg, OutfitReq):
+            self.request_outfit(msg.outfit)
         elif isinstance(msg, Hud):
             self.ov.hud = msg if (msg.title or msg.items) else None
         elif isinstance(msg, Confirm):

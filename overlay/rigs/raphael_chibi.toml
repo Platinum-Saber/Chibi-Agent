@@ -1,0 +1,36 @@
+# Mood -> motion/expression map for Raphael's chibi rig (white robe; other outfits
+# share it). Group and expression names come from docs/rig-checklist.md; each
+# group holds one motion at index 0. Stub: untested until the rig is exported.
+# A clip is { motion = "<group>", index = <n> (omit for random), expression = "<name>" }.
+# Moods missing here fall back to `idle`.
+height_dip = 180  # feet to head top in DIPs; was 140 (the rig's acceptance gate), raised for Kryo 2026-10-19
+
+[moods]
+idle         = { motion = "Idle", expression = "neutral" }
+surprised    = { motion = "Surprised", index = 0, expression = "surprised" }
+pout         = { motion = "Pout", index = 0, expression = "pout" }
+crying       = { motion = "Upset", index = 0, expression = "upset" }
+happy        = { motion = "Happy", index = 0, expression = "happy" }
+held         = { motion = "Held", index = 0, expression = "surprised" }
+falling      = { motion = "Fall", index = 0, expression = "surprised" }
+soft_landing = { motion = "Land", index = 0, expression = "happy" }
+dizzy        = { motion = "Dizzy", index = 0, expression = "upset" }
+walking      = { motion = "Walk", index = 0, expression = "neutral" }
+wander       = { motion = "Walk", index = 0, expression = "neutral" }
+sleeping     = { motion = "Sleep", index = 0, expression = "sleepy" }
+dancing      = { motion = "Idle", index = 0, expression = "happy" }
+cursor_near  = { expression = "happy" }
+cursor_far   = { expression = "neutral" }
+talking      = { expression = "neutral" }
+thinking     = { motion = "Think", index = 0, expression = "thinking" }
+working      = { motion = "Analyse", index = 0, expression = "focused" }
+alert        = { motion = "Notice", index = 0, expression = "warning" }
+
+[moments]
+look_around = { motion = "LookAround", index = 0 }
+stretch     = { motion = "Stretch", index = 0, expression = "happy" }
+analyse     = { motion = "Analyse", index = 0, expression = "focused" }
+sit         = { motion = "Sit", index = 0, expression = "neutral" }
+wave        = { motion = "Wave", index = 0, expression = "happy" }
+curious     = { motion = "Notice", index = 0, expression = "thinking" }
+thinking    = { motion = "Think", index = 0, expression = "thinking" }

@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
 import websockets
 
@@ -26,8 +26,9 @@ class AgentLink:
     agent restarts; `send()` drops messages while disconnected instead of blocking.
     """
 
-    def __init__(self, role: Role):
+    def __init__(self, role: Role, on_connect: Callable[[], None] | None = None):
         self.role = role
+        self.on_connect = on_connect  # after each handshake, e.g. to announce state
         self._ws = None
         self._closed = False
 
@@ -48,6 +49,8 @@ class AgentLink:
                 self._ws = await self._connect()
                 delay = 0.25
                 log.info("connected to agent as %s", self.role)
+                if self.on_connect:
+                    self.on_connect()
                 async for raw in self._ws:
                     yield decode(raw)
             except websockets.ConnectionClosed as e:

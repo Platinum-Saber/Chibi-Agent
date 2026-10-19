@@ -43,6 +43,7 @@ Agent → overlay:
 |---|---|
 | `mood` | `{mood, priority, ttl_ms}`. The brain may refuse; it replies with `mood_ack{accepted}` |
 | `form` | `{form: "chibi" \| "serious", sticky: bool}` |
+| `outfit` | `{outfit}`: change into another outfit (a name from `outfit_state.outfits`); form, mood and facing stay. The overlay answers with `outfit_state` |
 | `bubble` | `{text, stream: bool, done: bool}`: streamed reply text |
 | `hud` | `{title, items[], progress?}`: serious-form panel |
 | `confirm` | `{call_id, tool, summary, detail}`: Yes / No buttons on the HUD |
@@ -58,6 +59,7 @@ Overlay → agent:
 | `text_input` | `{text}`: typed in the bubble |
 | `file_drop` | `{paths[]}`: files dropped on her ("what is this?") |
 | `fullscreen` | `{active: bool, exe}`: the overlay watches the foreground window |
+| `outfit_state` | `{outfit, outfits[], ok: bool, error}`: what she wears and can wear. Sent on connect, after each change, and as the refusal of a bad `outfit` (`ok: false`, unknown name, missing model file or bad map). The agent keeps it in `Controller.outfit` / `.outfits` |
 
 Voice ↔ agent:
 
@@ -175,8 +177,12 @@ sequenceDiagram
   - A 60 Hz timer gets the cursor position and hit-tests it against her current model bounds, using the alpha of her pixels from the last frame (1-pixel `glReadPixels`) and the HUD/cloud rects.
   - It toggles `WS_EX_TRANSPARENT` with `SetWindowLongPtr` only when the state flips.
 - **Rendering:**
-  - `QOpenGLWidget` hosts two live2d-py models (chibi, serious), the particle transform and the HUD (QPainter on the GL surface).
+  - `QOpenGLWidget` hosts two live2d-py models (chibi, serious) of the current outfit, the particle transform and the HUD (QPainter on the GL surface).
   - The overlay renders on whichever GPU drives the primary monitor: the RTX 4060 here (spike 1). Budget ~300 MiB of VRAM for it. Moving it to the 780M (Graphics "Power saving", or a different main display) is untested.
+- **Outfits** (`outfits.py`, docs/character.md → Outfits): one exported model per outfit and form.
+  - Config: `[overlay] outfit = "robe"` picks the current one; `[overlay.outfits.<name>]` has `chibi_rig` / `serious_rig` (`.model3.json`) and optional `chibi_map` / `serious_map`, which default to the shared `[overlay] chibi_map` / `serious_map` (relative to `overlay/`). Old configs with only `[overlay] chibi_rig` / `serious_rig` still work as one outfit, `default`; next to an `outfits` table those keys only fill an outfit's missing rig. An unknown `outfit` falls back to the first one; an outfit without a rig or map stops the overlay at start.
+  - Switching: an `outfit` message or tray → Outfit. The stage checks the name, the model files and the maps first (refusals go back as `outfit_state ok=false`), then plays the transform particle puff without changing form; at its midpoint it swaps the maps and model paths and bumps `outfit_gen`, and the window reloads both puppets in its GL context and re-measures them. Brain, physics, form and facing are untouched. The choice lasts until restart (the config holds the start outfit).
+  - Until her rigs exist, `robe` is Haru/Mao and `coat` is the same two samples swapped.
 - **Body:**
   - `brain.py`: a port of `MascotBrain` (moods, pokes, sleep, Duel/Point → cursor gaze/point).
   - `physics.py`: a port of `MascotPhysics` (gravity, bounces, floor = taskbar top / focused window's title-bar top, found with `GetWindowRect` + `DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS)`).
@@ -231,7 +237,7 @@ Chibi-Agent/
   docs/                   # scope, character, architecture, spikes
 ```
 - **Python and environments:** uv. One venv per process family if the Qt pin forces it (overlay on 3.11, agent and voice on 3.12).
-- **Models:** they live outside the repo (`F:\ChibiAgent\models`). Ollama's model dir is set with `OLLAMA_MODELS`; that's your setting to change.
+- **Models:** they live outside the repo (`D:\Projects\Chibi-Agent-Project\ChibiAgent\models`). Ollama's model dir is set with `OLLAMA_MODELS`; that's your setting to change.
 
 ## Spikes before building
 1. **Overlay:** PySide6 + live2d-py with a sample model (Hiyori) in a transparent, always-on-top, click-through window on the iGPU, on both monitors.

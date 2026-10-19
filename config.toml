@@ -7,7 +7,7 @@ voice = true
 [ollama]
 url = "http://127.0.0.1:11434"
 exe = '%LOCALAPPDATA%\Programs\Ollama\ollama.exe'
-models_dir = 'F:\ChibiAgent\ollama'   # set for the child process only
+models_dir = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\ollama'   # set for the child process only
 start_if_down = true
 model = "qwen3.5:4b"
 embed_model = "nomic-embed-text"
@@ -16,9 +16,9 @@ temperature = 0.4        # qwen3.5 defaults to 1.0, which made tool choice errat
 keep_alive = "120s"
 
 [voice]
-hf_home = 'F:\ChibiAgent\hf'
-reference = 'F:\ChibiAgent\voice\ref_06_clean.wav'   # variant B: noise-reduced + EQ (spikes/voice/tune_voice.py)
-reference_text = 'F:\ChibiAgent\voice\ref_06.txt'
+hf_home = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\hf'
+reference = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\voice\ref_06_clean.wav'   # variant B: noise-reduced + EQ (spikes/voice/tune_voice.py)
+reference_text = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\voice\ref_06.txt'
 speed = 0.90
 nfe = 8
 stt_model = "small.en"
@@ -28,11 +28,27 @@ push_to_talk = "alt+1"
 look_at_screen = "ctrl+alt+s"
 
 [overlay]
-# Placeholders (Live2D samples) until her real rigs exist. *_map paths are relative to overlay/.
-chibi_rig = 'F:\ChibiAgent\rigs\chibi\Haru.model3.json'
+# The outfit she wears (one of [overlay.outfits.*]); the agent can change it while she runs.
+outfit = "robe"
+# Shared mood maps (relative to overlay/); an outfit may set its own chibi_map / serious_map.
 chibi_map = 'rigs/haru.toml'
-serious_rig = 'F:\ChibiAgent\rigs\serious\Mao.model3.json'
 serious_map = 'rigs/mao.toml'
+
+# One exported model per outfit and form (docs/character.md -> Outfits).
+# Placeholders (Live2D samples) until her real rigs exist.
+[overlay.outfits.robe]
+# Testing her own chibi rig (runtime v20: hair physics + 9 expressions, 2026-10-19; was v04); Haru was:
+# chibi_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\chibi\Haru.model3.json'
+chibi_rig = 'D:\Character Design\output\runtime\chibi\robe\Raphael_chibi_robe_v20.model3.json'
+chibi_map = 'rigs/raphael_chibi.toml'
+serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
+
+[overlay.outfits.coat]
+# Stand-in: the two samples swapped, so a switch is easy to see.
+chibi_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
+chibi_map = 'rigs/mao.toml'
+serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\chibi\Haru.model3.json'
+serious_map = 'rigs/haru.toml'
 
 [tools]
 # Folders file tools may read and change (no deleting in v1).

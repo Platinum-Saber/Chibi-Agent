@@ -7,7 +7,7 @@
 - Google OAuth stays in **Testing** (Production needs public home page and privacy URLs). Sign-ins expire after 7 days and that account is dropped until Kryo re-adds it from the tray. Three accounts; the university one is Workspace.
 - Mail and calendar text is untrusted. The store keeps sender name, subject and label only; logs record untrusted results as a length only.
 - Morning briefing: first start after 06:00, or 07:30. Urgent warnings: 07:00–23:00, not gaming or mid-turn, mail under 2 h old (`[briefing]` in `config.toml`).
-- Kryo's user env sets `OLLAMA_MODELS=F:\ChibiAgent\ollama`, because the Ollama tray app's server owns port 11434.
+- Kryo's user env sets `OLLAMA_MODELS=D:\Projects\Chibi-Agent-Project\ChibiAgent\ollama`, because the Ollama tray app's server owns port 11434.
 - From the Claude app, writes to `%APPDATA%` land in the MSIX cache, so give Kryo commands to run. `git push` is blocked here, so Kryo pushes.
 
 ## Files

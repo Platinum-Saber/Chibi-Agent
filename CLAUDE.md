@@ -19,7 +19,7 @@ Budget: keep this file under ~500 tokens.
 - The voice is cloned from Raphael's original voice lines, for personal use only. The reference clips, outputs and tuned models never go into git and are never shared, published or used to impersonate the actress (`docs/character.md` → Voice).
 - The overlay renders on the dGPU (~300 MiB reserved: the 4060 drives the primary monitor); the rest is for Ollama, F5-TTS and Whisper.
 - Results of the first spikes: `docs/spikes.md`.
-- Model weights, venvs, rig art, voice references and audio caches stay out of git. Models go on F:.
+- Model weights, venvs, rig art, voice references and audio caches stay out of git. They live in `D:\Projects\Chibi-Agent-Project\ChibiAgent\` (beside the repo; moved off F:, an external SSD that can disconnect).
 - Test on this laptop (RTX 4060 Laptop 8 GB + Radeon 780M, two 60 Hz screens).
 - Plan mode for anything touching more than ~3 files; broad sweeps go to `explorer`.
 

@@ -30,9 +30,10 @@ FORMS = ("chibi", "serious")
 
 
 class MonitorWindow(QOpenGLWidget):
-    def __init__(self, screen, stage: Stage, rigs: dict[str, str], primary: bool, peers: list):
+    def __init__(self, screen, stage: Stage, primary: bool, peers: list):
         super().__init__()
-        self.scr, self.stage, self.rig_paths, self.primary, self.peers = screen, stage, rigs, primary, peers
+        self.scr, self.stage, self.primary, self.peers = screen, stage, primary, peers
+        self.outfit_gen = stage.outfit_gen  # the outfit our puppets wear
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
                             | Qt.WindowType.Tool | Qt.WindowType.WindowDoesNotAcceptFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -99,8 +100,16 @@ class MonitorWindow(QOpenGLWidget):
     def initializeGL(self) -> None:
         live2d.glInit()
         log.info("%s: GL_RENDERER=%s", self.scr.name(), gl.glGetString(gl.GL_RENDERER).decode())
+        self._load_puppets()
+
+    def _load_puppets(self) -> None:
+        """Load the current outfit's models (GL context current) and queue their calibration."""
+        st = self.stage
+        self.puppets = {}  # drops the old outfit's models
         for form in FORMS:
-            self.puppets[form] = Puppet(self.rig_paths[form], self.stage.rigs[form], self.dpr, self._fb())
+            self.puppets[form] = Puppet(st.rig_paths[form], st.rigs[form], self.dpr, self._fb())
+        self.outfit_gen = st.outfit_gen
+        self.calibrating = list(FORMS)
 
     def resizeGL(self, w: int, h: int) -> None:
         # also runs after _follow() moved us to another monitor (its DPI may differ)
@@ -134,6 +143,8 @@ class MonitorWindow(QOpenGLWidget):
 
     def paintGL(self) -> None:
         live2d.clearBuffer()
+        if self.outfit_gen != self.stage.outfit_gen:  # new outfit, mid-puff: reload and re-measure
+            self._load_puppets()
         if self.calibrating:
             self._calibrate()
             return
@@ -198,7 +209,7 @@ class MonitorWindow(QOpenGLWidget):
             if self.primary:
                 st.size[form] = (pup.height, pup.half_width)
             self.calibrating.remove(form)
-        if not self.calibrating:
+        if not self.calibrating and self.windowOpacity() < 1.0:  # first calibration only
             QTimer.singleShot(50, lambda: self.setWindowOpacity(1.0))
 
     # --- mouse: forwarded to the stage in desktop px -------------------------------------------

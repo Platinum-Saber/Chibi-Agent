@@ -62,7 +62,7 @@ Left open (only if the budget gets tight): the Graphics "Power saving" setting (
 
 ## Spike 2: voice
 
-**Setup:** `spikes/voice/` (uv, Python 3.12): torch 2.11.0+cu128, f5-tts 1.1.22 (F5TTS_v1_Base), faster-whisper 1.2.1, kokoro-onnx 0.6.1 (CPU), pedalboard. Models are in `F:\ChibiAgent\hf` and `F:\ChibiAgent\models\kokoro`. Date: 2026-10-17. The clean runs had the GPU idle; an earlier run with VALORANT open gave about the same F5 numbers.
+**Setup:** `spikes/voice/` (uv, Python 3.12): torch 2.11.0+cu128, f5-tts 1.1.22 (F5TTS_v1_Base), faster-whisper 1.2.1, kokoro-onnx 0.6.1 (CPU), pedalboard. Models are in `D:\Projects\Chibi-Agent-Project\ChibiAgent\hf` and `D:\Projects\Chibi-Agent-Project\ChibiAgent\models\kokoro`. Date: 2026-10-17. The clean runs had the GPU idle; an earlier run with VALORANT open gave about the same F5 numbers.
 - **Run:**
   - `.venv\Scripts\python tts_bench.py`
   - `.venv\Scripts\python stt_bench.py`
@@ -115,7 +115,7 @@ Left open (only if the budget gets tight): the Graphics "Power saving" setting (
 
 ## Spike 3: brain
 
-**Setup:** Ollama 0.40.5 (`winget`). Its tray app was stopped, and `ollama serve` runs with `OLLAMA_MODELS=F:\ChibiAgent\ollama` and `OLLAMA_FLASH_ATTENTION=1` set for that process only.
+**Setup:** Ollama 0.40.5 (`winget`). Its tray app was stopped, and `ollama serve` runs with `OLLAMA_MODELS=D:\Projects\Chibi-Agent-Project\ChibiAgent\ollama` and `OLLAMA_FLASH_ATTENTION=1` set for that process only.
 - **Models:** `qwen3.5:4b` (4.2 B, Q4_K_M, vision + tools + thinking; thinking is **on by default**, so we send `think: false`) and `nomic-embed-text`.
 - **Run (in `spikes/brain/`):**
   - `.venv\Scripts\python tool_bench.py tools|vision|embed`

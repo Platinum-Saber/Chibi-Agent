@@ -25,6 +25,10 @@ from .tts import MODEL, Tts
 
 log = logging.getLogger(__name__)
 
+# After a failed F5 load, a live sentence retries it at most this often (a reply's
+# sentences would otherwise each wait out a ~15 s load that fails the same way).
+TTS_RETRY_S = 30.0
+
 
 class VoiceApp:
     def __init__(self, vcfg: dict, send):
@@ -40,6 +44,7 @@ class VoiceApp:
         self._stt_pool = ThreadPoolExecutor(1, thread_name_prefix="stt")
         self._bg: set[asyncio.Task] = set()
         self.loading: asyncio.Future | None = None
+        self._tts_failed_at: float | None = None  # monotonic time of the last failed load
 
     # --- plumbing ---------------------------------------------------------------
     async def _on(self, pool: ThreadPoolExecutor, fn, *args):
@@ -64,11 +69,24 @@ class VoiceApp:
     async def load_tts(self) -> None:
         try:
             await self._on(self._tts_pool, self.tts.load)
+            self._tts_failed_at = None
             made = await self._on(self._tts_pool, self.clips.ensure, self.tts.synth)
             if made:
                 log.info("rendered %d clips", len(made))
         except Exception:
+            if not self.tts.loaded:
+                self._tts_failed_at = time.monotonic()
             log.exception("tts load failed")
+
+    async def _retry_tts(self) -> None:
+        """A failed load (once: a CUDA error reading the checkpoint) left F5 unloaded and
+        every live sentence silent until a restart. Retry it when speech needs it; an
+        unload the agent asked for (gaming mode) is not a failure and stays unloaded."""
+        failed = self._tts_failed_at
+        if self.tts.loaded or failed is None or time.monotonic() - failed < TTS_RETRY_S:
+            return
+        log.info("tts failed to load earlier; retrying for live speech")
+        await self.load_tts()
 
     def start(self) -> None:
         try:
@@ -87,6 +105,7 @@ class VoiceApp:
                 data, sr = await asyncio.to_thread(sf.read, str(path), dtype="float32")
                 return data, sr
             log.info("no clip for %r; synthesising it", item.clip)
+        await self._retry_tts()
         return await self._on(self._tts_pool, self.tts.synth, item.text or item.clip)
 
     # --- listening ------------------------------------------------------------------
@@ -132,6 +151,7 @@ class VoiceApp:
                 if stt:
                     self._spawn(self._on(self._stt_pool, self.stt.unload))
                 if tts:
+                    self._tts_failed_at = None
                     self._spawn(self._on(self._tts_pool, self.tts.unload))
         else:
             log.debug("ignoring %s", msg.t)

@@ -14,7 +14,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from chibi_shared import paths
-from chibi_shared.protocol import Bubble, Command, Fullscreen, MemoryItems, Message, Role, State
+from chibi_shared.protocol import (Bubble, Command, Fullscreen, MemoryItems, Message, OutfitState, Role,
+                                   State)
 
 from .google_auth import short
 
@@ -34,6 +35,8 @@ class Controller:
         if notify:
             notify.on_access = self.push_state
         self._signing_in: asyncio.Task | None = None
+        self.outfit = ""               # what she wears, from the overlay's `outfit_state`
+        self.outfits: list[str] = []   # what she can wear (change it with `OutfitReq`)
         vram.on_change = self.push_state
         hub.on_message(self.on_message)
         hub.on_connect(self._connected)
@@ -53,6 +56,10 @@ class Controller:
             await self.vram.set_fullscreen(msg.exe if msg.active else "")
         elif isinstance(msg, Command):
             await self.command(msg.name, msg.arg)
+        elif isinstance(msg, OutfitState):
+            self.outfit, self.outfits = msg.outfit, list(msg.outfits)
+            if not msg.ok:
+                log.warning("outfit change refused: %s", msg.error)
 
     async def command(self, name: str, arg: str) -> None:
         log.info("tray: %s %s", name, arg)

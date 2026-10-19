@@ -3,7 +3,7 @@ import os
 import time
 from pathlib import Path
 
-os.environ.setdefault("HF_HOME", r"F:\ChibiAgent\hf")
+os.environ.setdefault("HF_HOME", r"D:\Projects\Chibi-Agent-Project\ChibiAgent\hf")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 import torch  # noqa: E402  (loads cuBLAS/cuDNN DLLs that ctranslate2 also needs)
@@ -24,7 +24,7 @@ torchaudio.load = _load_with_soundfile
 HERE = Path(__file__).parent
 OUT = HERE / "out"
 OUT.mkdir(exist_ok=True)
-KOKORO_DIR = Path(r"F:\ChibiAgent\models\kokoro")
+KOKORO_DIR = Path(r"D:\Projects\Chibi-Agent-Project\ChibiAgent\models\kokoro")
 
 pynvml.nvmlInit()
 _gpu = pynvml.nvmlDeviceGetHandleByIndex(0)

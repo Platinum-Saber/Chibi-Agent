@@ -83,7 +83,7 @@ Target machine: Ryzen 7 7840HS; RTX 4060 Laptop 8 GB; 16 GB single-channel RAM.
 
 - **Latency** from the end of speech to the first audio, target ≤ 1.5 s: STT 0.18 s + LLM to its opener 0.64 s = **0.82 s**, with the opener ("Answer.") playing from a cached clip while F5 renders the next sentence (ready at ~2.0 s). Without cached openers it's 2.0 s (spike 3). She shows a thinking pose meanwhile.
 - **Overlay:** 60 fps, ~1.3 % CPU while idle (spike 1).
-- **Disk:** about 12–16 GB in total for torch, models and voice *(GS: ~16 GB)*. Models go on F:.
+- **Disk:** about 12–16 GB in total for torch, models and voice *(GS: ~16 GB)*. Models live in `D:\Projects\Chibi-Agent-Project\ChibiAgent\`, beside the repo (moved off F:, an external SSD that can disconnect).
 
 ## Success criteria for v1
 - **Voice commands:** "open X", "what's on today", "look at this" pick the right tool in ≥ 9/10 tries.

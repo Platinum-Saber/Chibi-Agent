@@ -5,30 +5,64 @@ Raphael is an **agentic desktop companion** built to help her user, Kryo. In
 the app she presents only as that: no Ultimate Skill, no evolved form of
 Great Sage (decided 2026-10-17). Her look and voice are still inspired by
 Raphael from *That Time I Got Reincarnated as a Slime*. Canon gives that
-Raphael no fixed body, so **we design her look ourselves**, guided by how fans
-usually picture her: silver-white hair, calm eyes, a white-and-gold outfit,
-and holographic "analysis" motifs. This version is for personal use only and
-is never published or sold.
+Raphael no fixed body, so **we design her look ourselves**, from the fan art
+Kryo picked (2026-10-17): hooded white robe, light-blue hair, ruby-red eyes,
+golden halo. The references live in `D:\Projects\Chibi-Agent-Project\ChibiAgent\references\{serious,chibi}\`.
+They're a guide only: they stay out of git, and the final art is new work,
+never traced from them. Where a reference shows gold or yellow eyes, they become ruby red.
+This version is for personal use only and is never published or sold.
 
 ## Visual design
-Shared identity, so both forms read as the same person:
-- **Hair:** long silver-white with a faint cyan sheen, a side braid and a small ahoge.
-- **Eyes:** gold irises with a thin ring of light (lit in the serious form).
-- **Outfit:** a white high-collar coat-dress with gold trim and pale-cyan inner lining. Gloves.
-- **Motif:** a thin floating ring or halo of glyphs behind her head. Hexagon/glyph particles when she "analyses".
-- **Palette:** silver `#E6ECF2`, white `#FAFBFF`, gold `#D8B45A`, cyan glow `#7FE3FF`, ink outline `#2B2F3A`.
+Shared identity, so both forms and every outfit read as the same person:
+- **Hair:** long, straight, light sky-blue, darker blue in the shadows, reaching past the waist. Sharp, uneven bangs fall between the eyes, and long strands frame the face and spill out of the hood. No braid, no ahoge.
+- **Eyes:** ruby-red irises (never gold) with a darker rim, a sharp highlight and a faint vertical-slit pupil. The look is calm and half-lidded; the eyes glow in the serious form.
+- **Face:** pale skin, small nose, small mouth, an expressionless, quietly composed default.
+- **Halo:** an ornate golden sunburst ring behind her head, with long spikes, leaf filigree and red gems. It is small, simplified and dim on the chibi, and large and bright in the serious form. It's part of her, not of an outfit, so it shows with every outfit.
+- **Motifs:** white feathers drifting around her; a glowing cyan-violet orb that floats above her open palm (in front of her chest, between both hands, on the chibi) and crackles with small sparks when she "analyses"; hexagon/glyph particles when she scans.
+- **Palette:**
+  - hair light `#A8DDF5`, hair mid `#6CC0EC`, hair shadow `#3E8FD6`;
+  - eyes ruby `#D4243A`, eye rim `#8E1426`;
+  - skin `#FBE6DA`;
+  - white `#FAFBFF`, cloth shadow `#C8D0E4`;
+  - gold `#D8B45A`, halo gems `#C8372D`;
+  - cyan glow `#7FE3FF`, ink outline `#2B2F3A`.
+
+  These hex values were picked by eye from the references; fix them on the concept sheet.
+
+### Outfits (swappable)
+The outfit is a setting, not part of her identity. v1 has two, the next one is
+planned, and more will come:
+- **White robe** (the default, as in the references): one long piece of white cloth worn as a deep hood and draped toga-style, wrapped across the chest and leaving one shoulder bare, with loose folds and long trailing sleeves. The hood frames her face, and her hair falls out of it in front.
+- **Coat-dress:** a white high-collar coat-dress with gold trim, a pale-cyan lining and gloves. No hood.
+- **Casual coat** (planned, after v1's two; chibi refs 05–06): a navy-blue long coat with white trim down the front, puffy lighter-blue cuffs, a beige scarf (or a fluffy fur collar), dark leggings and blue boots. Optionally a russet cape with a white fur hem, worn over the coat. No hood.
+
+Rules every outfit follows, so outfits stay swappable:
+- Same body, head, face, hair, halo, parameters, expressions and motions. Only the clothing layers change (and, for hooded outfits, the hood and the parts of the hair it hides).
+- **Each outfit is its own exported model**: one `.model3.json` per outfit and form (for example `rigs/chibi/robe/`, `rigs/chibi/coat/`), built from the same rig file by swapping the clothing layers. Putting two outfits in one chibi model would not fit Cubism FREE (one 2048 px texture, ≤ 100 meshes).
+- The outfit is picked in settings or by voice ("change into the coat"), and it's the same in both forms. Switching outfits reloads the model behind a quick feather/glyph puff (for now the transform particles). Config keys and the `outfit` message: `docs/architecture.md` → Overlay internals → Outfits. Voice ("change into the coat") still needs a confirmed agent tool.
 
 ### Chibi form (idle and chat)
-- About 2.5 heads tall, full body, about 140 px on screen. Soft shapes, big expressive eyes, the ring small and dim.
-- She lives on the taskbar or title bars: she walks, sits, sleeps, gets carried and thrown.
+- About 2.5 heads tall, full body, about 140 px on screen. The halo is small and dim.
+- **Style (chibi refs 05–08):**
+  - **Head:** about 2.5 heads tall, so the skull is 40 % of her height. The hair dome and hood make the head read even bigger, close to half her height.
+  - **Hair:** reads as one glossy, slime-like dome, with white shine spots on top and pointed bangs over the forehead. The long side locks fall to her feet.
+  - **Eyes:** big ruby eyes with tall, vertical highlights; the default is calm and half-lidded.
+  - **Face:** pink oval blush and a tiny mouth.
+  - **Body:** a stubby body with short legs. She's barefoot in the robe; the robe drapes like a sheet with one loose tail.
+- **Analysing:** the orb floats in front of her chest between her outstretched hands, with small violet sparks (ref 07).
+- **Idea for a later moment:** she hugs a small slime plush like a pillow while she sits or sleeps, with slime droplets floating around her (ref 08). It isn't in the v1 coverage.
+- She lives on the taskbar or title bars: she walks, sits, sleeps, gets carried and thrown. The robe and hood swing with hair physics.
 
 ### Serious form (work, alerts, on command)
-- Realistic proportions (about 7 heads), shown from the bust or half-body, about 360–420 px tall, floating beside her chibi spot.
-- Composed face, eyes lit, the ring large and bright, with a translucent HUD panel beside her for task progress, briefing items and confirmations.
+- Realistic proportions (about 7 heads), **full body** with bare legs and feet (decided 2026-10-17), about **600–700 px tall** on screen, floating beside her chibi spot.
+  - That makes her head about 90–100 px, big enough for the face to read.
+  - The whole figure must fit within the work area of the 1080p screen, above the taskbar.
+  - The design master is `D:\Character Design\output\masters\serious-robe-front-v2.png`.
+- Composed face, glowing eyes, the halo large and bright, with a translucent HUD panel beside her for task progress, briefing items and confirmations.
 
 ### Transform (about 0.6 s)
-1. The chibi dissolves into cyan/gold glyph particles that spiral up.
-2. The serious model fades in from the particles, the ring expands, and the eyes light up.
+1. The chibi dissolves into cyan/gold glyph particles and white feathers that spiral up.
+2. The serious model fades in from the particles, the halo expands, and the eyes light up.
 3. A soft chime plays, and she says "Confirmed." (cached clip).
 
 The reverse runs on the way back. The effect is drawn by the overlay (a
@@ -48,11 +82,12 @@ make our own.
 
 - **Licence:** the Cubism Core used by live2d-py is under Live2D's SDK licence, which is free for individuals and small entities.
 - **Chibi model:** it's meant to fit the FREE limits.
-- **Serious model:** it may need PRO, for more than 100 meshes or a second texture. Rig it during a PRO trial, or keep it lean: bust only, simpler hair.
+- **Serious model:** a full-body, 7-head rig with 80–120 layers will likely need PRO, for more than 100 meshes or a second texture. Rig it during a PRO trial, or keep it lean: simpler hair, fewer cloth pieces, and legs as two simple parts each.
 
 ### Art pipeline (both forms)
-1. **Concept sheet:** front view, ¾ view and expressions for each form, drawn by you or a commissioned artist. AI image tools are fine for concept exploration; the final art is clean, hand-split layers.
+1. **Concept sheet:** front view, ¾ view and expressions for each form. It can be drawn by Kryo, commissioned, or **AI-generated**.
 2. **Layered PSD:** each moving part on its own layer, with the hidden parts painted underneath (for example, the hair behind the face).
+   - The layers can be AI-generated too, but not as separate parts glued together (output v1 showed why). Cut them from the approved master, then complete what each part hides (`D:\Character Design\output\improvements.md`).
    - Chibi: about 40–60 layers.
    - Serious: about 80–120 layers.
    - Standard names (`face`, `eye_L_white`, `eye_L_iris`, `brow_L`, `mouth_upper`, `hair_front_1`, …) so the rigging stays predictable.
@@ -73,25 +108,30 @@ focused, warning.
 
 | Motion | Chibi | Serious |
 |---|---|---|
-| idle (breath, blink, ring float) | ✓ | ✓ |
+| idle (breath, blink, halo float) | ✓ | ✓ |
 | talk (lip sync driven live from audio RMS) | ✓ | ✓ |
 | think (hand to chin, eyes up, glyphs) | ✓ | ✓ |
 | notice (small start, looks at the cloud/HUD) | ✓ | ✓ |
 | happy / pout / surprised / upset | ✓ | — |
 | held (dangle) / fall / land / dizzy | ✓ | — |
 | walk (cycle, flipped by facing) / sit / sleep | ✓ | — |
-| analyse (hand raised, HUD scan) | — | ✓ |
+| analyse (chibi: arms out, orb between the hands; serious: hand raised, HUD scan) | ✓ | ✓ |
 | report (presenting gesture toward the HUD) | — | ✓ |
-| warn (stern face, ring turns amber) | — | ✓ |
+| warn (stern face, halo turns amber) | — | ✓ |
 
 Movement across the screen, throw arcs, squash on landing and facing are
 done by the overlay (window position, scale, flip), not by the rig.
 
 ### Future (after the v1 release): a VRoid 3D model
+**Update (2026-10-17):** a spike now tests building her in **Blender** by script, from a
+licensed VRM base model, instead of in VRoid Studio (`handoffs/blender-vrm-spike.md`).
+Its results decide whether 3D replaces or backs up the Live2D rigs.
+
 v1 ships with the 2D Live2D rigs. After that we build our own Raphael in
 VRoid Studio:
 - one model, with a chibi-proportion variant for the chibi form;
-- ruby-red eyes and a more feminine face;
+- the same ruby-red eyes, light-blue hair and halo, and a more feminine face;
+- the same swappable outfits (white robe, coat-dress, and later ones);
 - toon shading, so she still reads as anime.
 
 The look to aim for is
@@ -112,7 +152,7 @@ waits until she lands.
 | Mood requested / event | Form | Motion + expression |
 |---|---|---|
 | idle (no request) | chibi | idle; idle moments every 8–20 s; sleep after 60 s of quiet |
-| listening (PTT held) | current | idle + looks at the cursor, ring brightens |
+| listening (PTT held) | current | idle + looks at the cursor, halo brightens |
 | thinking (waiting for the LLM) | current | think |
 | talking | current | talk + the expression from the reply's tone tag |
 | working (tool run, file search, screen read) | **serious** | analyse; HUD shows the step |
