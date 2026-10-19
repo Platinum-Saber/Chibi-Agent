@@ -3,7 +3,7 @@
 # group holds one motion at index 0. Stub: untested until the rig is exported.
 # A clip is { motion = "<group>", index = <n> (omit for random), expression = "<name>" }.
 # Moods missing here fall back to `idle`.
-height_dip = 180  # feet to head top in DIPs; was 140 (the rig's acceptance gate), raised for Kryo 2026-10-19
+height_dip = 240  # feet to head top in DIPs; was 140 (the rig's acceptance gate), raised for Kryo 2026-10-19 (180, then 240 so the face reads)
 
 [moods]
 idle         = { motion = "Idle", expression = "neutral" }

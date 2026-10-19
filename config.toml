@@ -37,9 +37,9 @@ serious_map = 'rigs/mao.toml'
 # One exported model per outfit and form (docs/character.md -> Outfits).
 # Placeholders (Live2D samples) until her real rigs exist.
 [overlay.outfits.robe]
-# Testing her own chibi rig (runtime v20: hair physics + 9 expressions, 2026-10-19; was v04); Haru was:
+# Testing her own chibi rig (runtime v21: physics, 9 expressions, 18 motions, readable face; 2026-10-19); Haru was:
 # chibi_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\chibi\Haru.model3.json'
-chibi_rig = 'D:\Character Design\output\runtime\chibi\robe\Raphael_chibi_robe_v20.model3.json'
+chibi_rig = 'D:\Character Design\output\runtime\chibi\robe\Raphael_chibi_robe_v21.model3.json'
 chibi_map = 'rigs/raphael_chibi.toml'
 serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
 
