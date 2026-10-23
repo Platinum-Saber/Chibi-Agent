@@ -1,0 +1,36 @@
+# Mood -> sequence/expression map for her chibi drawn as an image pack (svg-rig
+# branch; chibi_overlay/sprites.py). Motion names are SEQUENCES keys there;
+# expressions are the pack's expressions/<name>.png. Every mood names a motion,
+# so a looping sequence never carries over into the next mood.
+# A clip is { motion = "<sequence>", expression = "<name>" }. Moods missing here fall back to `idle`.
+height_dip = 320  # feet to head top in DIPs
+
+[moods]
+idle         = { motion = "Idle", expression = "neutral" }
+surprised    = { motion = "Surprised", expression = "surprised" }
+pout         = { motion = "Pout", expression = "pout" }
+crying       = { motion = "Upset", expression = "upset" }
+happy        = { motion = "Happy", expression = "happy" }
+held         = { motion = "Held", expression = "surprised" }
+falling      = { motion = "Fall", expression = "surprised" }
+soft_landing = { motion = "Land", expression = "happy" }
+dizzy        = { motion = "Dizzy", expression = "upset" }
+walking      = { motion = "Walk", expression = "neutral" }
+wander       = { motion = "Walk", expression = "neutral" }
+sleeping     = { motion = "Sleep", expression = "sleepy" }
+dancing      = { motion = "Dance", expression = "happy" }
+cursor_near  = { motion = "Idle", expression = "happy" }
+cursor_far   = { motion = "Idle", expression = "neutral" }
+talking      = { motion = "Talk", expression = "neutral" }
+thinking     = { motion = "Think", expression = "thinking" }
+working      = { motion = "Analyse", expression = "focused" }
+alert        = { motion = "Notice", expression = "warning" }
+
+[moments]
+look_around = { motion = "LookAround", expression = "neutral" }
+stretch     = { motion = "Stretch", expression = "happy" }
+analyse     = { motion = "Analyse", expression = "focused" }
+sit         = { motion = "Sit", expression = "neutral" }
+wave        = { motion = "Wave", expression = "happy" }
+curious     = { motion = "Notice", expression = "thinking" }
+thinking    = { motion = "Think", expression = "thinking" }

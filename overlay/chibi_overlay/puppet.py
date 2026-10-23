@@ -16,6 +16,9 @@ import numpy as np
 import OpenGL.GL as gl
 
 from .body.motion import Clip, RigMap, looping_groups
+from .sprites import PREFIX as SPRITES, SpriteModel
+from .vector import PREFIX as VECTOR
+from .vector.model import VectorModel
 
 log = logging.getLogger(__name__)
 
@@ -44,10 +47,15 @@ class Geom:
 
 
 class Puppet:
-    def __init__(self, model_json: str, rig: RigMap, dpr: float, fb_size: tuple[int, int]):
+    def __init__(self, model_json: str, rig: RigMap, dpr: float, fb_size: tuple[int, int], widget=None):
         self.rig, self.dpr = rig, dpr
-        self.model = live2d.Model()
-        self.model.LoadModelJson(model_json)
+        if model_json.startswith(SPRITES):  # an image pack (svg-rig branch), drawn with QPainter on `widget`
+            self.model = SpriteModel(model_json[len(SPRITES):], widget)
+        elif model_json.startswith(VECTOR):  # the code-drawn vector rig (svg-rig branch)
+            self.model = VectorModel(model_json[len(VECTOR):], widget)
+        else:
+            self.model = live2d.Model()
+            self.model.LoadModelJson(model_json)
         self.model.Resize(*fb_size)
         self.fb = fb_size
         self.scale = 1.0

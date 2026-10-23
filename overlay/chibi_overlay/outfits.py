@@ -14,6 +14,8 @@ from pathlib import Path
 
 from .body import motion
 from .body.motion import RigMap
+from .sprites import PREFIX as SPRITES
+from .vector import PREFIX as VECTOR
 
 log = logging.getLogger(__name__)
 FORMS = ("chibi", "serious")
@@ -30,7 +32,8 @@ class Outfit:
         return {form: motion.load(pkg / self.maps[form]) for form in FORMS}
 
     def missing_models(self) -> list[str]:
-        return [p for p in self.rigs.values() if not Path(p).exists()]
+        return [p for p in self.rigs.values()
+                if not p.startswith(VECTOR) and not Path(p.removeprefix(SPRITES)).exists()]
 
 
 @dataclass(frozen=True)

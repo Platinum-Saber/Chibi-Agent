@@ -29,7 +29,7 @@ look_at_screen = "ctrl+alt+s"
 
 [overlay]
 # The outfit she wears (one of [overlay.outfits.*]); the agent can change it while she runs.
-outfit = "aniya"  # her own robe rig is "robe"
+outfit = "casual_coat"  # her own robe rig is "robe"; was "aniya"
 # Stay in the chibi form (no switch to serious while working/alerting); the HUD and
 # confirm buttons then show beside the chibi. Off by default; on for now (Kryo, 2026-10-19).
 chibi_only = true
@@ -44,6 +44,13 @@ serious_map = 'rigs/mao.toml'
 # chibi_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\chibi\Haru.model3.json'
 chibi_rig = 'D:\Character Design\output\runtime\chibi\robe\Raphael_chibi_robe_v21.model3.json'
 chibi_map = 'rigs/raphael_chibi.toml'
+serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
+
+[overlay.outfits.casual_coat]
+# svg-rig branch: her chibi as Kryo's casual-coat image pack (chibi_overlay/sprites.py), not Live2D.
+# Wear it with outfit = "casual_coat" above, or ask her to change outfit.
+chibi_rig = 'sprites:D:\Character Design\output\assets\chibi\casual-coat\v01'
+chibi_map = 'rigs/raphael_sprites.toml'
 serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
 
 [overlay.outfits.aniya]

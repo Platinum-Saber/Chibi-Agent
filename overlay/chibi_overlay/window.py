@@ -107,7 +107,7 @@ class MonitorWindow(QOpenGLWidget):
         st = self.stage
         self.puppets = {}  # drops the old outfit's models
         for form in FORMS:
-            self.puppets[form] = Puppet(st.rig_paths[form], st.rigs[form], self.dpr, self._fb())
+            self.puppets[form] = Puppet(st.rig_paths[form], st.rigs[form], self.dpr, self._fb(), self)
         self.outfit_gen = st.outfit_gen
         self.calibrating = list(FORMS)
 
