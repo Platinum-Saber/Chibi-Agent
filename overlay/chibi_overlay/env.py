@@ -9,8 +9,10 @@ import asyncio
 import ctypes
 import logging
 import threading
+import time
 from ctypes import wintypes
 
+from . import audio_sessions
 from .body.music import Track
 from .body.physics import Rect
 
@@ -112,9 +114,16 @@ class Ground:
         return work.right - (work.right - work.left) * 0.12, work.bottom
 
 
+PLAYER_HOLD_S = 5.0  # a desktop player counts as playing this long after its last sound (quiet passages)
+
+
 class MediaWatcher:
     """Polls Windows media sessions (GSMTC) every 2 s on its own thread: whether anything plays,
-    and what (`now`: title, artist, album, genres, app), for the dance style (body/music.py)."""
+    and what (`now`: title, artist, album, genres, app), for the dance style (body/music.py).
+
+    Players that never publish a media session (classic VLC, MPC-HC, mpv...) are caught by
+    their sound instead: audio_sessions reads Windows' per-app meters, and the track is the
+    player's window title."""
 
     def __init__(self):
         self.playing = False
@@ -145,15 +154,26 @@ class MediaWatcher:
         async def poll():
             mgr = await Manager.request_async()
             seen: tuple | None = None  # (app, title) last read: properties are re-read on a change
+            heard: tuple[float, Track] | None = None  # a desktop player's last sound: when, what
             while not self._stop.is_set():
                 try:
                     playing = [s for s in mgr.get_sessions()
                                if s.get_playback_info().playback_status == Status.PLAYING]
-                    self.playing = bool(playing)
-                    if not playing:
+                    t = None
+                    if playing:  # details unreadable: still playing, just unknown
+                        t = await track(playing[0]) or Track(app=playing[0].source_app_user_model_id or "")
+                    else:
+                        players = await asyncio.to_thread(audio_sessions.playing_players)
+                        now_s = time.monotonic()
+                        if players:
+                            exe, title = players[0]
+                            heard = (now_s, Track(title=title, app=exe))
+                        if heard and now_s - heard[0] < PLAYER_HOLD_S:
+                            t = heard[1]
+                    self.playing = t is not None
+                    if t is None:
                         self.now, seen = None, None
                     else:
-                        t = await track(playing[0])
                         key = (t.app, t.title, t.artist) if t else None
                         if key != seen:
                             seen = key
