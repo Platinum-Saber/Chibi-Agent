@@ -1,0 +1,38 @@
+# Mood -> motion/expression map for the free ANIYA model (DG_studio, personal use only),
+# prepared by tools/prepare_aniya.py into ChibiAgent/rigs/chibi/aniya/ (outside git).
+# Her motions: Idle (added), Walk, OutfitChange, Peanut, TearsZzz. Her reaction faces
+# (exp/): smug, star_eyes, crying, wailing, shocked, startled, angry, confused,
+# speechless, zzz, tiny_pupils, grin, gesture, peanut, outfit_change; the app's
+# nine names (neutral, happy, ...) map onto them (see TRANSLATION.md there).
+# A clip is { motion = "<group>", index = <n> (omit for random), expression = "<name>" }.
+height_dip = 320
+
+[moods]
+idle         = { motion = "Idle", expression = "neutral" }
+surprised    = { motion = "Idle", index = 0, expression = "shocked" }
+pout         = { motion = "Idle", index = 0, expression = "angry" }
+crying       = { motion = "Idle", index = 0, expression = "wailing" }
+happy        = { motion = "Idle", index = 0, expression = "smug" }
+held         = { motion = "Idle", index = 0, expression = "startled" }
+falling      = { motion = "Idle", index = 0, expression = "tiny_pupils" }
+soft_landing = { motion = "Idle", index = 0, expression = "grin" }
+dizzy        = { motion = "Idle", index = 0, expression = "speechless" }
+walking      = { motion = "Walk", index = 0, expression = "neutral" }
+wander       = { motion = "Walk", index = 0, expression = "neutral" }
+sleeping     = { motion = "Idle", index = 0, expression = "zzz" }
+dancing      = { motion = "Idle", index = 0, expression = "star_eyes" }
+cursor_near  = { expression = "star_eyes" }
+cursor_far   = { expression = "neutral" }
+talking      = { expression = "neutral" }
+thinking     = { motion = "Idle", index = 0, expression = "confused" }
+working      = { motion = "Idle", index = 0, expression = "smug" }
+alert        = { motion = "Idle", index = 0, expression = "startled" }
+
+[moments]
+look_around = { motion = "Idle", index = 0, expression = "tiny_pupils" }
+stretch     = { motion = "Idle", index = 0, expression = "grin" }
+analyse     = { motion = "Idle", index = 0, expression = "smug" }
+sit         = { motion = "Idle", index = 0, expression = "gesture" }
+wave        = { motion = "Idle", index = 0, expression = "star_eyes" }
+curious     = { motion = "Idle", index = 0, expression = "confused" }
+thinking    = { motion = "Idle", index = 0, expression = "confused" }

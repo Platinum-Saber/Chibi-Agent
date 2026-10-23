@@ -68,7 +68,8 @@ def _run_puff(s):
     s.transform_t0 -= stage_mod.TRANSFORM_S / 2  # jump to the midpoint
     s._step_transform(s.transform_t0 + stage_mod.TRANSFORM_S / 2, 0.0)
     s.transform_t0 -= stage_mod.TRANSFORM_S
-    s._step_transform(s.transform_t0 + stage_mod.TRANSFORM_S, 0.0)
+    # + a margin: with a large time.monotonic() (days of uptime) t0 + T - t0 can round below T
+    s._step_transform(s.transform_t0 + stage_mod.TRANSFORM_S + 1e-3, 0.0)
 
 
 def test_starts_in_the_configured_outfit(st):

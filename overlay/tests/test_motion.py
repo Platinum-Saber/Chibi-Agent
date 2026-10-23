@@ -45,17 +45,18 @@ def test_looping_groups_reads_meta_loop(tmp_path):
     assert motion.looping_groups(tmp_path / "nope.model3.json") == frozenset()
 
 
-def test_raphael_chibi_map_names_exist_in_its_rig():
+@pytest.mark.parametrize("outfit,map_name", [("robe", "raphael_chibi.toml"), ("aniya", "aniya_chibi.toml")])
+def test_chibi_map_names_exist_in_its_rig(outfit, map_name):
     """Every motion group and expression the map asks for exists in the configured rig."""
     import json
     from chibi_shared import config
     from chibi_overlay import outfits
-    rig = outfits.parse(config.load()["overlay"]).outfits["robe"].rigs["chibi"]
+    rig = outfits.parse(config.load()["overlay"]).outfits[outfit].rigs["chibi"]
     if not Path(rig).exists():
         pytest.skip("rig export not on this machine")
     refs = json.loads(Path(rig).read_text(encoding="utf-8-sig"))["FileReferences"]
     groups, exps = set(refs.get("Motions", {})), {e["Name"] for e in refs.get("Expressions", [])}
-    m = motion.load(RIGS / "raphael_chibi.toml")
+    m = motion.load(RIGS / map_name)
     clips = list(m.moods.values()) + list(m.moments.values())
     assert {c.motion for c in clips if c.motion} <= groups
     assert {c.expression for c in clips if c.expression} <= exps

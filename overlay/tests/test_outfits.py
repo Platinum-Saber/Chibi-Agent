@@ -86,6 +86,6 @@ def test_repo_config_parses():
     import tomllib
     cfg = tomllib.loads((PKG.parent / "config.toml").read_text(encoding="utf-8"))["overlay"]
     w = outfits.parse(cfg)
-    assert w.current == "robe" and set(w.names) >= {"robe", "coat"}
+    assert w.current in w.names and set(w.names) >= {"robe", "coat"}
     for o in w.outfits.values():
         o.load_maps(PKG)
