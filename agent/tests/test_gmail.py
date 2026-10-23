@@ -161,7 +161,7 @@ def test_mail_tools_are_read_only_and_the_prompt_fits():
     reg = tools.load_all()
     for name in ("mail_list", "read_mail"):
         assert not reg[name].side_effect and not reg[name].confirm
-    assert len(system_prompt(tools.listing())) < 3000  # the real prompt, every tool listed
+    assert len(system_prompt(tools.listing())) < 3400  # the real prompt, every tool listed
 
 
 async def test_untrusted_results_stay_out_of_the_log(caplog, monkeypatch):

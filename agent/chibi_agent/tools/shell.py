@@ -8,10 +8,11 @@ from . import Result, tool
 
 BLOCKED = re.compile(
     r"(?ix)\b(remove-item|rm|rmdir|del|erase|rd|format-volume|clear-disk|remove-partition|"
-    r"stop-computer|restart-computer|reg\s+delete|bcdedit|cipher\s+/w)\b|-verb\s+runas|sudo\b")
+    r"stop-computer|restart-computer|reg\s+delete|bcdedit|cipher\s+/w|clear-recyclebin|"
+    r"emptyrecyclebin|shemptyrecyclebin)\b|-verb\s+runas|sudo\b")
 
 
-@tool("run_shell", "Run a PowerShell command.",
+@tool("run_shell", "Run PowerShell (not cmd syntax).",
       {"command": ("The full command line", True)},
       side_effect=True, summary=lambda a: f"Run: {a.get('command')}", timeout_s=35)
 def run_shell(command: str) -> Result:

@@ -25,7 +25,7 @@ def test_persona_lists_exactly_the_registry():
     prompt = system_prompt(tools.listing())
     for name in REG:
         assert f"- {name}:" in prompt
-    assert len(prompt) < 3000
+    assert len(prompt) < 3400  # small model: keep the tool list short (raised for the script tools)
     assert {s["function"]["name"] for s in tools.schemas()} == set(REG)
 
 
