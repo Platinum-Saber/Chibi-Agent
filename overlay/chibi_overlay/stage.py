@@ -17,7 +17,7 @@ from pathlib import Path
 from chibi_shared.protocol import (Bubble, Confirm, ConfirmResult, FormReq, Hud, Lip, MoodAck,
                                    MoodReq, OutfitReq, OutfitState, Quit, Touch, Visibility)
 
-from .body import motion
+from .body import motion, music
 from .body.brain import Brain, Mood
 from .body.motion import Clip, RigMap
 from .body.physics import Physics, Rect
@@ -95,6 +95,8 @@ class Stage:
         self.facing_left = False
         self.cursor = (0, 0)
         self.look_at: tuple[float, float, float] | None = None  # last click: x, y (desktop px), when
+        self._style_key: tuple | None = None
+        self._style = music.VIBE
         self._was_pressed = False
         self.cursor_on_her = False  # set by the window under the cursor (alpha test)
         self.size = {"chibi": (0.0, 0.0), "serious": (0.0, 0.0)}  # (height, half width) px
@@ -123,7 +125,22 @@ class Stage:
         return self.form
 
     def clip(self, form: str) -> Clip:
-        return self.rigs[form].clip(self.brain.mood, self.brain.moment)
+        rig = self.rigs[form]
+        if self.brain.mood == Mood.DANCING and self.music_style == music.EXCITED and "dancing_excited" in rig.moods:
+            return rig.moods["dancing_excited"]  # EDM and the like: the energetic dance
+        return rig.clip(self.brain.mood, self.brain.moment)
+
+    @property
+    def music_style(self) -> str:
+        """"vibe" (the default) or "excited", for what's playing; worked out once per track."""
+        now = self.media.now if getattr(self.media, "playing", False) else None
+        key = (now, self.character.behaviour.dance_words)
+        if key != self._style_key:
+            self._style_key = key
+            self._style = music.style(now, self.character.behaviour.dance_words)
+            if now is not None:
+                log.info("music: %s -> %s", now.label, self._style)
+        return self._style
 
     def params(self, t: float) -> dict[str, float]:
         """Procedural parameters layered over the clip (saved params survive Update)."""

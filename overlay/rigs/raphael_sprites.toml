@@ -18,7 +18,8 @@ dizzy        = { motion = "Dizzy", expression = "upset" }
 walking      = { motion = "Walk", expression = "neutral" }
 wander       = { motion = "Walk", expression = "neutral" }
 sleeping     = { motion = "Sleep", expression = "sleepy" }
-dancing      = { motion = "Dance", expression = "happy" }
+dancing      = { motion = "DanceVibe", expression = "happy" }      # any music: the slow headphone sway
+dancing_excited = { motion = "DanceExcited", expression = "happy" } # EDM and the like (body/music.py)
 cursor_near  = { motion = "Idle", expression = "happy" }
 cursor_far   = { motion = "Idle", expression = "neutral" }
 talking      = { motion = "Talk", expression = "neutral" }

@@ -256,3 +256,46 @@ def test_tune_sets_worn_props_and_sequence_props(pack):
     assert m.sequences["Notice"].prop == sprites.SWORD  # untouched: the built-in choice
     m.tune(ch, "another_outfit")
     assert m.wear_mask == sprites.MASK_ENABLED and m.wear_sword  # outfits without settings: the sword (no mask for now)
+
+
+def test_dance_cycles_build_both_styles_in_order(pack):
+    for kind, names in (("type-1-vibe", ("01", "02", "03", "06", "07")), ("type-2-excited", [f"{i:02d}" for i in range(1, 9)])):
+        for n in names:
+            _png(pack, f"dance-cycles-v01/{kind}/frames/dance_{n}", 140)
+    p = sprites.Pack(pack)
+    vibe, excited = p.sequences["DanceVibe"], p.sequences["DanceExcited"]
+    assert [k.rsplit("_", 1)[1] for k, _ in vibe.frames] == ["03", "02", "01", "07", "01", "02"]  # no 06
+    assert vibe.frames[0][0] == "dance-cycles-v01/type-1-vibe/frames/dance_03"
+    assert [k.rsplit("_", 1)[1] for k, _ in excited.frames] == ["01", "02", "03", "04", "06", "07"]
+    assert excited.length == pytest.approx(1.0) and vibe.length == pytest.approx(7 * 0.20 * 1.75)
+    assert vibe.loop and excited.loop and vibe.effect == excited.effect == "music_note"
+    assert p.get(vibe.frames[0][0]) is not None
+
+
+def test_without_dance_cycles_both_styles_use_the_old_dance(pack):
+    p = sprites.Pack(pack)
+    assert p.sequences["DanceVibe"] == p.sequences["DanceExcited"] == sprites.SEQUENCES["Dance"]
+
+
+def test_drawn_dances_get_no_added_sway(pack):
+    """The stage's dance bob (ParamBodyAngleX) tilts other poses; the drawn dances move on their own."""
+    from PySide6.QtGui import QPainter
+    m = sprites.SpriteModel(str(pack), None)
+    m.wear_sword = False
+    img = QImage(300, 300, QImage.Format.Format_ARGB32_Premultiplied)
+    m.Resize(300, 300)
+
+    def draw(motion, lean):
+        m.StartMotion(motion)
+        m._t0, m._motion_t0 = 0.0, 100.0  # one moment for both draws (breathing, effects)
+        m.SetSaveParamById("ParamBodyAngleX", lean)
+        m.Update()
+        img.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(img)
+        painter.setTransform(m.transform())
+        m.paint(painter, 100.01)
+        painter.end()
+        return img.copy()
+
+    assert draw("DanceExcited", 10.0) == draw("DanceExcited", 0.0)
+    assert draw("Idle", 10.0) != draw("Idle", 0.0)

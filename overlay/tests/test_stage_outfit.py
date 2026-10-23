@@ -25,6 +25,7 @@ class FakeGround(Ground):
 
 class FakeMedia:
     playing = False
+    now = None
 
     def stop(self):
         pass
@@ -174,3 +175,21 @@ def test_she_looks_where_you_click_then_ahead(st, monkeypatch):
     assert st.gaze_target() is None
     st.character.behaviour.look_at = "cursor"
     assert st.gaze_target() == st.cursor
+
+
+def test_excited_music_picks_the_excited_dance(st):
+    from chibi_overlay.body.music import Track
+    from chibi_overlay.body.motion import Clip
+    rig = st.rigs["chibi"]
+    st.rigs = {**st.rigs, "chibi": type(rig)(rig.height_dip, {**rig.moods, "dancing": Clip("DanceVibe"),
+                                                                "dancing_excited": Clip("DanceExcited")}, rig.moments)}
+    st.brain.mood = Mood.DANCING
+    st.media.playing, st.media.now = True, Track("Clair de Lune", "Debussy")
+    assert st.clip("chibi").motion == "DanceVibe"
+    st.media.now = Track("Levels", "Avicii")
+    assert st.clip("chibi").motion == "DanceExcited"
+    st.character.behaviour.dance_words = "debussy"
+    st.media.now = Track("Clair de Lune", "Debussy")
+    assert st.clip("chibi").motion == "DanceExcited"
+    st.brain.mood = Mood.IDLE
+    assert st.clip("chibi").motion != "DanceExcited"

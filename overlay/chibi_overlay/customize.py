@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from chibi_shared import config, paths
 from chibi_shared.protocol import Command, VoiceTune
 
 from . import character, sprites
+from .body import music
 
 log = logging.getLogger(__name__)
 KOKORO_GROUPS = {"af": "American female", "am": "American male", "bf": "British female", "bm": "British male"}
@@ -372,7 +374,32 @@ class CustomizeDialog(QDialog):
         f.addRow("Idle moment every (max)", self.b_moment[1])
         f.addRow("Fall asleep after no touches for", self.b_sleep)
         f.addRow(self.b_effects)
+        self.b_dance = QLineEdit()
+        self.b_dance.setPlaceholderText("e.g. LiSA, anime openings, k-pop")
+        self.b_dance.textChanged.connect(self._behaviour_set)
+        f.addRow("Excited dance also for", self.b_dance)
+        f.addRow(QLabel("Any music gets the slow sway; EDM, house, dubstep, nightcore, remixes and known EDM
+"
+                        "artists/channels get the excited dance. Add your own words or artists above."))
+        self.now_playing = QLabel("")
+        f.addRow("Now playing", self.now_playing)
+        refresh = QTimer(self)
+        refresh.timeout.connect(self._show_now_playing)
+        refresh.start(2000)
         return w
+
+    def _show_now_playing(self) -> None:
+        """What she hears and which dance it gets (with the words typed here, before Apply)."""
+        if not self.isVisible():
+            return
+        media = getattr(self.stage, "media", None)
+        now = media.now if media is not None and getattr(media, "playing", False) else None
+        if now is None:
+            self.now_playing.setText("nothing (she dances when music plays)")
+            return
+        words = self.ch.behaviour.dance_words
+        hit = music.matches(now, words)
+        self.now_playing.setText(f"{now.label}  →  " + (f"excited dance (\"{hit}\")" if hit else "slow sway"))
 
     def _fill_behaviour(self) -> None:
         self._filling = True
@@ -386,6 +413,7 @@ class CustomizeDialog(QDialog):
         self.b_moment[1].setValue(b.moment_max_s)
         self.b_sleep.setValue(b.sleep_after_s)
         self.b_effects.setChecked(b.effects)
+        self.b_dance.setText(b.dance_words)
         self._filling = False
 
     def _behaviour_set(self, *_):
@@ -395,6 +423,8 @@ class CustomizeDialog(QDialog):
         b.look_at, b.look_hold_s = self.b_look.currentData(), self.b_hold.value()
         b.gaze = b.look_at != "off"
         b.gaze_reach, b.effects = self.b_reach.value(), self.b_effects.isChecked()
+        b.dance_words = self.b_dance.text().strip()
+        self._show_now_playing()
         b.blink_min_s, b.blink_max_s = self.b_blink[0].value(), max(self.b_blink[0].value(), self.b_blink[1].value())
         b.moment_min_s, b.moment_max_s = self.b_moment[0].value(), max(self.b_moment[0].value(),
                                                                        self.b_moment[1].value())
@@ -466,7 +496,8 @@ class CustomizeDialog(QDialog):
             wdg.setEnabled(enabled)
         self.seq_note.setText("" if enabled else "Sequences are for drawn (sprite) outfits.")
         if m is not None:
-            self._images = [k for d in ("poses", "walk-cycle/frames", "expressions", "states") for k in m.pack.keys(d)]
+            dances = [Path(os.path.relpath(d, m.pack.root)).as_posix() for d in m.pack.dance_dirs]
+            self._images = [k for d in ("poses", *dances, "expressions", "states") for k in m.pack.keys(d)]
             self.seq_effect.clear()
             self.seq_effect.addItems(["(none)", *m.pack.effects()])
             self.seq_list.addItems(sorted(m.sequences))

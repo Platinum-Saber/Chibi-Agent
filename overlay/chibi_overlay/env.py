@@ -11,6 +11,7 @@ import logging
 import threading
 from ctypes import wintypes
 
+from .body.music import Track
 from .body.physics import Rect
 
 log = logging.getLogger(__name__)
@@ -112,10 +113,12 @@ class Ground:
 
 
 class MediaWatcher:
-    """Polls Windows media sessions (GSMTC) every 2 s on its own thread."""
+    """Polls Windows media sessions (GSMTC) every 2 s on its own thread: whether anything plays,
+    and what (`now`: title, artist, album, genres, app), for the dance style (body/music.py)."""
 
     def __init__(self):
         self.playing = False
+        self.now: Track | None = None  # the playing track, None when nothing plays
         self._stop = threading.Event()
         threading.Thread(target=self._run, name="media", daemon=True).start()
 
@@ -131,14 +134,34 @@ class MediaWatcher:
             log.info("winrt media control not installed; no dancing")
             return
 
+        async def track(session) -> Track | None:
+            try:
+                p = await session.try_get_media_properties_async()
+            except OSError:
+                return None
+            return Track(p.title or "", p.artist or "", p.album_title or "", p.album_artist or "",
+                          tuple(p.genres or ()), session.source_app_user_model_id or "")
+
         async def poll():
             mgr = await Manager.request_async()
+            seen: tuple | None = None  # (app, title) last read: properties are re-read on a change
             while not self._stop.is_set():
                 try:
-                    self.playing = any(s.get_playback_info().playback_status == Status.PLAYING
-                                       for s in mgr.get_sessions())
+                    playing = [s for s in mgr.get_sessions()
+                               if s.get_playback_info().playback_status == Status.PLAYING]
+                    self.playing = bool(playing)
+                    if not playing:
+                        self.now, seen = None, None
+                    else:
+                        t = await track(playing[0])
+                        key = (t.app, t.title, t.artist) if t else None
+                        if key != seen:
+                            seen = key
+                            if t:
+                                log.info("now playing: %s (%s)", t.label, t.app.split("!")[-1])
+                        self.now = t
                 except OSError:
-                    self.playing = False
+                    self.playing, self.now = False, None
                 await asyncio.sleep(2)
 
         asyncio.run(poll())

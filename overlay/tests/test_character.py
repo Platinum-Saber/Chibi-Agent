@@ -92,6 +92,7 @@ def test_sprite_model_takes_sequences_and_behaviour(tmp_path):
 def test_new_fields_round_trip(tmp_path):
     ch = character.Character()
     ch.behaviour.look_at, ch.behaviour.look_hold_s = "cursor", 2.5
+    ch.behaviour.dance_words = "LiSA, anime openings"
     tw = ch.tweaks("casual_coat")
     tw.mask, tw.sword = False, True
     ch.sequences["Sit"] = {"frames": [["poses/sit", 0.9]], "loop": True, "effect": "", "prop": "", "seat": "extras/slime"}

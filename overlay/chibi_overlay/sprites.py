@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import math
 import random
 import threading
@@ -104,7 +105,23 @@ SEQUENCES: dict[str, Seq] = {
     "Stretch": Seq((("poses/stretch", 1.5),)),
     "Wave": Seq((("poses/wave", 1.6),), effect="heart"),
     "Dance": Seq((("poses/dance", 0.27), ("expressions/happy", 0.27)), loop=True, effect="music_note"),
+    # the two dance styles (rig map: dancing / dancing_excited); a pack's dance-cycles replace these
+    "DanceVibe": Seq((("poses/dance", 0.27), ("expressions/happy", 0.27)), loop=True, effect="music_note"),
+    "DanceExcited": Seq((("poses/dance", 0.27), ("expressions/happy", 0.27)), loop=True, effect="music_note"),
 }
+
+# A pack's *dance-cycles*/type-N*/frames/dance_NN.png, played in these orders: (frame, beats), a
+# beat being the set's own frame time (its cycle.json; else the default here). Kryo's choices:
+# - Type 1 sways as a pendulum through its unique drawings (no alias repeats; 06, a near-copy of
+#   07, is left out, so the lone right lean holds two beats), at 1.75 beats a frame: slow.
+# - Type 2 uses six of its eight frames: 05 (the far right peak, closest to 04) and 08 (closest to
+#   01) are left out, so the side swing is smaller; 4/3 beats a frame keeps its 1 s loop.
+DANCE_CYCLES = {
+    "DanceVibe": ("type-1", 0.20, tuple((n, b * 1.75) for n, b in
+                                        (("03", 1), ("02", 1), ("01", 1), ("07", 2), ("01", 1), ("02", 1)))),
+    "DanceExcited": ("type-2", 0.125, tuple((n, 4 / 3) for n in ("01", "02", "03", "04", "06", "07"))),
+}
+DANCES = frozenset({"Dance", *DANCE_CYCLES})
 
 
 @dataclass
@@ -214,7 +231,46 @@ class Pack:
         self.walk_dir: Path | None = None
         self._walk_src: list = []
         self._walk_anchor = 1508.0
+        self.dance_dirs: list[Path] = []
         self.use_walk()
+
+    def _load_dances(self) -> None:
+        """DanceVibe / DanceExcited from the newest *dance-cycles* folder in (or beside) the pack,
+        one with cycle.json timings and sole offsets first."""
+        cands = list(self.root.glob("*dance-cycles*")) + list(self.root.parent.glob("*dance-cycles*"))
+        cands = sorted((c for c in cands if c.is_dir()),
+                       key=lambda c: (any(c.glob("*/cycle.json")), c.stat().st_mtime), reverse=True)
+        if not cands:
+            return
+        base = cands[0]
+        self.dance_dirs = []
+        for name, (kind, beat, order) in DANCE_CYCLES.items():
+            kind_dir = next((d for d in sorted(base.glob(f"{kind}*")) if (d / "frames").is_dir()), None)
+            if kind_dir is None:
+                continue
+            folder = kind_dir / "frames"
+            timing, offsets, anchor = {}, {}, None
+            try:  # the set's own frame times and support-sole offsets
+                c = json.loads((kind_dir / "cycle.json").read_text(encoding="utf-8"))
+                anchor = float(c["anchor_xy"][1])
+                for f in c["frames"]:
+                    n = Path(f["file"]).stem.rsplit("_", 1)[-1]
+                    timing.setdefault(n, f.get("duration_ms", beat * 1000) / 1000)
+                    offsets.setdefault(n, f.get("draw_offset_xy", [0, 0]))
+            except (OSError, ValueError, KeyError, TypeError, IndexError):
+                pass
+            frames = []
+            for n, beats in order:
+                if not (folder / f"dance_{n}.png").exists():
+                    continue
+                key = Path(os.path.relpath(folder / f"dance_{n}", self.root)).as_posix()
+                frames.append((key, beats * timing.get(n, beat)))
+                if anchor is not None and n in offsets:
+                    dx, dy = offsets[n]
+                    self.anchors[key] = (float(dx), anchor - float(dy))
+            if frames:
+                self.sequences[name] = Seq(tuple(frames), loop=True, effect="music_note")
+                self.dance_dirs.append(folder)
 
     def walk_sets(self) -> list[Path]:
         """Folders with a walk.json: the pack's walk-cycle/ and sets beside the pack folder
@@ -229,6 +285,7 @@ class Pack:
         placed exactly on an even bob; the body sits halfway between that and planting its support
         sole (walk.json's offsets). Planting alone made the head jump."""
         self.sequences = dict(SEQUENCES)
+        self._load_dances()
         self.walk_dir, self._walk_src = None, []
         for k in [k for k in self.sprites if k.startswith(WALK_LOCK)]:
             del self.sprites[k]
@@ -590,7 +647,8 @@ class SpriteModel:
         p.save()
         # stage params: lean (dance, held) and tilt, around her feet; breathing squash
         p.translate(feet)
-        p.rotate(0.8 * prm.get("ParamBodyAngleX", 0.0) + 0.6 * prm.get("ParamAngleZ", 0.0))
+        if self.motion not in DANCES:  # the drawn dances move on their own: no added sway on top
+            p.rotate(0.8 * prm.get("ParamBodyAngleX", 0.0) + 0.6 * prm.get("ParamAngleZ", 0.0))
         p.scale(1.0, 1.0 + 0.008 * math.sin((now - self._t0) * 2 * math.pi / 3.6))
         p.translate(-feet)
         dx, fy = self.pack.anchors.get(key, (0.0, sp.feet))
