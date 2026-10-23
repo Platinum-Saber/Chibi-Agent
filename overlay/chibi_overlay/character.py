@@ -53,6 +53,8 @@ class Behaviour:
     sleep_after_s: float = 60.0  # untouched this long: she falls asleep
     effects: bool = True        # zzz, sparkles, notes, hearts, "!"
     dance_words: str = ""       # extra words/artists (comma-separated) that make a track "excited" (body/music.py)
+    panel_font: str = ""        # her text panel's font family; "" = the default (hud.PANEL_FONTS)
+    panel_font_size: float = 11.5
 
 
 @dataclass
@@ -109,7 +111,7 @@ def _behaviour(d: dict) -> Behaviour:
         if f.name in d:
             default = getattr(b, f.name)
             try:
-                if f.name == "dance_words":
+                if f.name in ("dance_words", "panel_font"):
                     setattr(b, f.name, str(d[f.name]))
                 elif isinstance(default, str):
                     if d[f.name] in ("clicks", "cursor", "off"):

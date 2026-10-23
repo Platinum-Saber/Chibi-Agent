@@ -36,9 +36,10 @@ def load_fonts(folder) -> list[str]:
     return families
 
 
-def panel_font(size: float = 11.5) -> QFont:
+def panel_font(size: float = 11.5, family: str = "") -> QFont:
+    """The text panel's font: Kryo's pick (Customize -> Look), then the defaults as fallbacks."""
     f = QFont()
-    f.setFamilies(PANEL_FONTS)
+    f.setFamilies([family, *PANEL_FONTS] if family else PANEL_FONTS)
     f.setStyleHint(QFont.StyleHint.Monospace)
     f.setPointSizeF(size)
     return f
@@ -88,7 +89,8 @@ class Painter:
         """Her words in a liquid-glass panel beside her (her right, or her left near the screen
         edge), level with her face. A layered window can't blur what's behind it, so the glass is
         frosted translucency: a soft shadow, a white-blue fill, a top sheen and a bright rim."""
-        font = panel_font()
+        b = getattr(getattr(self.stage, "character", None), "behaviour", None)
+        font = panel_font(b.panel_font_size, b.panel_font) if b else panel_font()
         p.setFont(font)
         text = text if len(text) < 600 else "…" + text[-600:]
         tr = QFontMetrics(font).boundingRect(0, 0, 320, 2000, Qt.TextFlag.TextWordWrap, text)

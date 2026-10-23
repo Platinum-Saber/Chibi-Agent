@@ -12,20 +12,21 @@ import copy
 import json
 import logging
 import os
+import shutil
 import time
 from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import QPointF, Qt, QTimer
-from PySide6.QtGui import QColor, QPainter, QTransform
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QHBoxLayout,
-                               QHeaderView, QLabel, QLineEdit, QListWidget, QPushButton, QSlider, QSpinBox,
-                               QTableWidget, QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QPainter, QTransform
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFileDialog, QFontComboBox,
+                               QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
+                               QPushButton, QSlider, QSpinBox, QTableWidget, QTabWidget, QVBoxLayout, QWidget)
 
 from chibi_shared import config, paths
 from chibi_shared.protocol import Command, VoiceTune
 
-from . import character, sprites
+from . import character, hud, sprites
 from .body import music
 
 log = logging.getLogger(__name__)
@@ -122,7 +123,9 @@ class CustomizeDialog(QDialog):
         self.stage, self.send = stage, send
         self.setWindowTitle("Customize Raphael")
         self.resize(1040, 660)
-        self.vcfg = config.load().get("voice", {})
+        cfg = config.load()
+        self.vcfg = cfg.get("voice", {})
+        self.fonts_dir = cfg.get("overlay", {}).get("fonts_dir")
         self.ch = character.Character()
         self.outfit = stage.outfit
         self.base = None  # the outfit's chibi RigMap without Kryo's overrides
@@ -316,7 +319,86 @@ class CustomizeDialog(QDialog):
         if sprites.MASK_ENABLED:
             f.addRow("", self.wear_mask)
         f.addRow(QLabel("The outfit she starts in is the one saved here."))
+        # her text panel's font
+        self.font_combo = QFontComboBox()
+        self.font_combo.setEditable(False)
+        self.font_combo.currentFontChanged.connect(self._font_set)
+        self.font_size = QDoubleSpinBox()
+        self.font_size.setRange(7.0, 28.0)
+        self.font_size.setSingleStep(0.5)
+        self.font_size.setSuffix(" pt")
+        self.font_size.valueChanged.connect(self._font_set)
+        add = QPushButton("Add font file…")
+        add.clicked.connect(self._add_font)
+        default = QPushButton("Default")
+        default.clicked.connect(self._font_default)
+        row = QHBoxLayout()
+        row.addWidget(self.font_combo, 1)
+        row.addWidget(self.font_size)
+        row.addWidget(add)
+        row.addWidget(default)
+        self.font_sample = QLabel("ANSWER. I'VE OPENED SPOTIFY FOR YOU. Answer, Sir.")
+        self.font_sample.setStyleSheet(  # the panel as it looks on a dark desktop
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2c4a66, stop:1 #2a6f6c);"
+            "color: #F6F9FF; padding: 8px; border: 1px solid rgba(255, 255, 255, 160); border-radius: 12px;")
+        self.font_note = QLabel("")
+        f.addRow("Text panel font", row)
+        f.addRow("", self.font_sample)
+        f.addRow("", self.font_note)
         return w
+
+    def _fill_font(self) -> None:
+        self._filling = True
+        b = self.ch.behaviour
+        family = b.panel_font or hud.panel_font().family() or hud.PANEL_FONTS[0]
+        self.font_combo.setCurrentFont(QFont(family))
+        self.font_size.setValue(b.panel_font_size)
+        self._filling = False
+        self._show_font_sample()
+
+    def _show_font_sample(self) -> None:
+        b = self.ch.behaviour
+        self.font_sample.setFont(hud.panel_font(b.panel_font_size, b.panel_font))
+        self.font_note.setText(f"Saved fonts folder: {self.fonts_dir or '(none: set [overlay] fonts_dir)'}"
+                               if not b.panel_font else "")
+
+    def _font_set(self, *_):
+        if self._filling:
+            return
+        b = self.ch.behaviour
+        b.panel_font = self.font_combo.currentFont().family()
+        b.panel_font_size = round(self.font_size.value(), 1)
+        self._show_font_sample()
+
+    def _font_default(self) -> None:
+        self.ch.behaviour.panel_font = ""
+        self.ch.behaviour.panel_font_size = character.Behaviour().panel_font_size
+        self._fill_font()
+
+    def _add_font(self) -> None:
+        """Copy a font file into [overlay] fonts_dir (loaded at every start) and use it now."""
+        path, _ = QFileDialog.getOpenFileName(self, "Add a font", "", "Fonts (*.otf *.ttf)")
+        if not path:
+            return
+        src = Path(path)
+        dest_dir = Path(self.fonts_dir) if self.fonts_dir else None
+        if dest_dir is not None:
+            try:
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                if src.resolve().parent != dest_dir.resolve():
+                    shutil.copy2(src, dest_dir / src.name)
+                src = dest_dir / src.name
+            except OSError as e:
+                self.font_note.setText(f"Couldn't copy it into {dest_dir}: {e}")
+        i = QFontDatabase.addApplicationFont(str(src))
+        families = QFontDatabase.applicationFontFamilies(i) if i >= 0 else []
+        if not families:
+            self.font_note.setText(f"Not a usable font: {src.name}")
+            return
+        self.font_combo.setCurrentFont(QFont(families[0]))  # (the combo lists app fonts too)
+        self._font_set()
+        self.font_note.setText(f"Added {families[0]}" + (f" (kept in {dest_dir})" if dest_dir else
+                                                       " (this session only: set [overlay] fonts_dir)"))
 
     def _outfit_picked(self, name: str) -> None:
         if not self._filling and name and name != self.outfit:
@@ -401,6 +483,7 @@ class CustomizeDialog(QDialog):
         self.now_playing.setText(f"{now.label}  →  " + (f"excited dance (\"{hit}\")" if hit else "slow sway"))
 
     def _fill_behaviour(self) -> None:
+        self._fill_font()
         self._filling = True
         b = self.ch.behaviour
         self.b_look.setCurrentIndex(max(0, self.b_look.findData(b.look_at if b.gaze else "off")))

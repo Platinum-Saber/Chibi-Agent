@@ -29,3 +29,19 @@ def test_window_builds_shows_and_applies(app, st):  # noqa: F811
     assert st.character.behaviour.dance_words == "LiSA"
     assert isinstance(st.character, character.Character)
     d.hide()
+
+
+def test_font_picker_sets_and_resets_the_panel_font(app, st):  # noqa: F811
+    d = customize.CustomizeDialog(st, lambda m: None)
+    d.show_current()
+    from PySide6.QtGui import QFont
+    d.font_combo.setCurrentFont(QFont("Consolas"))
+    d.font_size.setValue(14.0)
+    d.apply()
+    b = st.character.behaviour
+    assert b.panel_font == "Consolas" and b.panel_font_size == 14.0
+    assert d.font_sample.font().family() == "Consolas"
+    d._font_default()
+    d.apply()
+    assert st.character.behaviour.panel_font == ""
+    d.hide()

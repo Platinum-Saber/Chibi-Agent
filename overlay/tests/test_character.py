@@ -100,3 +100,12 @@ def test_new_fields_round_trip(tmp_path):
     character.save(ch, path)
     assert character.load(path) == ch
     assert character.parse({"behaviour": {"look_at": "everywhere"}}).behaviour.look_at == "clicks"
+
+
+def test_panel_font_round_trip(tmp_path):
+    ch = character.Character()
+    ch.behaviour.panel_font, ch.behaviour.panel_font_size = "Electroharmonix", 13.0
+    path = tmp_path / "c.toml"
+    character.save(ch, path)
+    back = character.load(path)
+    assert back.behaviour.panel_font == "Electroharmonix" and back.behaviour.panel_font_size == 13.0
