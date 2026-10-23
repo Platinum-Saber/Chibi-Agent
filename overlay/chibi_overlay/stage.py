@@ -94,6 +94,8 @@ class Stage:
         self.hidden = False
         self.facing_left = False
         self.cursor = (0, 0)
+        self.look_at: tuple[float, float, float] | None = None  # last click: x, y (desktop px), when
+        self._was_pressed = False
         self.cursor_on_her = False  # set by the window under the cursor (alpha test)
         self.size = {"chibi": (0.0, 0.0), "serious": (0.0, 0.0)}  # (height, half width) px
         self.geom: dict = {}  # rig -> puppet.Geom, measured once by the primary window
@@ -142,18 +144,30 @@ class Stage:
         return p
 
     def gaze_target(self) -> tuple[float, float] | None:
-        """Desktop px she looks at, or None to look ahead."""
+        """Desktop px she looks at, or None to look ahead. By default she looks where Kryo last
+        clicked, for a few seconds (Customize -> Behaviour: clicks / cursor / off)."""
         if self.brain.mood in (Mood.SLEEPING, Mood.DIZZY, Mood.CRYING):
             return None
-        return self.cursor
+        mode = self.character.behaviour.look_at
+        if mode == "cursor":
+            return self.cursor
+        if mode == "clicks" and self.look_at is not None:
+            x, y, t = self.look_at
+            if time.monotonic() - t < self.character.behaviour.look_hold_s:
+                return x, y
+        return None
 
     # --- per frame --------------------------------------------------------------------------
-    def tick(self, cursor: tuple[int, int]) -> None:
+    def tick(self, cursor: tuple[int, int], pressed: bool = False) -> None:
+        """One frame. `pressed`: a mouse button is down anywhere (a new press is a click she looks at)."""
         now_s = time.monotonic()
         dt = min(now_s - self._t, 0.05)
         self._t = now_s
         now = int(now_s * 1000)
         self.cursor = cursor
+        if pressed and not self._was_pressed:
+            self.look_at = (cursor[0], cursor[1], now_s)
+        self._was_pressed = pressed
         b, ph = self.brain, self.physics
 
         if now_s - self._last_ground > 0.1:
@@ -200,8 +214,11 @@ class Stage:
         if near and not self.cursor_on_her and not self.dragging:
             b.cursor_near(now)
             self.last_touch = now_s
-        elif b.mood == Mood.CURSOR_NEAR:
-            b.cursor_gone(now)
+        else:
+            if not near:
+                b.cursor_left()
+            if b.mood == Mood.CURSOR_NEAR:
+                b.cursor_gone(now)
 
         b.tick(now, quiet_for_ms=int((now_s - self.last_touch) * 1000), music=self.media.playing)
 

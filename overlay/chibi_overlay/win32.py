@@ -37,6 +37,11 @@ def cursor_pos() -> tuple[int, int]:
     return p.x, p.y
 
 
+def buttons_down() -> bool:
+    """Is a mouse button (left, right or middle) held down anywhere on the desktop?"""
+    return any(user32.GetAsyncKeyState(vk) & 0x8000 for vk in (0x01, 0x02, 0x04))
+
+
 def window_rect(hwnd: int) -> tuple[int, int, int, int]:
     r = wintypes.RECT()
     user32.GetWindowRect(hwnd, ctypes.byref(r))

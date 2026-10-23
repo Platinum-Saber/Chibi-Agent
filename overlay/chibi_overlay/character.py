@@ -42,7 +42,9 @@ FILE_NAME = "character.toml"
 
 @dataclass
 class Behaviour:
-    gaze: bool = True           # eyes follow the cursor (sprite packs with gaze art)
+    gaze: bool = True           # eyes move at all (sprite packs with gaze art)
+    look_at: str = "clicks"     # what she looks at: "clicks" (where Kryo last clicked), "cursor" or "off"
+    look_hold_s: float = 4.0    # how long she keeps looking at a click
     gaze_reach: float = 0.45    # x her canvas width: how far out the cursor counts as fully to one side
     blink_min_s: float = 2.0
     blink_max_s: float = 6.0
@@ -63,6 +65,8 @@ class VoiceSettings:
 @dataclass
 class OutfitTweaks:
     height_dip: int | None = None
+    mask: bool = False  # drawn outfits: the mask worn on her head (off for now: sprites.MASK_ENABLED)
+    sword: bool = True  # drawn outfits: the sheathed sword at her hip
     moods: dict[str, dict] = field(default_factory=dict)    # mood -> {motion, expression}
     moments: dict[str, dict] = field(default_factory=dict)  # moment -> {motion, expression}
 
@@ -103,7 +107,11 @@ def _behaviour(d: dict) -> Behaviour:
         if f.name in d:
             default = getattr(b, f.name)
             try:
-                setattr(b, f.name, bool(d[f.name]) if isinstance(default, bool) else float(d[f.name]))
+                if isinstance(default, str):
+                    if d[f.name] in ("clicks", "cursor", "off"):
+                        setattr(b, f.name, d[f.name])
+                else:
+                    setattr(b, f.name, bool(d[f.name]) if isinstance(default, bool) else float(d[f.name]))
             except (TypeError, ValueError):
                 log.warning("character.toml: bad behaviour.%s = %r", f.name, d[f.name])
     return b
@@ -122,6 +130,7 @@ def parse(d: dict) -> Character:
         if isinstance(t, dict):
             h = t.get("height_dip")
             outfits[name] = OutfitTweaks(int(h) if isinstance(h, (int, float)) and h > 0 else None,
+                                         bool(t.get("mask", False)), bool(t.get("sword", True)),
                                          _clips(t.get("moods")), _clips(t.get("moments")))
     seqs = {}
     for name, t in (d.get("sequences") or {}).items():
@@ -129,6 +138,9 @@ def parse(d: dict) -> Character:
             frames = [[str(f[0]), float(f[1])] for f in t["frames"]
                       if isinstance(f, list) and len(f) == 2 and isinstance(f[1], (int, float))]
             seqs[name] = {"frames": frames, "loop": bool(t.get("loop", False)), "effect": t.get("effect") or ""}
+            for k in ("prop", "seat"):  # absent: the built-in choice; "": none
+                if isinstance(t.get(k), str):
+                    seqs[name][k] = t[k]
     outfit = d.get("outfit")
     return Character(outfit if isinstance(outfit, str) and outfit else None,
                      _behaviour(d.get("behaviour") or {}), outfits, seqs, _voice(d.get("voice")))
@@ -194,6 +206,7 @@ def dumps(ch: Character) -> str:
         out += ["", f"[outfits.{_key(name)}]"]
         if tw.height_dip:
             out.append(f"height_dip = {int(tw.height_dip)}")
+        out += [f"mask = {_value(tw.mask)}", f"sword = {_value(tw.sword)}"]
         for table in ("moods", "moments"):
             clips = getattr(tw, table)
             if clips:
@@ -206,6 +219,9 @@ def dumps(ch: Character) -> str:
                 f"loop = {_value(bool(s.get('loop', False)))}"]
         if s.get("effect"):
             out.append(f"effect = {_value(s['effect'])}")
+        for k in ("prop", "seat"):
+            if k in s:
+                out.append(f"{k} = {_value(s[k])}")
     return "\n".join(out) + "\n"
 
 

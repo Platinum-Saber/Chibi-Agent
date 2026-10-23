@@ -49,13 +49,23 @@ GAZE_RADIUS = 0.45  # x canvas width: how far from her eyes the cursor counts as
 GAZE_HOLD_S = 0.12  # a new direction must hold this long before her eyes switch (no flicker on a sector edge)
 
 
+ORB, MASK, SWORD, SLIME = "extras/orb", "extras/mask", "extras/sword_sheathed", "extras/slime"
+MASK_ENABLED = False  # Kryo, 2026-10-23: no mask for now (worn or held); the drawing code stays
+PROPS = (ORB, MASK, SWORD) if MASK_ENABLED else (ORB, SWORD)  # what she can hold
+SEATS = (SLIME,)            # what she can sit on
+SEAT_W = 760.0      # the slime's visible width, canvas px
+SEAT_SINK = 0.15    # her seat line sinks this far (x the slime's height) into the slime
+SEAT_LINE = 0.80    # a seated pose's seat line: this far from its top to its lowest row
+
+
 @dataclass(frozen=True)
 class Seq:
     frames: tuple[tuple[str, float], ...] = ()  # (image, seconds); none: the expression shows
     loop: bool = False
     effect: str | None = None  # an SVG from effects/, placed by her head
-    prop: str | None = None    # an image from extras/, held in front of her (the orb)
+    prop: str | None = None    # extras/ image she holds: the orb, the mask or the sword
     drawn_left: bool = False   # the frames face viewer-left; the overlay's unmirrored facing is right
+    seat: str | None = None    # extras/ image she sits on (the slime), drawn under her
 
     @property
     def length(self) -> float:
@@ -77,11 +87,11 @@ SEQUENCES: dict[str, Seq] = {
     "Walk": Seq((("poses/walk_contact_left", 0.15), ("poses/walk_pass_left", 0.15),
                  ("poses/walk_contact_right", 0.15), ("poses/walk_pass_right", 0.15)), loop=True,
                 drawn_left=True),  # the pack's walk keys step toward viewer-left
-    "Sleep": Seq((("poses/sleep", 1.0),), loop=True, effect="zzz"),
-    "Sit": Seq((("poses/sit", 0.9), ("poses/sit_legs", 0.9)), loop=True),
+    "Sleep": Seq((("poses/sleep", 1.0),), loop=True, effect="zzz", seat=SLIME),
+    "Sit": Seq((("poses/sit", 0.9), ("poses/sit_legs", 0.9)), loop=True, seat=SLIME),
     "Think": Seq((("poses/think", 1.0),), loop=True, effect="thought_dots"),
     "Analyse": Seq((("poses/analyse", 1.0),), loop=True, prop="extras/orb"),
-    "Notice": Seq((("poses/notice", 1.6),), effect="alert_mark"),
+    "Notice": Seq((("poses/notice", 1.6),), effect="alert_mark", prop=SWORD),
     "LookAround": Seq((("poses/point", 1.2), ("poses/talk", 0.8))),
     "Stretch": Seq((("poses/stretch", 1.5),)),
     "Wave": Seq((("poses/wave", 1.6),), effect="heart"),
@@ -95,14 +105,43 @@ class Sprite:
     k: float         # stored px per canvas px
     feet: float      # lowest opaque row, canvas px
     top: float       # highest opaque row, canvas px
+    box: tuple[float, float, float, float] = (0, 0, 0, 0)  # opaque bounds x0, y0, x1, y1, canvas px
+    head: tuple[float, float, float] | None = None      # her hair dome: x0, x1, top row (canvas px)
+
+
+def _alpha(img: QImage) -> np.ndarray:
+    img = img.convertToFormat(QImage.Format.Format_ARGB32)
+    return np.frombuffer(img.constBits(), np.uint8).reshape(img.height(), img.bytesPerLine() // 4, 4)[:, :img.width(), 3]
 
 
 def _bounds(img: QImage) -> tuple[int, int, int, int] | None:
     """(x0, y0, x1, y1) of the opaque pixels."""
-    img = img.convertToFormat(QImage.Format.Format_ARGB32)
-    a = np.frombuffer(img.constBits(), np.uint8).reshape(img.height(), img.bytesPerLine() // 4, 4)[:, :img.width(), 3]
-    ys, xs = np.nonzero(a > 128)
+    ys, xs = np.nonzero(_alpha(img) > 128)
     return None if len(xs) == 0 else (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max()))
+
+
+def _head(a: np.ndarray) -> tuple[float, float, float] | None:
+    """Her hair dome in a character image: the topmost opaque row in the central columns (raised
+    hands are off to the sides), then the opaque run through that point 0.1 x height lower,
+    which is the dome's width. None when nothing sits in the middle (a prop image)."""
+    h, w = a.shape
+    band = a[:, int(0.38 * w):int(0.62 * w)] > 128
+    rows = np.nonzero(band.any(axis=1))[0]
+    if len(rows) == 0 or rows[0] > 0.4 * h:
+        return None
+    top = int(rows[0])
+    cx = int(0.38 * w) + int(np.nonzero(band[top])[0].mean())
+    r = min(h - 1, top + int(0.1 * h))
+    row = a[r] > 128
+    if not row[cx]:
+        return None
+    x0 = cx
+    while x0 > 0 and row[x0 - 1]:
+        x0 -= 1
+    x1 = cx
+    while x1 < w - 1 and row[x1 + 1]:
+        x1 += 1
+    return float(x0), float(x1), float(top)
 
 
 class Pack:
@@ -120,6 +159,28 @@ class Pack:
         self.canvas = (neutral.image.width() / neutral.k, neutral.image.height() / neutral.k)
         self.feet = neutral.feet
         self.gaze, self.eye_rects, self.deadzone = self._load_gaze()
+        # images placed by a given anchor instead of their lowest opaque row: key -> (dx, feet row)
+        self.anchors: dict[str, tuple[float, float]] = {}
+        self.sequences = self._load_sequences()
+
+    def _load_sequences(self) -> dict[str, Seq]:
+        """The built-in sequences, with this pack's own where it has them (walk-cycle/walk.json:
+        an 8-frame walk whose draw offsets plant the support boot on one row)."""
+        seqs = dict(SEQUENCES)
+        try:
+            w = json.loads((self.root / "walk-cycle" / "walk.json").read_text(encoding="utf-8"))
+            _ax, ay = w.get("anchor_xy", [0, 0])
+            frames = []
+            for f in w["frames"]:
+                key = "walk-cycle/" + f["file"].removesuffix(".png")
+                dx, dy = f.get("draw_offset_xy", [0, 0])
+                self.anchors[key] = (float(dx), float(ay) - float(dy))
+                frames.append((key, f.get("duration_ms", 125) / 1000))
+        except (OSError, ValueError, KeyError, TypeError):
+            return seqs
+        left = "left" in str(w.get("facing", "left")).split(";")[0]
+        seqs["Walk"] = Seq(tuple(frames), loop=bool(w.get("loop", True)), drawn_left=left)
+        return seqs
 
     def _load_gaze(self) -> tuple[dict[tuple[int, int], str], list[QRectF], float]:
         """(x, y) direction -> image key, the eye rectangles (canvas px), the centre dead zone."""
@@ -152,10 +213,14 @@ class Pack:
                 log.warning("sprite pack: missing %s", key)
                 self.sprites[key] = None
                 return None
-            b = _bounds(img) or (0, 0, img.width(), img.height())
+            a = _alpha(img)
+            ys, xs = np.nonzero(a > 128)
+            b = (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())) if len(xs) else (0, 0, img.width(), img.height())
             k = STORE_H / img.height()
             small = img.scaledToHeight(STORE_H, Qt.TransformationMode.SmoothTransformation)
-            self.sprites[key] = Sprite(small.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied), k, b[3], b[1])
+            head = None if key.startswith("extras/") else _head(a)
+            self.sprites[key] = Sprite(small.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied), k, b[3], b[1],
+                                       tuple(map(float, b)), head)
         return self.sprites[key]
 
     def mouth_rect(self) -> QRect:
@@ -234,20 +299,26 @@ class SpriteModel:
         self._gaze_shown: str | None = None
         self._gaze_next: tuple[str | None, float] = (None, 0.0)
         # tunable from the Customize window (tune(); character.py)
-        self.sequences: dict[str, Seq] = dict(SEQUENCES)
+        self.sequences: dict[str, Seq] = dict(self.pack.sequences)
         self.gaze_on = True
         self.gaze_reach = GAZE_RADIUS
         self.blink_s = (2.0, 6.0)
         self.effects_on = True
+        self.wear_mask = False   # the mask tilted on her head (Customize -> Look)
+        self.wear_sword = False  # the sheathed sword at her hip
 
-    def tune(self, ch) -> None:
-        """Apply a character.Character: sequence overrides and behaviour."""
-        self.sequences = dict(SEQUENCES)
+    def tune(self, ch, outfit: str | None = None) -> None:
+        """Apply a character.Character: sequence overrides, behaviour, and what this outfit wears."""
+        self.sequences = dict(self.pack.sequences)
         for name, d in ch.sequences.items():
             frames = tuple((str(k), float(sec)) for k, sec in d.get("frames", []) if float(sec) > 0)
-            base = SEQUENCES.get(name, Seq())
+            base = self.pack.sequences.get(name, Seq())
+            pick = lambda k, dflt: (d[k] or None) if k in d else dflt  # noqa: E731 ("" = none)
             self.sequences[name] = Seq(frames, bool(d.get("loop", base.loop)), d.get("effect") or None,
-                                       base.prop, base.drawn_left)
+                                       pick("prop", base.prop), base.drawn_left, pick("seat", base.seat))
+        tw = ch.outfits.get(outfit) if outfit else None
+        self.wear_mask = MASK_ENABLED and (tw.mask if tw else True)
+        self.wear_sword = tw.sword if tw else True
         b = ch.behaviour
         self.gaze_on, self.gaze_reach = b.gaze, max(0.05, b.gaze_reach)
         self.blink_s = (b.blink_min_s, max(b.blink_min_s, b.blink_max_s))
@@ -365,11 +436,21 @@ class SpriteModel:
         p.rotate(0.8 * prm.get("ParamBodyAngleX", 0.0) + 0.6 * prm.get("ParamAngleZ", 0.0))
         p.scale(1.0, 1.0 + 0.008 * math.sin((now - self._t0) * 2 * math.pi / 3.6))
         p.translate(-feet)
-        p.translate(0, self.pack.feet - sp.feet)  # this image's feet on the shared baseline
-        if seq and seq.drawn_left and key.startswith("poses/"):  # face the way the stage walks her
+        dx, fy = self.pack.anchors.get(key, (0.0, sp.feet))
+        seat = self.pack.get(seq.seat) if seq and seq.seat else None
+        if seat is not None:  # the slime on the baseline, her seat line sunk into its top
+            top = self._seat(p, seat)
+            line = sp.top + SEAT_LINE * (sp.feet - sp.top)
+            p.translate(dx, top + SEAT_SINK * (self.pack.feet - top) - line)
+        else:
+            p.translate(dx, self.pack.feet - fy)  # this image's feet on the shared baseline
+        if seq and seq.drawn_left and not key.startswith(("expressions/", "states/")):  # face the way she walks
             p.translate(cw / 2, 0)
             p.scale(-1, 1)
             p.translate(-cw / 2, 0)
+        held = seq.prop if seq and (seq.prop != MASK or MASK_ENABLED) else None
+        if self.wear_sword and held != SWORD:
+            self._worn_sword(p, sp)
         p.save()
         p.scale(1 / sp.k, 1 / sp.k)
         p.drawImage(0, 0, sp.image)
@@ -380,8 +461,10 @@ class SpriteModel:
         p.restore()
         if key in GAZE_FACES:
             self._eyes(p, now)
-        if seq and seq.prop:
-            self._prop(p, seq.prop, sp, now)
+        if self.wear_mask and held != MASK:
+            self._worn_mask(p, sp)
+        if held:
+            self._prop(p, held, sp, now)
         if seq and seq.effect and self.effects_on:
             self._effect(p, seq.effect, sp, now)
         p.restore()
@@ -424,15 +507,60 @@ class SpriteModel:
             self._blink_at = now + random.uniform(*self.blink_s)
         return now >= self._blink_at
 
-    def _prop(self, p: QPainter, key: str, sp: Sprite, now: float) -> None:
-        prop = self.pack.get(key)
-        if prop is None:
+    def _draw_extra(self, p: QPainter, key: str, centre: QPointF, width: float, angle: float = 0.0) -> None:
+        """An extras/ image's opaque part, `width` canvas px wide, centred and rotated."""
+        e = self.pack.get(key)
+        if e is None:
             return
+        x0, y0, x1, y1 = e.box
+        src = QRectF(x0 * e.k, y0 * e.k, (x1 - x0) * e.k, (y1 - y0) * e.k)
+        h = width * (y1 - y0) / max(1.0, x1 - x0)
+        p.save()
+        p.translate(centre)
+        p.rotate(angle)
+        p.drawImage(QRectF(-width / 2, -h / 2, width, h), e.image, src)
+        p.restore()
+
+    def _seat(self, p: QPainter, seat: Sprite) -> float:
+        """Draws the seat on the baseline, centred under her; returns its top row (canvas px)."""
         cw, _ = self.pack.canvas
-        size = 300.0  # canvas px
-        bob = 10 * math.sin((now - self._t0) * 2.0)
-        r = QRectF(cw / 2 - size / 2, sp.top + 0.6 * (sp.feet - sp.top) - size / 2 + bob, size, size)
-        p.drawImage(r, prop.image)
+        x0, y0, x1, y1 = seat.box
+        h = SEAT_W * (y1 - y0) / max(1.0, x1 - x0)
+        top = self.pack.feet - h
+        p.drawImage(QRectF(cw / 2 - SEAT_W / 2, top, SEAT_W, h), seat.image,
+                    QRectF(x0 * seat.k, y0 * seat.k, (x1 - x0) * seat.k, (y1 - y0) * seat.k))
+        return top
+
+    def _worn_mask(self, p: QPainter, sp: Sprite) -> None:
+        """Tilted on the viewer-left side of her head, like Kryo's reference."""
+        if sp.head is None:
+            return
+        x0, x1, top = sp.head
+        w = x1 - x0
+        self._draw_extra(p, MASK, QPointF(x0 + 0.16 * w, top + 0.22 * w), 0.48 * w, -38)
+
+    def _worn_sword(self, p: QPainter, sp: Sprite) -> None:
+        """Sheathed, slung behind her at the hip (drawn before her, so only its ends show)."""
+        cw, _ = self.pack.canvas
+        y = sp.top + 0.70 * (sp.feet - sp.top)
+        self._draw_extra(p, SWORD, QPointF(cw / 2 + 20, y - 40), 0.98 * cw, -24)
+
+    def _prop(self, p: QPainter, key: str, sp: Sprite, now: float) -> None:
+        """What she holds, in front of her: the orb floats at her chest, the sword lies across
+        her hands, the mask is held up at her chest."""
+        cw, _ = self.pack.canvas
+        h = sp.feet - sp.top
+        if key == ORB or key not in PROPS:
+            prop = self.pack.get(key)
+            if prop is None:
+                return
+            size = 300.0
+            bob = 10 * math.sin((now - self._t0) * 2.0)
+            p.drawImage(QRectF(cw / 2 - size / 2, sp.top + 0.6 * h - size / 2 + bob, size, size), prop.image)
+        elif key == SWORD:
+            self._draw_extra(p, SWORD, QPointF(cw / 2 + 40, sp.top + 0.66 * h), 0.80 * cw, -6)
+        elif key == MASK:
+            self._draw_extra(p, MASK, QPointF(cw / 2 - 40, sp.top + 0.60 * h), 0.30 * cw, -12)
 
     def _effect(self, p: QPainter, name: str, sp: Sprite, now: float) -> None:
         r = self.pack.svg(name)

@@ -133,15 +133,28 @@ def test_pokes_still_work_while_sleeping(brain):
 
 # Cursor: the desktop's finger (Duel/Point on the phone).
 
-def test_near_cursor_lingers_after_it_goes(brain):
+def test_near_cursor_reaction_ends_even_if_it_stays(brain):
     brain.cursor_near(0)
     assert brain.mood == Mood.CURSOR_NEAR
-    brain.tick(10_000)
+    for t in range(0, b.CURSOR_NEAR_MAX_MS, 500):  # the pointer rests beside her
+        brain.cursor_near(t)
+        brain.tick(t)
+        assert brain.mood == Mood.CURSOR_NEAR
+    brain.tick(b.CURSOR_NEAR_MAX_MS)
+    assert brain.mood == Mood.IDLE
+    brain.cursor_near(b.CURSOR_NEAR_MAX_MS + 100)  # still there: no new smile
+    assert brain.mood == Mood.IDLE
+    brain.cursor_left()
+    brain.cursor_near(b.CURSOR_NEAR_MAX_MS + 200)  # it left and came back
     assert brain.mood == Mood.CURSOR_NEAR
-    brain.cursor_gone(10_000)
-    brain.tick(10_000 + b.CURSOR_NEAR_LINGER_MS - 1)
+
+
+def test_near_cursor_going_away_ends_it_sooner(brain):
+    brain.cursor_near(0)
+    brain.cursor_gone(100)
+    brain.tick(100 + b.CURSOR_NEAR_LINGER_MS - 1)
     assert brain.mood == Mood.CURSOR_NEAR
-    brain.tick(10_000 + b.CURSOR_NEAR_LINGER_MS)
+    brain.tick(100 + b.CURSOR_NEAR_LINGER_MS)
     assert brain.mood == Mood.IDLE
 
 
@@ -159,12 +172,12 @@ def test_far_cursor_points_and_crossing_switches(brain):
     assert brain.mood == Mood.IDLE
 
 
-def test_cursor_back_before_the_linger_ends_keeps_her_at_it(brain):
+def test_cursor_back_during_the_reaction_does_not_extend_it(brain):
     brain.cursor_near(0)
     brain.cursor_gone(100)
     brain.cursor_near(1_000)
-    brain.tick(100 + b.CURSOR_NEAR_LINGER_MS + 5_000)
-    assert brain.mood == Mood.CURSOR_NEAR
+    brain.tick(b.CURSOR_NEAR_MAX_MS + 5_000)
+    assert brain.mood == Mood.IDLE
 
 
 def test_cursor_is_ignored_while_held_or_crying(brain):

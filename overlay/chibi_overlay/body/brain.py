@@ -78,6 +78,8 @@ MOMENT_GAP_MIN_MS = 8_000
 MOMENT_GAP_MAX_MS = 20_000
 WANDER_CHANCE = 0.25
 CURSOR_NEAR_LINGER_MS = 1_400
+CURSOR_NEAR_MAX_MS = 2_500
+"""How long she reacts to a pointer near her, however long it stays."""
 CURSOR_FAR_LINGER_MS = 1_800
 
 CURSOR_MOODS = frozenset({
@@ -122,6 +124,7 @@ class Brain:
         self._next_moment_at = -1
         self._pokes: deque[int] = deque()
         # tunable from the Customize window (character.py)
+        self._near_spent = False  # reacted to the pointer near her; reset when it leaves
         self.sleep_after_ms = SLEEP_AFTER_MS
         self.moment_gap_ms = (MOMENT_GAP_MIN_MS, MOMENT_GAP_MAX_MS)
 
@@ -145,14 +148,26 @@ class Brain:
             self._set(Mood.SURPRISED, now, SURPRISE_MS)
 
     def cursor(self, near: bool, now: int) -> None:
-        """The cursor is on her monitor, away from her (called every frame it stays)."""
+        """The cursor is on her monitor (called every frame it stays).
+
+        Near her she reacts once, for CURSOR_NEAR_MAX_MS: a pointer resting beside her
+        kept her smiling until a click. She reacts again only after it has left
+        (`cursor_left`)."""
         if self.mood not in CURSOR_MOODS:
             return
-        want = Mood.CURSOR_NEAR if near else Mood.CURSOR_FAR
-        if self.mood != want:
-            self._set(want, now, None)
+        if near:
+            if self.mood == Mood.CURSOR_NEAR or self._near_spent:
+                return
+            self._near_spent = True
+            self._set(Mood.CURSOR_NEAR, now, CURSOR_NEAR_MAX_MS)
+        elif self.mood != Mood.CURSOR_FAR:
+            self._set(Mood.CURSOR_FAR, now, None)
         else:
             self._until = NEVER
+
+    def cursor_left(self) -> None:
+        """The cursor moved away from her: the next approach gets a reaction again."""
+        self._near_spent = False
 
     def cursor_near(self, now: int) -> None:
         self.cursor(True, now)
@@ -163,7 +178,7 @@ class Brain:
     def cursor_gone(self, now: int) -> None:
         """The cursor left (or went still): she keeps at it a moment longer."""
         if self.mood == Mood.CURSOR_NEAR:
-            self._until = now + CURSOR_NEAR_LINGER_MS
+            self._until = min(self._until, now + CURSOR_NEAR_LINGER_MS)
         elif self.mood == Mood.CURSOR_FAR:
             self._until = now + CURSOR_FAR_LINGER_MS
 

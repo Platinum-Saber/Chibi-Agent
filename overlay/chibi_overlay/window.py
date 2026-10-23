@@ -117,7 +117,7 @@ class MonitorWindow(QOpenGLWidget):
         """Hand Kryo's customization to puppets that take it (sprite packs)."""
         for p in self.puppets.values():
             if hasattr(p.model, "tune"):
-                p.model.tune(self.stage.character)
+                p.model.tune(self.stage.character, self.stage.outfit)
         self.character_gen = self.stage.character_gen
 
     def resizeGL(self, w: int, h: int) -> None:
@@ -162,7 +162,7 @@ class MonitorWindow(QOpenGLWidget):
         st = self.stage
         cx, cy = win32.cursor_pos()
         if self.primary:
-            st.tick((cx, cy))
+            st.tick((cx, cy), win32.buttons_down())
             self._follow()
             for w in self.peers:
                 if w is not self:
@@ -179,7 +179,8 @@ class MonitorWindow(QOpenGLWidget):
             for pid, v in st.params(time.monotonic()).items():
                 pup.set_param(pid, v)
             g = st.gaze_target()
-            gx, gy = (g[0] - l, g[1] - t) if g else (x - l, y - t - pup.height)
+            # no target: look ahead, at a point level with her eyes (above her head rolled them up)
+            gx, gy = (g[0] - l, g[1] - t) if g else (x - l, y - t - pup.height * 0.6)
             pup.model.Drag(gx, gy)
             pup.model.Update()
             pup.model.Draw()

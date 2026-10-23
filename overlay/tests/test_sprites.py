@@ -142,3 +142,77 @@ def test_missing_models_checks_the_pack_folder(tmp_path):
     o = outfits.Outfit("casual_coat", {"chibi": f"sprites:{tmp_path}", "serious": f"sprites:{tmp_path / 'nope'}"},
                        {"chibi": "rigs/raphael_sprites.toml", "serious": "rigs/mao.toml"})
     assert o.missing_models() == [f"sprites:{tmp_path / 'nope'}"]
+
+
+def _walk_pack(root: Path) -> None:
+    """Two walk frames whose lowest rows differ; walk.json's offsets put both boots on row 145."""
+    _png(root, "walk-cycle/frames/walk_01", 140)
+    _png(root, "walk-cycle/frames/walk_02", 130)
+    (root / "walk-cycle" / "walk.json").write_text(json.dumps({
+        "anchor_xy": [50, 145], "loop": True, "facing": "three-quarter toward viewer-left",
+        "frames": [{"file": "frames/walk_01.png", "duration_ms": 125, "draw_offset_xy": [0, 5]},
+                   {"file": "frames/walk_02.png", "duration_ms": 125, "draw_offset_xy": [2, 15]}]}),
+        encoding="utf-8")
+
+
+def test_walk_json_replaces_the_walk_and_anchors_its_frames(pack):
+    _walk_pack(pack)
+    p = sprites.Pack(pack)
+    walk = p.sequences["Walk"]
+    assert [k for k, _ in walk.frames] == ["walk-cycle/frames/walk_01", "walk-cycle/frames/walk_02"]
+    assert walk.drawn_left and walk.loop and walk.length == pytest.approx(0.25)
+    assert p.anchors["walk-cycle/frames/walk_01"] == (0.0, 140.0)  # support boot row = 145 - 5
+    assert p.anchors["walk-cycle/frames/walk_02"] == (2.0, 130.0)
+
+
+def test_pack_without_walk_json_keeps_the_built_in_walk(pack):
+    assert sprites.Pack(pack).sequences["Walk"] == sprites.SEQUENCES["Walk"]
+
+
+def test_head_anchor_found_on_a_figure_not_on_a_prop(pack):
+    img = QImage(100, 150, QImage.Format.Format_ARGB32)  # a head (rows 10-40, x 30-70) on a narrow body
+    img.fill(Qt.GlobalColor.transparent)
+    for y in range(10, 141):
+        for x in (range(30, 71) if y <= 40 else range(45, 56)):
+            img.setPixelColor(x, y, QColor("navy"))
+    img.save(str(pack / "poses" / "figure.png"))
+    p = sprites.Pack(pack)
+    assert p.get("poses/figure").head == pytest.approx((30, 70, 10), abs=1)
+    _png(pack, "extras/slime", 140)
+    assert p.get("extras/slime").head is None
+
+
+def test_sitting_raises_her_onto_the_seat(pack):
+    _png(pack, "poses/sit", 140)
+    _png(pack, "extras/slime", 140)
+    m = sprites.SpriteModel(str(pack), None)
+    img = QImage(300, 300, QImage.Format.Format_ARGB32_Premultiplied)
+    m.Resize(300, 300)
+
+    def lowest(motion):
+        m.StartMotion(motion)
+        img.fill(Qt.GlobalColor.transparent)
+        from PySide6.QtGui import QPainter
+        painter = QPainter(img)
+        painter.setTransform(m.transform())
+        m.paint(painter, time.monotonic())
+        painter.end()
+        return [y for y in range(300) if any(img.pixelColor(x, y).alpha() > 128 for x in range(0, 300, 2))][-1]
+
+    m.wear_mask = m.wear_sword = False
+    assert abs(lowest("Sit") - lowest("Idle")) <= 2  # the seat stands on the baseline
+
+
+def test_tune_sets_worn_props_and_sequence_props(pack):
+    from chibi_overlay import character
+    ch = character.Character()
+    tw = ch.tweaks("casual_coat")
+    tw.mask, tw.sword = True, True
+    ch.sequences["Think"] = {"frames": [["poses/think", 1.0]], "loop": True, "prop": "", "seat": sprites.SLIME}
+    m = sprites.SpriteModel(str(pack), None)
+    m.tune(ch, "casual_coat")
+    assert m.wear_mask == sprites.MASK_ENABLED and m.wear_sword  # the mask stays off even if saved on
+    assert m.sequences["Think"].prop is None and m.sequences["Think"].seat == sprites.SLIME
+    assert m.sequences["Notice"].prop == sprites.SWORD  # untouched: the built-in choice
+    m.tune(ch, "another_outfit")
+    assert m.wear_mask == sprites.MASK_ENABLED and m.wear_sword  # outfits without settings: the sword (no mask for now)

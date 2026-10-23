@@ -187,11 +187,16 @@ class CustomizeDialog(QDialog):
             self.status.setText(f"Can't read {name}'s mood map: {e}")
         self.preview.load(self._rig_path())
         if self.preview.model is not None:
-            self.preview.model.tune(self.ch)
+            self.preview.model.tune(self.ch, self.outfit)
         self._filling = True
         self.outfit_combo.setCurrentText(name)
         tw = self.ch.outfits.get(name)
         self.height.setValue((tw.height_dip if tw and tw.height_dip else None) or (self.base.height_dip if self.base else 320))
+        sprite = self.preview.model is not None
+        self.wear_mask.setChecked(tw.mask if tw else False)
+        self.wear_sword.setChecked(tw.sword if tw else True)
+        self.wear_mask.setEnabled(sprite)
+        self.wear_sword.setEnabled(sprite)
         self._filling = False
         self._fill_moods()
         self._fill_sequences()
@@ -287,15 +292,29 @@ class CustomizeDialog(QDialog):
         self.height.valueChanged.connect(self._height_set)
         w = QWidget()
         f = QFormLayout(w)
+        self.wear_mask = QCheckBox("Mask worn on her head")
+        self.wear_sword = QCheckBox("Sword slung at her hip")
+        for c in (self.wear_mask, self.wear_sword):
+            c.toggled.connect(self._wear_set)
         f.addRow("Outfit", self.outfit_combo)
         f.addRow("Height (feet to head)", self.height)
         f.addRow("", slider)
+        f.addRow("Drawn outfits", self.wear_sword)
+        if sprites.MASK_ENABLED:
+            f.addRow("", self.wear_mask)
         f.addRow(QLabel("The outfit she starts in is the one saved here."))
         return w
 
     def _outfit_picked(self, name: str) -> None:
         if not self._filling and name and name != self.outfit:
             self._load_outfit(name)
+
+    def _wear_set(self, *_):
+        if not self._filling:
+            tw = self.ch.tweaks(self.outfit)
+            tw.mask, tw.sword = self.wear_mask.isChecked(), self.wear_sword.isChecked()
+            if self.preview.model is not None:
+                self.preview.model.tune(self.ch, self.outfit)
 
     def _height_set(self, v: int) -> None:
         if not self._filling:
@@ -312,8 +331,12 @@ class CustomizeDialog(QDialog):
             s.valueChanged.connect(self._behaviour_set)
             return s
 
-        self.b_gaze = QCheckBox("Her eyes follow the mouse")
-        self.b_gaze.toggled.connect(self._behaviour_set)
+        self.b_look = QComboBox()
+        self.b_look.addItem("Where you click (for a few seconds)", "clicks")
+        self.b_look.addItem("The mouse pointer, always", "cursor")
+        self.b_look.addItem("Straight ahead", "off")
+        self.b_look.currentIndexChanged.connect(self._behaviour_set)
+        self.b_hold = spin(0.5, 30, 0.5, " s")
         self.b_reach = spin(0.1, 2.0, 0.05, "", 2)
         self.b_blink = (spin(0.5, 30, 0.5, " s"), spin(0.5, 30, 0.5, " s"))
         self.b_moment = (spin(2, 600, 1, " s"), spin(2, 600, 1, " s"))
@@ -322,7 +345,8 @@ class CustomizeDialog(QDialog):
         self.b_effects.toggled.connect(self._behaviour_set)
         w = QWidget()
         f = QFormLayout(w)
-        f.addRow(self.b_gaze)
+        f.addRow("She looks at", self.b_look)
+        f.addRow("Keeps looking at a click for", self.b_hold)
         f.addRow("Eye reach (smaller: eyes turn sooner)", self.b_reach)
         f.addRow("Blink every (min)", self.b_blink[0])
         f.addRow("Blink every (max)", self.b_blink[1])
@@ -335,7 +359,8 @@ class CustomizeDialog(QDialog):
     def _fill_behaviour(self) -> None:
         self._filling = True
         b = self.ch.behaviour
-        self.b_gaze.setChecked(b.gaze)
+        self.b_look.setCurrentIndex(max(0, self.b_look.findData(b.look_at if b.gaze else "off")))
+        self.b_hold.setValue(b.look_hold_s)
         self.b_reach.setValue(b.gaze_reach)
         self.b_blink[0].setValue(b.blink_min_s)
         self.b_blink[1].setValue(b.blink_max_s)
@@ -349,13 +374,15 @@ class CustomizeDialog(QDialog):
         if self._filling:
             return
         b = self.ch.behaviour
-        b.gaze, b.gaze_reach, b.effects = self.b_gaze.isChecked(), self.b_reach.value(), self.b_effects.isChecked()
+        b.look_at, b.look_hold_s = self.b_look.currentData(), self.b_hold.value()
+        b.gaze = b.look_at != "off"
+        b.gaze_reach, b.effects = self.b_reach.value(), self.b_effects.isChecked()
         b.blink_min_s, b.blink_max_s = self.b_blink[0].value(), max(self.b_blink[0].value(), self.b_blink[1].value())
         b.moment_min_s, b.moment_max_s = self.b_moment[0].value(), max(self.b_moment[0].value(),
                                                                        self.b_moment[1].value())
         b.sleep_after_s = self.b_sleep.value()
         if self.preview.model is not None:
-            self.preview.model.tune(self.ch)
+            self.preview.model.tune(self.ch, self.outfit)
 
     # --- Sequences -------------------------------------------------------------------------------
     def _sequences_tab(self) -> QWidget:
@@ -369,6 +396,16 @@ class CustomizeDialog(QDialog):
         self.seq_loop.toggled.connect(self._seq_store)
         self.seq_effect = QComboBox()
         self.seq_effect.currentTextChanged.connect(self._seq_store)
+        self.seq_prop = QComboBox()
+        self.seq_seat = QComboBox()
+        held = [("(nothing)", ""), ("Orb", sprites.ORB), ("Sword", sprites.SWORD)]
+        if sprites.MASK_ENABLED:
+            held.insert(2, ("Mask", sprites.MASK))
+        for c, items in ((self.seq_prop, tuple(held)),
+                         (self.seq_seat, (("(stands)", ""), ("Slime", sprites.SLIME)))):
+            for text, data in items:
+                c.addItem(text, data)
+            c.currentIndexChanged.connect(self._seq_store)
         btns = QHBoxLayout()
         for text, fn in (("Add frame", self._frame_add), ("Remove", self._frame_remove), ("Up", lambda: self._frame_move(-1)),
                          ("Down", lambda: self._frame_move(1)), ("Reset", self._seq_reset)):
@@ -384,6 +421,12 @@ class CustomizeDialog(QDialog):
         opts.addWidget(QLabel("Effect"))
         opts.addWidget(self.seq_effect, 1)
         right.addLayout(opts)
+        opts2 = QHBoxLayout()
+        opts2.addWidget(QLabel("Holds"))
+        opts2.addWidget(self.seq_prop, 1)
+        opts2.addWidget(QLabel("Sits on"))
+        opts2.addWidget(self.seq_seat, 1)
+        right.addLayout(opts2)
         right.addWidget(QLabel("No frames: the mood's face shows (for Idle, Talk, Happy...)."))
         w = QWidget()
         lay = QHBoxLayout(w)
@@ -401,11 +444,11 @@ class CustomizeDialog(QDialog):
         self.seq_list.clear()
         self.frames.setRowCount(0)
         enabled = m is not None
-        for wdg in (self.seq_list, self.frames, self.seq_loop, self.seq_effect):
+        for wdg in (self.seq_list, self.frames, self.seq_loop, self.seq_effect, self.seq_prop, self.seq_seat):
             wdg.setEnabled(enabled)
         self.seq_note.setText("" if enabled else "Sequences are for drawn (sprite) outfits.")
         if m is not None:
-            self._images = [k for d in ("poses", "expressions", "states") for k in m.pack.keys(d)]
+            self._images = [k for d in ("poses", "walk-cycle/frames", "expressions", "states") for k in m.pack.keys(d)]
             self.seq_effect.clear()
             self.seq_effect.addItems(["(none)", *m.pack.effects()])
             self.seq_list.addItems(sorted(m.sequences))
@@ -416,8 +459,13 @@ class CustomizeDialog(QDialog):
     def _seq_dict(self, name: str) -> dict:
         if name in self.ch.sequences:
             return copy.deepcopy(self.ch.sequences[name])
-        s = sprites.SEQUENCES.get(name, sprites.Seq())
-        return {"frames": [[k, sec] for k, sec in s.frames], "loop": s.loop, "effect": s.effect or ""}
+        return self._seq_dict_builtin(name)
+
+    def _seq_dict_builtin(self, name: str) -> dict:
+        m = self.preview.model
+        s = (m.pack.sequences if m is not None else sprites.SEQUENCES).get(name, sprites.Seq())
+        return {"frames": [[k, sec] for k, sec in s.frames], "loop": s.loop, "effect": s.effect or "",
+                "prop": s.prop or "", "seat": s.seat or ""}
 
     def _seq_picked(self, name: str) -> None:
         if not name:
@@ -429,6 +477,9 @@ class CustomizeDialog(QDialog):
             self._frame_row(key, sec)
         self.seq_loop.setChecked(bool(d["loop"]))
         self.seq_effect.setCurrentText(d.get("effect") or "(none)")
+        base = self._seq_dict_builtin(name)
+        self.seq_prop.setCurrentIndex(max(0, self.seq_prop.findData(d.get("prop", base["prop"]))))
+        self.seq_seat.setCurrentIndex(max(0, self.seq_seat.findData(d.get("seat", base["seat"]))))
         self._filling = False
         self.preview.play(name, "neutral")
 
@@ -458,9 +509,10 @@ class CustomizeDialog(QDialog):
             return
         eff = self.seq_effect.currentText()
         self.ch.sequences[name] = {"frames": self._frames(), "loop": self.seq_loop.isChecked(),
-                                   "effect": "" if eff == "(none)" else eff}
+                                   "effect": "" if eff == "(none)" else eff,
+                                   "prop": self.seq_prop.currentData() or "", "seat": self.seq_seat.currentData() or ""}
         if self.preview.model is not None:
-            self.preview.model.tune(self.ch)
+            self.preview.model.tune(self.ch, self.outfit)
             self.preview.play(name, "neutral")
 
     def _frame_add(self) -> None:
@@ -493,7 +545,7 @@ class CustomizeDialog(QDialog):
         if item is not None:
             self.ch.sequences.pop(item.text(), None)
             if self.preview.model is not None:
-                self.preview.model.tune(self.ch)
+                self.preview.model.tune(self.ch, self.outfit)
             self._seq_picked(item.text())
 
     # --- Voice -----------------------------------------------------------------------------------

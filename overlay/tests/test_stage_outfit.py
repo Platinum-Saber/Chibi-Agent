@@ -159,3 +159,18 @@ def test_serious_moods_still_switch_without_chibi_only(st):
     st.serious_until = 1e12
     st.tick((0, 0))
     assert st.transform_t0 is not None
+
+
+
+def test_she_looks_where_you_click_then_ahead(st, monkeypatch):
+    st.tick((100, 200), pressed=False)
+    assert st.gaze_target() is None
+    st.tick((300, 400), pressed=True)
+    assert st.gaze_target() == (300, 400)
+    st.tick((500, 500), pressed=True)  # still held: not a new click
+    assert st.gaze_target() == (300, 400)
+    later = st.look_at[2] + st.character.behaviour.look_hold_s + 0.1
+    monkeypatch.setattr(stage_mod.time, "monotonic", lambda: later)
+    assert st.gaze_target() is None
+    st.character.behaviour.look_at = "cursor"
+    assert st.gaze_target() == st.cursor
