@@ -26,10 +26,11 @@ def _png(root: Path, key: str, feet: int, w: int = 100, h: int = 150) -> None:
 
 @pytest.fixture
 def pack(tmp_path):
-    _png(tmp_path, "expressions/neutral", 140)
-    _png(tmp_path, "expressions/happy", 140)
-    _png(tmp_path, "poses/held", 120)
-    return tmp_path
+    root = tmp_path / "v01"  # its own parent: walk sets beside the pack stay private to the test
+    _png(root, "expressions/neutral", 140)
+    _png(root, "expressions/happy", 140)
+    _png(root, "poses/held", 120)
+    return root
 
 
 def test_every_mapped_motion_has_a_sequence():
@@ -148,6 +149,12 @@ def _walk_pack(root: Path) -> None:
     """Two walk frames whose lowest rows differ; walk.json's offsets put both boots on row 145."""
     _png(root, "walk-cycle/frames/walk_01", 140)
     _png(root, "walk-cycle/frames/walk_02", 130)
+    img = QImage(str(root / "walk-cycle/frames/walk_02.png"))  # a step: its legs move over
+    for y in range(110, 131):
+        for x in range(40, 60):
+            img.setPixelColor(x, y, QColor(0, 0, 0, 0))
+            img.setPixelColor(x + 25, y, QColor("navy"))
+    img.save(str(root / "walk-cycle/frames/walk_02.png"))
     (root / "walk-cycle" / "walk.json").write_text(json.dumps({
         "anchor_xy": [50, 145], "loop": True, "facing": "three-quarter toward viewer-left",
         "frames": [{"file": "frames/walk_01.png", "duration_ms": 125, "draw_offset_xy": [0, 5]},
@@ -159,10 +166,43 @@ def test_walk_json_replaces_the_walk_and_anchors_its_frames(pack):
     _walk_pack(pack)
     p = sprites.Pack(pack)
     walk = p.sequences["Walk"]
-    assert [k for k, _ in walk.frames] == ["walk-cycle/frames/walk_01", "walk-cycle/frames/walk_02"]
+    assert [k for k, _ in walk.frames] == [f"{sprites.WALK_LOCK}0", f"{sprites.WALK_LOCK}1"]
     assert walk.drawn_left and walk.loop and walk.length == pytest.approx(0.25)
-    assert p.anchors["walk-cycle/frames/walk_01"] == (0.0, 140.0)  # support boot row = 145 - 5
-    assert p.anchors["walk-cycle/frames/walk_02"] == (2.0, 130.0)
+    assert p.walk_dir.name == "walk-cycle"
+    assert p.get(f"{sprites.WALK_LOCK}1") is not None  # built on first use
+    dx, feet = p.anchors[f"{sprites.WALK_LOCK}1"]
+    assert dx == 2.0 and 130 <= feet <= 145  # between the planted sole and the even bob
+
+
+def test_newest_walk_set_beside_the_pack_wins(pack, tmp_path):
+    _walk_pack(pack)
+    other = pack.parent / "white-segment-walk"
+    (other / "frames").mkdir(parents=True)
+    import shutil
+    for f in ("walk_01", "walk_02"):
+        shutil.copy(pack / "walk-cycle" / "frames" / f"{f}.png", other / "frames" / f"{f}.png")
+    data = json.loads((pack / "walk-cycle" / "walk.json").read_text(encoding="utf-8"))
+    (other / "walk.json").write_text(json.dumps(data), encoding="utf-8")
+    import os
+    os.utime(other / "walk.json", (time.time() + 10, time.time() + 10))
+    p = sprites.Pack(pack)
+    assert [d.name for d in p.walk_sets()] == ["white-segment-walk", "walk-cycle"]
+    assert p.walk_dir.name == "white-segment-walk"
+    p.use_walk("walk-cycle")
+    assert p.walk_dir.name == "walk-cycle"
+
+
+def test_near_duplicate_walk_frames_are_dropped(pack):
+    _walk_pack(pack)
+    _png(pack, "walk-cycle/frames/walk_03", 140)  # the same legs as frame 1 again
+    w = json.loads((pack / "walk-cycle" / "walk.json").read_text(encoding="utf-8"))
+    w["frames"].insert(1, {"file": "frames/walk_03.png", "duration_ms": 125, "draw_offset_xy": [0, 5]})
+    (pack / "walk-cycle" / "walk.json").write_text(json.dumps(w), encoding="utf-8")
+    p = sprites.Pack(pack)
+    assert len(p.sequences["Walk"].frames) == 3  # before the build: as listed
+    p.get(f"{sprites.WALK_LOCK}0")
+    walk = p.sequences["Walk"]
+    assert len(walk.frames) == 2 and walk.length == pytest.approx(0.375)  # the copy is gone, the cycle keeps its time
 
 
 def test_pack_without_walk_json_keeps_the_built_in_walk(pack):

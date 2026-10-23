@@ -196,6 +196,14 @@ class CustomizeDialog(QDialog):
         self.wear_mask.setChecked(tw.mask if tw else False)
         self.wear_sword.setChecked(tw.sword if tw else True)
         self.wear_mask.setEnabled(sprite)
+        self.walk_combo.clear()
+        self.walk_combo.addItem("Newest set", "")
+        if sprite:
+            for d in self.preview.model.pack.walk_sets():
+                self.walk_combo.addItem(d.name, d.name)
+        i = self.walk_combo.findData(tw.walk if tw else "")
+        self.walk_combo.setCurrentIndex(max(0, i))
+        self.walk_combo.setEnabled(sprite)
         self.wear_sword.setEnabled(sprite)
         self._filling = False
         self._fill_moods()
@@ -299,7 +307,10 @@ class CustomizeDialog(QDialog):
         f.addRow("Outfit", self.outfit_combo)
         f.addRow("Height (feet to head)", self.height)
         f.addRow("", slider)
+        self.walk_combo = QComboBox()
+        self.walk_combo.currentIndexChanged.connect(self._walk_set)
         f.addRow("Drawn outfits", self.wear_sword)
+        f.addRow("Walk cycle", self.walk_combo)
         if sprites.MASK_ENABLED:
             f.addRow("", self.wear_mask)
         f.addRow(QLabel("The outfit she starts in is the one saved here."))
@@ -315,6 +326,13 @@ class CustomizeDialog(QDialog):
             tw.mask, tw.sword = self.wear_mask.isChecked(), self.wear_sword.isChecked()
             if self.preview.model is not None:
                 self.preview.model.tune(self.ch, self.outfit)
+
+    def _walk_set(self, *_):
+        if not self._filling:
+            self.ch.tweaks(self.outfit).walk = self.walk_combo.currentData() or ""
+            if self.preview.model is not None:
+                self.preview.model.tune(self.ch, self.outfit)
+                self.preview.play("Walk", "neutral")
 
     def _height_set(self, v: int) -> None:
         if not self._filling:

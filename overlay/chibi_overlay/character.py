@@ -67,6 +67,7 @@ class OutfitTweaks:
     height_dip: int | None = None
     mask: bool = False  # drawn outfits: the mask worn on her head (off for now: sprites.MASK_ENABLED)
     sword: bool = True  # drawn outfits: the sheathed sword at her hip
+    walk: str = ""      # drawn outfits: the walk set (a folder with walk.json); "" = the newest
     moods: dict[str, dict] = field(default_factory=dict)    # mood -> {motion, expression}
     moments: dict[str, dict] = field(default_factory=dict)  # moment -> {motion, expression}
 
@@ -131,6 +132,7 @@ def parse(d: dict) -> Character:
             h = t.get("height_dip")
             outfits[name] = OutfitTweaks(int(h) if isinstance(h, (int, float)) and h > 0 else None,
                                          bool(t.get("mask", False)), bool(t.get("sword", True)),
+                                         str(t.get("walk", "")),
                                          _clips(t.get("moods")), _clips(t.get("moments")))
     seqs = {}
     for name, t in (d.get("sequences") or {}).items():
@@ -207,6 +209,8 @@ def dumps(ch: Character) -> str:
         if tw.height_dip:
             out.append(f"height_dip = {int(tw.height_dip)}")
         out += [f"mask = {_value(tw.mask)}", f"sword = {_value(tw.sword)}"]
+        if tw.walk:
+            out.append(f"walk = {_value(tw.walk)}")
         for table in ("moods", "moments"):
             clips = getattr(tw, table)
             if clips:

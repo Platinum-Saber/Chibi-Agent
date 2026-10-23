@@ -28,6 +28,7 @@ import json
 import logging
 import math
 import random
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +50,13 @@ GAZE_RADIUS = 0.45  # x canvas width: how far from her eyes the cursor counts as
 GAZE_HOLD_S = 0.12  # a new direction must hold this long before her eyes switch (no flicker on a sector edge)
 
 
+WALK_LOCK = "walk/"  # keys of the built walk frames (frame 01's head on each)
+HEAD_SEAM = 700      # canvas row: frame 01's head (whole chin included) ends where its scarf begins; this if not found
+HEAD_FEATHER = 20    # rows each side of that seam that blend (the long hair at her sides crosses it)
+SCARF_GROW = 3       # stored px the scarf mask grows by (its ink outline), with a soft edge
+WALK_BOB = 6.0       # canvas px: the even head bob the walk frames are placed toward
+WALK_DEDUPE = 0.10   # walk frames whose legs change less than this (pixel share) from the last kept one are dropped
+WALK_PLANT = 0.5     # the body: 1 plants each support sole exactly, 0 follows the even bob (the head always does)
 ORB, MASK, SWORD, SLIME = "extras/orb", "extras/mask", "extras/sword_sheathed", "extras/slime"
 MASK_ENABLED = False  # Kryo, 2026-10-23: no mask for now (worn or held); the drawing code stays
 PROPS = (ORB, MASK, SWORD) if MASK_ENABLED else (ORB, SWORD)  # what she can hold
@@ -120,6 +128,46 @@ def _bounds(img: QImage) -> tuple[int, int, int, int] | None:
     return None if len(xs) == 0 else (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max()))
 
 
+def _grow(mask: np.ndarray, r: int) -> np.ndarray:
+    """A 0..1 mask grown by `r` px (max of shifted copies), then softened one step (mean of shifts)."""
+    out = mask.copy()
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            out = np.maximum(out, np.roll(np.roll(mask, dy, 0), dx, 1))
+    soft = sum(np.roll(np.roll(out, dy, 0), dx, 1) for dy in (-1, 0, 1) for dx in (-1, 0, 1)) / 9
+    return np.clip(soft, 0, 1)
+
+
+def _distinct_steps(arrs: list[np.ndarray], dys: list[float], min_change: float = WALK_DEDUPE) -> list[int]:
+    """Indexes of the walk frames to keep: a frame whose legs (the lowest quarter of the figure,
+    each placed by its support-sole offset) differ from the last kept one by less than
+    `min_change` of the pixels adds a hitch, not a step. The loop's last frame is checked
+    against the first too."""
+    h, w = arrs[0].shape[:2]
+    legs = [(np.roll(a[:, :, 3], int(round(dy)), 0)[int(0.77 * h):, int(0.2 * w):int(0.83 * w)] > 128)
+            for a, dy in zip(arrs, dys)]
+    change = lambda i, j: float((legs[i] != legs[j]).mean())  # noqa: E731
+    keep = [0]
+    for i in range(1, len(arrs)):
+        if change(i, keep[-1]) >= min_change:
+            keep.append(i)
+    if len(keep) > 2 and change(keep[-1], keep[0]) < min_change:
+        keep.pop()
+    return keep
+
+
+def _scarf_top(rgba: np.ndarray) -> int | None:
+    """The first row (below her eyes, above her waist) where the cream scarf crosses her centre:
+    cream is red/green-high, clearly less blue (skin is nearly as blue as red). Her gold eyes
+    pass that test too, so the search starts below them (~0.41 x height)."""
+    h, w = rgba.shape[:2]
+    band = rgba[int(0.41 * h):int(0.6 * h), int(0.42 * w):int(0.58 * w)]
+    b, g, r, a = band[..., 0], band[..., 1], band[..., 2], band[..., 3]  # ARGB32 is BGRA in memory
+    cream = (a > 200) & (r > 190) & (g > 160) & (r - b > 45)
+    rows = np.nonzero(cream.mean(axis=1) > 0.5)[0]
+    return int(0.41 * h) + int(rows[0]) if len(rows) else None
+
+
 def _head(a: np.ndarray) -> tuple[float, float, float] | None:
     """Her hair dome in a character image: the topmost opaque row in the central columns (raised
     hands are off to the sides), then the opaque run through that point 0.1 x height lower,
@@ -147,8 +195,10 @@ def _head(a: np.ndarray) -> tuple[float, float, float] | None:
 class Pack:
     """The pack's images, loaded on first use and kept downscaled."""
 
-    def __init__(self, root: str | Path):
+    def __init__(self, root: str | Path, background: bool = False):
         self.root = Path(root)
+        self.background = background  # build the walk frames on a thread (the overlay); tests build inline
+        self._walk_thread: threading.Thread | None = None
         self.sprites: dict[str, Sprite] = {}
         self.svgs: dict[str, QSvgRenderer] = {}
         self._mouth: QRect | None = None
@@ -161,26 +211,110 @@ class Pack:
         self.gaze, self.eye_rects, self.deadzone = self._load_gaze()
         # images placed by a given anchor instead of their lowest opaque row: key -> (dx, feet row)
         self.anchors: dict[str, tuple[float, float]] = {}
-        self.sequences = self._load_sequences()
+        self.walk_dir: Path | None = None
+        self._walk_src: list = []
+        self._walk_anchor = 1508.0
+        self.use_walk()
 
-    def _load_sequences(self) -> dict[str, Seq]:
-        """The built-in sequences, with this pack's own where it has them (walk-cycle/walk.json:
-        an 8-frame walk whose draw offsets plant the support boot on one row)."""
-        seqs = dict(SEQUENCES)
+    def walk_sets(self) -> list[Path]:
+        """Folders with a walk.json: the pack's walk-cycle/ and sets beside the pack folder
+        (casual-coat/<set>/walk.json), newest first."""
+        cands = [self.root / "walk-cycle"] + [w.parent for w in self.root.parent.glob("*/walk.json")]
+        found = {c.resolve(): c for c in cands if (c / "walk.json").exists()}
+        return sorted(found.values(), key=lambda c: (c / "walk.json").stat().st_mtime, reverse=True)
+
+    def use_walk(self, name: str = "") -> None:
+        """Walk with the set named `name` (a folder from walk_sets), or the newest. Its frames are
+        separate drawings, so each gets frame 01's head down to the chin (no face shimmer at 8 fps),
+        placed exactly on an even bob; the body sits halfway between that and planting its support
+        sole (walk.json's offsets). Planting alone made the head jump."""
+        self.sequences = dict(SEQUENCES)
+        self.walk_dir, self._walk_src = None, []
+        for k in [k for k in self.sprites if k.startswith(WALK_LOCK)]:
+            del self.sprites[k]
+        sets = self.walk_sets()
+        pick = next((d for d in sets if d.name == name), sets[0] if sets else None)
+        if pick is None:
+            return
         try:
-            w = json.loads((self.root / "walk-cycle" / "walk.json").read_text(encoding="utf-8"))
-            _ax, ay = w.get("anchor_xy", [0, 0])
-            frames = []
-            for f in w["frames"]:
-                key = "walk-cycle/" + f["file"].removesuffix(".png")
-                dx, dy = f.get("draw_offset_xy", [0, 0])
-                self.anchors[key] = (float(dx), float(ay) - float(dy))
-                frames.append((key, f.get("duration_ms", 125) / 1000))
-        except (OSError, ValueError, KeyError, TypeError):
-            return seqs
+            w = json.loads((pick / "walk.json").read_text(encoding="utf-8"))
+            ay = float(w.get("anchor_xy", [0, 1508])[1])
+            src = [(pick / f["file"], float(f.get("draw_offset_xy", [0, 0])[0]),
+                    float(f.get("draw_offset_xy", [0, 0])[1]), f.get("duration_ms", 125) / 1000) for f in w["frames"]]
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as e:
+            log.warning("walk set %s unreadable: %s", pick, e)
+            return
+        self.walk_dir, self._walk_src, self._walk_anchor = pick, src, ay
+        frames = tuple((f"{WALK_LOCK}{i}", sec) for i, (_, _, _, sec) in enumerate(src))
         left = "left" in str(w.get("facing", "left")).split(";")[0]
-        seqs["Walk"] = Seq(tuple(frames), loop=bool(w.get("loop", True)), drawn_left=left)
-        return seqs
+        self.sequences["Walk"] = Seq(frames, loop=bool(w.get("loop", True)), drawn_left=left)
+        if self.background:  # ~0.7 s of blending: off the drawing thread
+            self._walk_thread = threading.Thread(target=self._build_walk, name="walk-build", daemon=True)
+            self._walk_thread.start()
+
+    def _build_walk(self) -> None:
+        """The walk frames with frame 01's head blended in above the scarf, and their anchors.
+        Blended at the stored size (canvas rows scaled by kk)."""
+        src_imgs = [QImage(str(path)) for path, *_ in self._walk_src]
+        if not src_imgs or any(im.isNull() for im in src_imgs):
+            log.warning("walk set %s: missing frames", self.walk_dir)
+            self._walk_src = []
+            return
+        canvas_h = float(src_imgs[0].height())
+        kk = STORE_H / canvas_h
+        imgs = [im.scaledToHeight(STORE_H, Qt.TransformationMode.SmoothTransformation)
+                .convertToFormat(QImage.Format.Format_ARGB32) for im in src_imgs]
+        arrs = [np.frombuffer(im.constBits(), np.uint8).reshape(im.height(), im.bytesPerLine() // 4, 4)
+                [:, :im.width()].astype(np.float32) for im in imgs]
+        heads = [_head(a[:, :, 3].astype(np.uint8)) for a in arrs]
+        ref, rh = arrs[0], heads[0]
+        n = len(arrs)
+        ref_scarf = _scarf_top(ref)
+        ref_seam = ref_scarf if ref_scarf is not None else HEAD_SEAM * kk
+        keep = _distinct_steps(arrs, [dy * kk for _, _, dy, _ in self._walk_src])
+        if len(keep) < n:
+            log.info("walk %s: dropped near-duplicate frames %s", self.walk_dir.name,
+                     [i + 1 for i in range(n) if i not in keep])
+        total = sum(sec for *_, sec in self._walk_src)
+        arrs, heads, src = [arrs[i] for i in keep], [heads[i] for i in keep], [self._walk_src[i] for i in keep]
+        n = len(arrs)
+        tops = [h[2] if h else (rh[2] if rh else 0.0) for h in heads]  # stored px
+        ups = [WALK_BOB * math.cos(2 * math.pi * 2 * i / n) for i in range(n)]  # even bob: low on contacts
+        # the body: half planted on its support sole, half its own head on the even bob (canvas px down)
+        drops =[round(WALK_PLANT * dy + (1 - WALK_PLANT) * ((tops[0] - top) / kk + up))
+                 for top, up, (_, _, dy, _) in zip(tops, ups, src)]
+        built, anchors = {}, {}
+        for i, (a, h, (_, dx, _, _)) in enumerate(zip(arrs, heads, src)):
+            out = a
+            if rh is not None and h is not None and i > 0:
+                sx = int(round((h[0] + h[1]) / 2 - (rh[0] + rh[1]) / 2))
+                # frame 01's head exactly on the even bob, wherever this frame's body sits
+                sy = int(round((drops[0] - drops[i] + ups[i] - ups[0]) * kk))
+                head = np.roll(np.roll(ref, sy, 0), sx, 1)
+                y = np.arange(a.shape[0], dtype=np.float32)[:, None]
+                # the whole of frame 01's head, its chin outline included, down to its own scarf...
+                m = np.clip((ref_seam + sy + HEAD_FEATHER * kk - y) / (2 * HEAD_FEATHER * kk), 0, 1)[:, :, None]
+                m = np.repeat(m, a.shape[1], axis=1)  # per pixel from here on
+                # ...and this frame's scarf in front of it, as a scarf is (it rises higher on some frames)
+                low = int(0.41 * a.shape[0])
+                b_, g_, r_, al_ = (a[low:, :, c] for c in range(4))
+                cream = ((al_ > 200) & (r_ > 190) & (g_ > 160) & (r_ - b_ > 45)).astype(np.float32)
+                cream = _grow(cream, SCARF_GROW)
+                m[low:, :, 0] *= 1 - cream
+                a1, a2 = head[:, :, 3:4] / 255, a[:, :, 3:4] / 255
+                alpha = m * a1 + (1 - m) * a2
+                rgb = (m * head[:, :, :3] * a1 + (1 - m) * a[:, :, :3] * a2) / np.maximum(alpha, 1e-6)
+                out = np.concatenate([rgb, alpha * 255], 2)
+            buf = np.ascontiguousarray(out.clip(0, 255).astype(np.uint8))
+            img = QImage(buf.data, buf.shape[1], buf.shape[0], buf.shape[1] * 4, QImage.Format.Format_ARGB32).copy()
+            built[f"{WALK_LOCK}{i}"] = self._make(img, canvas_h=canvas_h)
+            anchors[f"{WALK_LOCK}{i}"] = (dx, self._walk_anchor - drops[i])
+        # swap in all at once: the drawing thread may be reading the walk meanwhile
+        self.anchors.update(anchors)
+        self.sprites.update(built)
+        walk = self.sequences["Walk"]
+        self.sequences = {**self.sequences, "Walk": Seq(tuple((k, total / n) for k in built), walk.loop,
+                                                       walk.effect, walk.prop, walk.drawn_left, walk.seat)}
 
     def _load_gaze(self) -> tuple[dict[tuple[int, int], str], list[QRectF], float]:
         """(x, y) direction -> image key, the eye rectangles (canvas px), the centre dead zone."""
@@ -208,20 +342,33 @@ class Pack:
 
     def get(self, key: str) -> Sprite | None:
         if key not in self.sprites:
+            if key.startswith(WALK_LOCK):
+                if self._walk_thread is None or not self._walk_thread.is_alive():
+                    self._build_walk()  # (the overlay starts it in the background; tests build here)
+                return self.sprites.get(key)  # None while building: she stands until it's ready
             img = QImage(str(self.root / f"{key}.png"))
             if img.isNull():
                 log.warning("sprite pack: missing %s", key)
                 self.sprites[key] = None
                 return None
-            a = _alpha(img)
-            ys, xs = np.nonzero(a > 128)
-            b = (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())) if len(xs) else (0, 0, img.width(), img.height())
-            k = STORE_H / img.height()
-            small = img.scaledToHeight(STORE_H, Qt.TransformationMode.SmoothTransformation)
-            head = None if key.startswith("extras/") else _head(a)
-            self.sprites[key] = Sprite(small.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied), k, b[3], b[1],
-                                       tuple(map(float, b)), head)
+            self.sprites[key] = self._make(img, not key.startswith("extras/"))
         return self.sprites[key]
+
+    @staticmethod
+    def _make(img: QImage, figure: bool = True, canvas_h: float | None = None) -> Sprite:
+        """An image -> its Sprite (downscaled to STORE_H) with bounds and, for a figure, its hair
+        dome, in canvas px. `canvas_h`: the canvas height when `img` is already downscaled."""
+        k = STORE_H / img.height() if canvas_h is None else img.height() / canvas_h
+        a = _alpha(img)
+        ys, xs = np.nonzero(a > 128)
+        b = (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())) if len(xs) else (0, 0, img.width(), img.height())
+        head = _head(a) if figure else None
+        small = img if canvas_h is not None else img.scaledToHeight(STORE_H, Qt.TransformationMode.SmoothTransformation)
+        if canvas_h is not None:  # bounds were measured on the small image: back to canvas px
+            b = tuple(v / k for v in b)
+            head = tuple(v / k for v in head) if head else None
+        return Sprite(small.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied), k, b[3], b[1],
+                      tuple(map(float, b)), head)
 
     def mouth_rect(self) -> QRect:
         """The mouth patch (stored px): a fixed box around the densest change between neutral
@@ -282,7 +429,7 @@ class Pack:
 
 class SpriteModel:
     def __init__(self, pack_dir: str, widget):
-        self.pack = Pack(pack_dir)
+        self.pack = Pack(pack_dir, background=True)
         self.widget = widget
         self.fb = (1, 1)
         self.scale_x = self.scale_y = 1.0
@@ -299,7 +446,7 @@ class SpriteModel:
         self._gaze_shown: str | None = None
         self._gaze_next: tuple[str | None, float] = (None, 0.0)
         # tunable from the Customize window (tune(); character.py)
-        self.sequences: dict[str, Seq] = dict(self.pack.sequences)
+        self._overrides: dict[str, Seq] = {}  # Kryo's sequences (Customize); the rest come from the pack
         self.gaze_on = True
         self.gaze_reach = GAZE_RADIUS
         self.blink_s = (2.0, 6.0)
@@ -309,14 +456,18 @@ class SpriteModel:
 
     def tune(self, ch, outfit: str | None = None) -> None:
         """Apply a character.Character: sequence overrides, behaviour, and what this outfit wears."""
-        self.sequences = dict(self.pack.sequences)
+        tw = ch.outfits.get(outfit) if outfit else None
+        walk = tw.walk if tw else ""
+        if (self.pack.walk_dir.name if self.pack.walk_dir else "") != walk and (walk or self.pack.walk_dir is None
+                                                                               or self.pack.walk_sets()[:1] != [self.pack.walk_dir]):
+            self.pack.use_walk(walk)
+        self._overrides = {}
         for name, d in ch.sequences.items():
             frames = tuple((str(k), float(sec)) for k, sec in d.get("frames", []) if float(sec) > 0)
             base = self.pack.sequences.get(name, Seq())
             pick = lambda k, dflt: (d[k] or None) if k in d else dflt  # noqa: E731 ("" = none)
-            self.sequences[name] = Seq(frames, bool(d.get("loop", base.loop)), d.get("effect") or None,
+            self._overrides[name] = Seq(frames, bool(d.get("loop", base.loop)), d.get("effect") or None,
                                        pick("prop", base.prop), base.drawn_left, pick("seat", base.seat))
-        tw = ch.outfits.get(outfit) if outfit else None
         self.wear_mask = MASK_ENABLED and (tw.mask if tw else True)
         self.wear_sword = tw.sword if tw else True
         b = ch.behaviour
@@ -325,6 +476,12 @@ class SpriteModel:
         self.effects_on = b.effects
         if not self.gaze_on:
             self._gaze_shown = None
+
+    @property
+    def sequences(self) -> dict[str, Seq]:
+        """What plays: Kryo's overrides over the pack's sequences, read live (the pack swaps in
+        its walk once the background build has trimmed and blended it)."""
+        return {**self.pack.sequences, **self._overrides}
 
     # --- live2d.Model API used by Puppet / MonitorWindow ------------------------------------------
     def LoadModelJson(self, _path: str) -> None:
