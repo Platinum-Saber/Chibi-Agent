@@ -22,6 +22,7 @@ from .body.brain import Brain, Mood
 from .body.motion import Clip, RigMap
 from .body.physics import Physics, Rect
 from .character import Character, apply_to_map
+from .core_fx import CoreFX
 from .env import Ground, MediaWatcher
 from .outfits import Wardrobe
 
@@ -90,6 +91,7 @@ class Stage:
         self.ov = Overlays()
         self.lip = 0.0
         self.lip_target = 0.0
+        self.core = CoreFX()  # the geometric object above her while she thinks or speaks
         self.listening = False
         self.hidden = False
         self.facing_left = False
@@ -238,6 +240,9 @@ class Stage:
                 b.cursor_gone(now)
 
         b.tick(now, quiet_for_ms=int((now_s - self.last_touch) * 1000), music=self.media.playing)
+        # the thinking core above her: while she thinks, and while she speaks (it follows her voice)
+        self.core.update(dt, thinking=b.mood == Mood.THINKING,
+                         speaking=b.mood == Mood.TALKING or self.lip > 0.03, level=min(1.0, self.lip * 1.6))
 
         # form
         if b.mood in motion.SERIOUS_MOODS:
@@ -369,7 +374,7 @@ class Stage:
             self.last_touch = now_s
             self.listening = msg.mood == "listening"
             if msg.mood == "thinking":
-                self.ov.bubble, self.ov.bubble_until = "…", now_s + 3600
+                self.ov.bubble = ""  # the thinking core above her shows it; no "…" text cloud
             elif msg.mood == "listening":
                 self.ov.bubble = ""
             target = motion.AGENT_TO_BRAIN.get(msg.mood)

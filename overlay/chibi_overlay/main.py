@@ -16,7 +16,7 @@ from chibi_shared import config, paths
 
 from chibi_shared.protocol import Fullscreen
 
-from . import character, env, outfits
+from . import character, env, hud, outfits
 from .link import QtLink
 from .stage import Stage
 from .tray import Tray
@@ -45,6 +45,9 @@ def main() -> None:
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     live2d.init()
     app = QApplication(sys.argv)
+    fonts = hud.load_fonts(cfg.get("fonts_dir"))  # Kryo's fonts for her text panel (outside git)
+    if fonts:
+        log.info("fonts: %s", ", ".join(fonts))
     wardrobe = outfits.parse(cfg)
     custom = character.load(paths.DATA / character.FILE_NAME)  # tray -> Customize Raphael
     if custom.outfit in wardrobe.outfits and not wardrobe.outfits[custom.outfit].missing_models():
