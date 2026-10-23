@@ -378,8 +378,7 @@ class CustomizeDialog(QDialog):
         self.b_dance.setPlaceholderText("e.g. LiSA, anime openings, k-pop")
         self.b_dance.textChanged.connect(self._behaviour_set)
         f.addRow("Excited dance also for", self.b_dance)
-        f.addRow(QLabel("Any music gets the slow sway; EDM, house, dubstep, nightcore, remixes and known EDM
-"
+        f.addRow(QLabel("Any music gets the slow sway; EDM, house, dubstep, nightcore, remixes and known EDM\n"
                         "artists/channels get the excited dance. Add your own words or artists above."))
         self.now_playing = QLabel("")
         f.addRow("Now playing", self.now_playing)
