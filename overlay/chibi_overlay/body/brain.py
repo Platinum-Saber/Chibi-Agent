@@ -121,6 +121,9 @@ class Brain:
         self._until = NEVER
         self._next_moment_at = -1
         self._pokes: deque[int] = deque()
+        # tunable from the Customize window (character.py)
+        self.sleep_after_ms = SLEEP_AFTER_MS
+        self.moment_gap_ms = (MOMENT_GAP_MIN_MS, MOMENT_GAP_MAX_MS)
 
     @property
     def busy(self) -> bool:
@@ -248,7 +251,7 @@ class Brain:
                 self._set(Mood.DANCING, now, None)
             elif m == Mood.IDLE and self.away_from_home:
                 self._set(Mood.WALKING, now, None)
-            elif m == Mood.IDLE and quiet_for_ms >= SLEEP_AFTER_MS:
+            elif m == Mood.IDLE and quiet_for_ms >= self.sleep_after_ms:
                 self._set(Mood.SLEEPING, now, None)
             elif m == Mood.IDLE and now >= self._next_moment_at:
                 self._start_moment(now)
@@ -274,7 +277,8 @@ class Brain:
         self._next_moment_at = now + self._gap()
 
     def _gap(self) -> int:
-        return MOMENT_GAP_MIN_MS + self._rng.randrange(MOMENT_GAP_MAX_MS - MOMENT_GAP_MIN_MS)
+        lo, hi = self.moment_gap_ms
+        return lo + self._rng.randrange(max(1, hi - lo))
 
     def _set(self, mood: Mood, now: int, duration_ms: int | None) -> None:
         self.mood = mood

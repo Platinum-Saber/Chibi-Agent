@@ -1,7 +1,8 @@
-"""Tray icon and menu: show/hide, mute, gaming mode, outfit, memory, settings, Google accounts,
-notification access, autostart, quit.
+"""Tray icon and menu: show/hide, mute, gaming mode, outfit, customize, memory, settings, Google
+accounts, notification access, autostart, quit.
 
-Show/hide and the outfit are handled here (they're only about her look); everything else is a
+Show/hide, the outfit and Customize Raphael (customize.py: moods, size, behaviour, sequences,
+voice) are handled here (they're about her look); everything else is a
 `Command` to the agent, which owns the state and echoes it back as `State` so
 the check marks always match what is really happening.
 """
@@ -74,6 +75,7 @@ class Tray:
         self.link, self.stage, self.on_visible = link, stage, on_visible
         self.user_hidden = False
         self.memory = MemoryDialog(link.send)
+        self.customize = None  # CustomizeDialog, built on first use
         self.icon = QSystemTrayIcon(_icon())
         self.icon.setToolTip("Raphael")
         m = QMenu()
@@ -85,6 +87,7 @@ class Tray:
         self.outfit_menu = m.addMenu("Outfit")
         self.outfit_menu.aboutToShow.connect(self._outfit_items)
         m.addSeparator()
+        self._action(m, "Customize Raphael…", self._customize)
         self._action(m, "Memory…", lambda: self._cmd("memory_list"))
         self._action(m, "Settings (config.toml)…", lambda: self._cmd("open_settings"))
         self.google_menu = m.addMenu("Google accounts")
@@ -126,6 +129,12 @@ class Tray:
             a.blockSignals(True)
             a.setChecked(name == self.stage.outfit)
             a.blockSignals(False)
+
+    def _customize(self) -> None:
+        if self.customize is None:
+            from .customize import CustomizeDialog  # numpy/svg imports only when first opened
+            self.customize = CustomizeDialog(self.stage, self.link.send)
+        self.customize.show_current()
 
     def _cmd(self, name: str, arg: str = "") -> None:
         self.link.send(Command(name=name, arg=arg))

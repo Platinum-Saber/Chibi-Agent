@@ -22,6 +22,9 @@ reference_text = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\voice\ref_06.txt'
 speed = 0.90
 nfe = 8
 stt_model = "small.en"
+# Kokoro preset voices (tray -> Customize Raphael -> Voice): kokoro-v1.0.onnx + voices-v1.0.bin
+# from github.com/thewh1teagle/kokoro-onnx releases (model-files-v1.0). Runs on the CPU.
+kokoro_dir = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\models\kokoro'
 
 [hotkeys]
 push_to_talk = "alt+1"

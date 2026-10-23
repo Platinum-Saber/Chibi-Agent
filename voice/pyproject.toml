@@ -13,6 +13,7 @@ dependencies = [
     "soundfile",
     "numpy",
     "nvidia-ml-py",
+    "kokoro-onnx>=0.6.1",
 ]
 
 [dependency-groups]

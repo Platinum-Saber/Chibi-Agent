@@ -21,6 +21,7 @@ from .body import motion
 from .body.brain import Brain, Mood
 from .body.motion import Clip, RigMap
 from .body.physics import Physics, Rect
+from .character import Character, apply_to_map
 from .env import Ground, MediaWatcher
 from .outfits import Wardrobe
 
@@ -66,6 +67,8 @@ class Stage:
         self.rigs: dict[str, RigMap] = wardrobe.outfits[self.outfit].load_maps(pkg)
         self.rig_paths: dict[str, str] = dict(wardrobe.outfits[self.outfit].rigs)  # form -> model3.json
         self.outfit_gen = 0  # bumped on each change; the windows reload their puppets
+        self.character = Character()  # Kryo's customization (tray -> Customize Raphael)
+        self.character_gen = 0  # bumped on each apply; the windows retune their puppets
         self._outfit_next: tuple[str, dict[str, RigMap]] | None = None  # waiting for its puff
         self._outfit_to: tuple[str, dict[str, RigMap]] | None = None    # puffing now
         self.scale = scale
@@ -274,12 +277,36 @@ class Stage:
 
     def _wear(self, name: str, maps: dict[str, RigMap]) -> None:
         """Midway through the puff: swap the maps and model paths; the windows reload."""
-        self.outfit, self.rigs = name, maps
+        self.outfit, self.rigs = name, self._tweaked(name, maps)
         self.rig_paths = dict(self.wardrobe.outfits[name].rigs)
         self.geom = {}
         self.outfit_gen += 1
         log.info("outfit -> %s", name)
         self.send_outfit_state()
+
+    # --- customization (tray -> Customize Raphael; character.py) -------------------------------------
+    def apply_character(self, ch: Character) -> None:
+        """Kryo's customization, live: brain timings and the chibi rig map's overrides. A size
+        change re-measures her (the outfit reload path); character_gen makes the windows
+        retune their puppets (sprite sequences, eye follow, blink, effects)."""
+        old_height = self.rigs["chibi"].height_dip
+        self.character = ch
+        b = ch.behaviour
+        self.brain.sleep_after_ms = int(b.sleep_after_s * 1000)
+        lo = int(b.moment_min_s * 1000)
+        self.brain.moment_gap_ms = (lo, max(lo + 1, int(b.moment_max_s * 1000)))
+        try:
+            self.rigs = self._tweaked(self.outfit, self.wardrobe.outfits[self.outfit].load_maps(self.pkg))
+        except (OSError, ValueError) as e:  # tomllib.TOMLDecodeError is a ValueError
+            log.warning("customize: can't reload the rig map for %s: %s", self.outfit, e)
+        if self.rigs["chibi"].height_dip != old_height:
+            self.geom = {}
+            self.outfit_gen += 1
+        self.character_gen += 1
+
+    def _tweaked(self, outfit: str, maps: dict[str, RigMap]) -> dict[str, RigMap]:
+        """The chibi map with Kryo's size and clip overrides for this outfit."""
+        return {**maps, "chibi": apply_to_map(maps["chibi"], self.character.outfits.get(outfit))}
 
     def send_outfit_state(self, error: str = "") -> None:
         self.link.send(OutfitState(outfit=self.outfit, outfits=self.wardrobe.names,

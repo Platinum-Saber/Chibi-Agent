@@ -15,7 +15,7 @@ from pathlib import Path
 
 from chibi_shared import paths
 from chibi_shared.protocol import (Bubble, Command, Fullscreen, MemoryItems, Message, OutfitState, Role,
-                                   State)
+                                   Speak, State, VoiceTune)
 
 from .google_auth import short
 
@@ -37,6 +37,7 @@ class Controller:
         self._signing_in: asyncio.Task | None = None
         self.outfit = ""               # what she wears, from the overlay's `outfit_state`
         self.outfits: list[str] = []   # what she can wear (change it with `OutfitReq`)
+        self.voice_tune: VoiceTune | None = None  # her voice from the Customize window; resent on reconnect
         vram.on_change = self.push_state
         hub.on_message(self.on_message)
         hub.on_connect(self._connected)
@@ -44,6 +45,8 @@ class Controller:
     async def _connected(self, role: Role) -> None:
         if role == "overlay":
             await self.push_state()
+        elif role == "voice" and self.voice_tune is not None:
+            await self.hub.send("voice", self.voice_tune)
 
     async def push_state(self) -> None:
         await self.hub.send("overlay", State(muted=self.orch.muted, gaming=self.vram.gaming,
@@ -56,6 +59,10 @@ class Controller:
             await self.vram.set_fullscreen(msg.exe if msg.active else "")
         elif isinstance(msg, Command):
             await self.command(msg.name, msg.arg)
+        elif isinstance(msg, VoiceTune):
+            self.voice_tune = msg
+            log.info("voice -> %s %s (speed %.2f, nfe %d)", msg.engine, msg.voice or "default", msg.speed, msg.nfe)
+            await self.hub.send("voice", msg)
         elif isinstance(msg, OutfitState):
             self.outfit, self.outfits = msg.outfit, list(msg.outfits)
             if not msg.ok:
@@ -90,6 +97,10 @@ class Controller:
         elif name == "notif_access" and self.notify:
             if await self.notify.refresh_access(ask=True) != "allowed":
                 os.startfile("ms-settings:privacy-notifications")  # noqa: S606 (Kryo clicked it; Windows asks no more)
+        elif name == "voice_test":
+            if arg.strip():
+                await self.hub.send("voice", Speak(utt_id=f"test-{os.urandom(4).hex()}", text=arg.strip()[:300]))
+            return
         elif name == "quit":
             self.quit_cb()
             return

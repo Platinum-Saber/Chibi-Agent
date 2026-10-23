@@ -15,13 +15,13 @@ from pathlib import Path
 import numpy as np
 
 from chibi_shared import paths
-from chibi_shared.protocol import Lip, Load, Msg, Ptt, Speak, SpeakState, Stop, Transcript
+from chibi_shared.protocol import Lip, Load, Msg, Ptt, Speak, SpeakState, Stop, Transcript, VoiceTune
 
-from .clips import ClipCache, voice_id
+from .clips import ClipCache
 from .player import Player
 from .speech import Item, SpeechQueue
 from .stt import Recorder, Stt
-from .tts import MODEL, Tts
+from .tts import Tts
 
 log = logging.getLogger(__name__)
 
@@ -35,8 +35,7 @@ class VoiceApp:
         self._send = send
         self.tts = Tts(vcfg)
         self.stt = Stt(vcfg.get("stt_model", "small.en"))
-        self.clips = ClipCache(paths.CLIPS, voice_id(Path(self.tts.ref), self.tts.ref_text,
-                                                     self.tts.speed, self.tts.nfe, MODEL))
+        self.clips = ClipCache(paths.CLIPS, self.tts.voice_key())
         self.recorder = Recorder()
         self.player = Player(on_lip=lambda rms: self._send(Lip(rms=round(rms, 3))))
         self.queue = SpeechQueue(self._render, self.player.play, self._emit)
@@ -87,6 +86,31 @@ class VoiceApp:
             return
         log.info("tts failed to load earlier; retrying for live speech")
         await self.load_tts()
+
+    async def retune(self, msg: VoiceTune) -> None:
+        """A new voice from the Customize window: switch, load it, re-render the fixed lines.
+        Switch and load are one job on the tts thread, so a test line sent right after waits
+        for the new voice instead of hitting a half-switched engine."""
+        def switch() -> bool:
+            was_loaded = self.tts.model is not None or self.tts.kokoro is not None
+            self.tts.tune(msg.engine, msg.voice, msg.speed, msg.nfe)
+            if was_loaded:  # gaming mode's unload stays an unload
+                self.tts.load()
+            return was_loaded
+
+        try:
+            loaded = await self._on(self._tts_pool, switch)
+        except Exception:
+            log.exception("voice switch failed")
+            self._tts_failed_at = time.monotonic()
+            return
+        self.clips = ClipCache(paths.CLIPS, self.tts.voice_key())
+        log.info("voice -> %s %s (speed %.2f)", self.tts.engine,
+                 self.tts.kvoice if self.tts.engine == "kokoro" else Path(self.tts.ref).name, self.tts.speed)
+        if loaded:
+            made = await self._on(self._tts_pool, self.clips.ensure, self.tts.synth)
+            if made:
+                log.info("rendered %d clips", len(made))
 
     def start(self) -> None:
         try:
@@ -140,6 +164,8 @@ class VoiceApp:
             self.queue.submit(Item(msg.utt_id, msg.text, msg.clip))
         elif isinstance(msg, Stop):
             await self.queue.stop()
+        elif isinstance(msg, VoiceTune):
+            self._spawn(self.retune(msg))
         elif isinstance(msg, Load):
             stt, tts = msg.what in ("stt", "all"), msg.what in ("tts", "all")
             if msg.t == "load":

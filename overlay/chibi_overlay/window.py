@@ -45,6 +45,7 @@ class MonitorWindow(QOpenGLWidget):
         self.rect_px = (0, 0, 0, 0)  # this window in desktop physical px
         self.puppets: dict[str, Puppet] = {}
         self.calibrating = list(FORMS)
+        self.character_gen = -1  # the stage's customization these puppets were tuned with
         self.drew_last = True
         self.min_frame_s = 0.0  # 1/30 on battery (main.py), else every vsync
         self._t_frame = 0.0
@@ -109,7 +110,15 @@ class MonitorWindow(QOpenGLWidget):
         for form in FORMS:
             self.puppets[form] = Puppet(st.rig_paths[form], st.rigs[form], self.dpr, self._fb(), self)
         self.outfit_gen = st.outfit_gen
+        self.character_gen = -1  # tune the new puppets on the next frame
         self.calibrating = list(FORMS)
+
+    def _tune(self) -> None:
+        """Hand Kryo's customization to puppets that take it (sprite packs)."""
+        for p in self.puppets.values():
+            if hasattr(p.model, "tune"):
+                p.model.tune(self.stage.character)
+        self.character_gen = self.stage.character_gen
 
     def resizeGL(self, w: int, h: int) -> None:
         # also runs after _follow() moved us to another monitor (its DPI may differ)
@@ -145,6 +154,8 @@ class MonitorWindow(QOpenGLWidget):
         live2d.clearBuffer()
         if self.outfit_gen != self.stage.outfit_gen:  # new outfit, mid-puff: reload and re-measure
             self._load_puppets()
+        if self.character_gen != self.stage.character_gen:
+            self._tune()
         if self.calibrating:
             self._calibrate()
             return

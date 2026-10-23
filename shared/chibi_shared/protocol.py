@@ -13,6 +13,7 @@ from typing import Annotated, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 VERSION = 4  # 2: tray commands, state, memory items (M6); 3: Google sign-in (M5); 4: outfits
+# (voice_tune / voice_test were added without a bump: new types, no existing shape changed)
 
 Role = Literal["overlay", "voice"]
 Form = Literal["chibi", "serious"]
@@ -149,7 +150,18 @@ class OutfitState(Msg):
 CommandName = Literal[
     "toggle_visible", "mute", "unmute", "gaming_on", "gaming_off", "memory_list", "memory_delete",
     "open_settings", "autostart_on", "autostart_off", "google_signin", "google_signout", "notif_access", "quit",
+    "voice_test",  # arg: a line for her to say in the current voice (Customize window)
 ]
+
+
+class VoiceTune(Msg):
+    """Her voice, chosen in the Customize window (overlay -> agent -> voice). The agent keeps
+    the last one and resends it when the voice process (re)connects."""
+    t: Literal["voice_tune"] = "voice_tune"
+    engine: Literal["f5", "kokoro"] = "f5"
+    voice: str = ""      # f5: a reference .wav path ("" = config.toml's); kokoro: a voice id (bf_emma)
+    speed: float = 0.90
+    nfe: int = 8         # f5 only: diffusion steps (quality vs speed)
 
 
 class Command(Msg):
@@ -218,7 +230,7 @@ class Lip(Msg):
 Message = Annotated[
     Union[Hello, Welcome, Quit, MoodReq, FormReq, OutfitReq, Bubble, Hud, Confirm, Cloud, Visibility,
           MoodAck, ConfirmResult, Touch, TextInput, FileDrop, Fullscreen, OutfitState, Command, State,
-          MemoryItems,
+          MemoryItems, VoiceTune,
           Ptt, Transcript, Speak, SpeakState, Stop, Load, Lip],
     Field(discriminator="t"),
 ]

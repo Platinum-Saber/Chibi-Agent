@@ -201,6 +201,13 @@ class Pack:
             self._patches[key] = patch
         return self._patches[key]
 
+    def keys(self, folder: str) -> list[str]:
+        """The pack's images in one folder, as keys ("poses/wave")."""
+        return sorted(f"{folder}/{f.stem}" for f in (self.root / folder).glob("*.png"))
+
+    def effects(self) -> list[str]:
+        return sorted(f.stem for f in (self.root / "effects").glob("*.svg"))
+
     def svg(self, name: str) -> QSvgRenderer | None:
         if name not in self.svgs:
             r = QSvgRenderer(str(self.root / "effects" / f"{name}.svg"))
@@ -226,6 +233,27 @@ class SpriteModel:
         self._look: tuple[float, float] | None = None  # cursor in canvas px
         self._gaze_shown: str | None = None
         self._gaze_next: tuple[str | None, float] = (None, 0.0)
+        # tunable from the Customize window (tune(); character.py)
+        self.sequences: dict[str, Seq] = dict(SEQUENCES)
+        self.gaze_on = True
+        self.gaze_reach = GAZE_RADIUS
+        self.blink_s = (2.0, 6.0)
+        self.effects_on = True
+
+    def tune(self, ch) -> None:
+        """Apply a character.Character: sequence overrides and behaviour."""
+        self.sequences = dict(SEQUENCES)
+        for name, d in ch.sequences.items():
+            frames = tuple((str(k), float(sec)) for k, sec in d.get("frames", []) if float(sec) > 0)
+            base = SEQUENCES.get(name, Seq())
+            self.sequences[name] = Seq(frames, bool(d.get("loop", base.loop)), d.get("effect") or None,
+                                       base.prop, base.drawn_left)
+        b = ch.behaviour
+        self.gaze_on, self.gaze_reach = b.gaze, max(0.05, b.gaze_reach)
+        self.blink_s = (b.blink_min_s, max(b.blink_min_s, b.blink_max_s))
+        self.effects_on = b.effects
+        if not self.gaze_on:
+            self._gaze_shown = None
 
     # --- live2d.Model API used by Puppet / MonitorWindow ------------------------------------------
     def LoadModelJson(self, _path: str) -> None:
@@ -251,7 +279,7 @@ class SpriteModel:
         self.expression = "neutral"
 
     def StartMotion(self, group: str, _index=None, _priority=None) -> None:
-        if group not in SEQUENCES:
+        if group not in self.sequences:
             log.debug("sprite pack: no sequence for motion %r", group)
         self.motion, self._motion_t0 = group, time.monotonic()
 
@@ -259,7 +287,7 @@ class SpriteModel:
         self.StartMotion(group)
 
     def IsMotionFinished(self) -> bool:
-        seq = SEQUENCES.get(self.motion or "")
+        seq = self.sequences.get(self.motion or "")
         return seq is None or (not seq.loop and time.monotonic() - self._motion_t0 >= seq.length)
 
     def SetSaveParamById(self, pid: str, value: float, _weight: float = 1.0) -> None:
@@ -299,7 +327,7 @@ class SpriteModel:
 
     def frame(self, now: float) -> tuple[str, Seq | None]:
         """The image to show now and the playing sequence."""
-        seq = SEQUENCES.get(self.motion or "")
+        seq = self.sequences.get(self.motion or "")
         if seq and seq.frames:
             t = now - self._motion_t0
             if seq.loop:
@@ -354,18 +382,18 @@ class SpriteModel:
             self._eyes(p, now)
         if seq and seq.prop:
             self._prop(p, seq.prop, sp, now)
-        if seq and seq.effect:
+        if seq and seq.effect and self.effects_on:
             self._effect(p, seq.effect, sp, now)
         p.restore()
 
     def gaze(self, now: float) -> str | None:
         """The gaze drawing to show: the cursor's sector, switched only after it holds GAZE_HOLD_S."""
         rects = self.pack.eye_rects
-        if self._look is None or not rects:
+        if self._look is None or not rects or not self.gaze_on:
             return None
         cx = sum(r.center().x() for r in rects) / len(rects)
         cy = sum(r.center().y() for r in rects) / len(rects)
-        radius = GAZE_RADIUS * self.pack.canvas[0]
+        radius = self.gaze_reach * self.pack.canvas[0]
         want = self.pack.gaze_key((self._look[0] - cx) / radius, (cy - self._look[1]) / radius)
         if want == self._gaze_shown:
             self._gaze_next = (None, 0.0)
@@ -393,7 +421,7 @@ class SpriteModel:
         if self.expression not in OPEN_EYES:
             return False
         if now >= self._blink_at + BLINK_S:
-            self._blink_at = now + random.uniform(2, 6)
+            self._blink_at = now + random.uniform(*self.blink_s)
         return now >= self._blink_at
 
     def _prop(self, p: QPainter, key: str, sp: Sprite, now: float) -> None:

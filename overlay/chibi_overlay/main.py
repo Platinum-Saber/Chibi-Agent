@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import signal
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import live2d
@@ -15,7 +16,7 @@ from chibi_shared import config, paths
 
 from chibi_shared.protocol import Fullscreen
 
-from . import env, outfits
+from . import character, env, outfits
 from .link import QtLink
 from .stage import Stage
 from .tray import Tray
@@ -45,15 +46,25 @@ def main() -> None:
     live2d.init()
     app = QApplication(sys.argv)
     wardrobe = outfits.parse(cfg)
+    custom = character.load(paths.DATA / character.FILE_NAME)  # tray -> Customize Raphael
+    if custom.outfit in wardrobe.outfits and not wardrobe.outfits[custom.outfit].missing_models():
+        wardrobe = replace(wardrobe, current=custom.outfit)
     log.info("outfits: %s; wearing %s", ", ".join(wardrobe.names), wardrobe.current)
     primary = QGuiApplication.primaryScreen()
 
     link = QtLink()
     stage = Stage(wardrobe, PKG, primary.devicePixelRatio(), link, own_windows=set())
+    stage.apply_character(custom)
     stage.chibi_only = bool(cfg.get("chibi_only", False))
     if stage.chibi_only:
         log.info("chibi_only: the serious form is off")
     link.connected.connect(stage.send_outfit_state)
+
+    def send_voice() -> None:  # her chosen voice (Customize window); the agent passes it on
+        if stage.character.voice is not None:
+            from .customize import voice_msg
+            link.send(voice_msg(stage.character.voice))
+    link.connected.connect(send_voice)
     windows: list[MonitorWindow] = []
     # One window that follows her between monitors (see MonitorWindow._follow).
     windows.append(MonitorWindow(primary, stage, True, windows))
