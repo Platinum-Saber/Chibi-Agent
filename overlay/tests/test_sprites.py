@@ -264,10 +264,10 @@ def test_dance_cycles_build_both_styles_in_order(pack):
             _png(pack, f"dance-cycles-v01/{kind}/frames/dance_{n}", 140)
     p = sprites.Pack(pack)
     vibe, excited = p.sequences["DanceVibe"], p.sequences["DanceExcited"]
-    assert [k.rsplit("_", 1)[1] for k, _ in vibe.frames] == ["03", "02", "01", "07", "01", "02"]  # no 06
-    assert vibe.frames[0][0] == "dance-cycles-v01/type-1-vibe/frames/dance_03"
+    assert [k.rsplit("_", 1)[1] for k, _ in vibe.frames] == ["01", "03", "01", "06"]  # no 02, no 07
+    assert vibe.frames[0][0] == "dance-cycles-v01/type-1-vibe/frames/dance_01"
     assert [k.rsplit("_", 1)[1] for k, _ in excited.frames] == ["01", "02", "03", "04", "06", "07"]
-    assert excited.length == pytest.approx(1.0) and vibe.length == pytest.approx(7 * 0.20 * 1.75)
+    assert excited.length == pytest.approx(1.0) and vibe.length == pytest.approx(6 * 0.20 * 1.75)
     assert vibe.loop and excited.loop and vibe.effect == excited.effect == "music_note"
     assert p.get(vibe.frames[0][0]) is not None
 

@@ -112,13 +112,14 @@ SEQUENCES: dict[str, Seq] = {
 
 # A pack's *dance-cycles*/type-N*/frames/dance_NN.png, played in these orders: (frame, beats), a
 # beat being the set's own frame time (its cycle.json; else the default here). Kryo's choices:
-# - Type 1 sways as a pendulum through its unique drawings (no alias repeats; 06, a near-copy of
-#   07, is left out, so the lone right lean holds two beats), at 1.75 beats a frame: slow.
+# - Type 1: the set's eight positions less the half-left ones (02 and its copy 04: head drawn
+#   ~15% smaller, popped on the tilt) and the right nod 07 (Kryo, kept out after a trial): 01-03-01-06, each
+#   lean held two beats so the sides match; 1.75 beats a frame: slow.
 # - Type 2 uses six of its eight frames: 05 (the far right peak, closest to 04) and 08 (closest to
 #   01) are left out, so the side swing is smaller; 4/3 beats a frame keeps its 1 s loop.
 DANCE_CYCLES = {
     "DanceVibe": ("type-1", 0.20, tuple((n, b * 1.75) for n, b in
-                                        (("03", 1), ("02", 1), ("01", 1), ("07", 2), ("01", 1), ("02", 1)))),
+                                        (("01", 1), ("03", 2), ("01", 1), ("06", 2)))),
     "DanceExcited": ("type-2", 0.125, tuple((n, 4 / 3) for n in ("01", "02", "03", "04", "06", "07"))),
 }
 DANCES = frozenset({"Dance", *DANCE_CYCLES})
