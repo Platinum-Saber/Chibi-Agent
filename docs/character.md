@@ -10,7 +10,9 @@ Kryo picked (2026-10-17): hooded white robe, light-blue hair, ruby-red eyes,
 golden halo. The references live in `D:\Projects\Chibi-Agent-Project\ChibiAgent\references\{serious,chibi}\`.
 They're a guide only: they stay out of git, and the final art is new work,
 never traced from them. Where a reference shows gold or yellow eyes, they become ruby red.
-This version is for personal use only and is never published or sold.
+This version is for personal use, and is never sold. Kryo's call (2026-10-24): her
+art and Live2D rig may be shown on Kryo's portfolio (sansikawaduge.dev/chibi-agent); her
+cloned voice may not (see Voice).
 
 ## Visual design
 Shared identity, so both forms and every outfit read as the same person:
