@@ -75,6 +75,13 @@ serious_map = 'rigs/haru.toml'
 [tools]
 # Folders file tools may read and change (no deleting in v1).
 allowed_roots = ['~']
+# Per-turn tool selection (agent/chibi_agent/tools/select.py): send only the top
+# families for the request. select = false sends every tool, as before.
+select = true
+families = 3        # top families by embedding similarity
+margin = 0.03       # plus any family this close to the last one picked
+min_sim = 0.35      # below this the request is unclear: send every tool
+sticky_turns = 2    # families of tools called in the last N turns stay in
 
 [briefing]
 # Morning briefing: the first start after morning_after, or at morning_at if she was already running.

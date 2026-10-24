@@ -76,9 +76,10 @@ def load_all() -> dict[str, Tool]:
     return REGISTRY
 
 
-def schemas() -> list[dict[str, Any]]:
-    return [t.schema() for t in REGISTRY.values()]
+def schemas(names: list[str] | None = None) -> list[dict[str, Any]]:
+    """Every tool's schema, or only `names` (tools/select.py), in registry order."""
+    return [t.schema() for t in REGISTRY.values() if names is None or t.name in names]
 
 
-def listing() -> list[tuple[str, str]]:
-    return [(t.name, t.description) for t in REGISTRY.values()]
+def listing(names: list[str] | None = None) -> list[tuple[str, str]]:
+    return [(t.name, t.description) for t in REGISTRY.values() if names is None or t.name in names]

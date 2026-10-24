@@ -17,6 +17,7 @@ from .mailwatch import Briefer, MailWatch, MorningBriefing
 from .notifywatch import NotifyWatch
 from .tools import files
 from .tools.runner import Gate, Runner
+from .tools.select import ToolPicker
 from .llm import Ollama
 from .memory import Memory
 from .memory.store import Store
@@ -46,7 +47,9 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
     store = Store(paths.DATA / "memory.db")
     memory = Memory(cfg["ollama"], store, llm=llm)
     vram = VramManager(hub, llm)
-    orch = Orchestrator(hub, llm, Runner(Gate(hub)), memory, vram)
+    picker = ToolPicker(memory.embed, cfg.get("tools", {}))
+    asyncio.create_task(picker.warm())
+    orch = Orchestrator(hub, llm, Runner(Gate(hub)), memory, vram, picker)
     reminders = Reminders(store, orch.announce)
     tools.CTX.memory, tools.CTX.reminders = memory, reminders
     tools.CTX.google = GoogleAuth()

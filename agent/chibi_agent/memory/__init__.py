@@ -64,14 +64,16 @@ class Memory:
         self.last_turn = 0.0
 
     # --- recall -------------------------------------------------------------------------
-    async def recall(self, query: str) -> str:
-        """A prompt block of what she remembers that relates to `query` ('' if nothing)."""
-        try:
-            (vec,) = await asyncio.wait_for(self.embed([query], query=True), 2.0)
-        except Exception as e:
-            log.warning("recall skipped: %s", "embedding took over 2 s (model cold?)"
-                        if isinstance(e, asyncio.TimeoutError) else repr(e))
-            return ""
+    async def recall(self, query: str, vec: list[float] | None = None) -> str:
+        """A prompt block of what she remembers that relates to `query` ('' if nothing).
+        `vec` is the turn's query vector when tool selection already embedded it."""
+        if vec is None:
+            try:
+                (vec,) = await asyncio.wait_for(self.embed([query], query=True), 2.0)
+            except Exception as e:
+                log.warning("recall skipped: %s", "embedding took over 2 s (model cold?)"
+                            if isinstance(e, asyncio.TimeoutError) else repr(e))
+                return ""
         facts = self.store.search_facts(vec, 5, FACT_MIN_SIM)
         convs = self.store.search_summaries(vec, 2, SUMMARY_MIN_SIM)
         if not facts and not convs:

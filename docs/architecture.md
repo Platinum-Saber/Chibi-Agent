@@ -127,6 +127,12 @@ sequenceDiagram
 - `orchestrator.py`: one turn at a time, through an asyncio queue for inputs (transcript, text, file drop, scheduler events). It builds the prompt and streams from Ollama.
   - Tool loop: at most 5 tool calls per turn.
   - Thinking mode off by default (latency); on for "think carefully" requests.
+  - Tool selection (`tools/select.py`): the turn's text is embedded once, and that vector also feeds memory recall.
+    - Only the top 3 tool *families* go to the model, so mail_list keeps read_mail and search_files keeps move_file.
+    - Three tools are always sent: look_at_screen, remember and open_app. The families of tools used in the last 2 turns are sent too.
+    - When unsure, or when the embedding fails, she gets every tool.
+    - If she says she can't do something while she only had a subset, the step reruns once with every tool.
+    - `[tools] select = false` turns selection off.
 - `persona.py`: system prompt under 3 k characters. It's generated from the tool registry, so the prompt and the tools always match *(GS lesson)*.
 - `llm.py`: Ollama client (`/api/chat`, `stream`, `tools`, `images`).
   - `num_ctx`: 8192, or 16384 when an image is attached. 4096 silently broke vision *(GS)*.
