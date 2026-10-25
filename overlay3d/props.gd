@@ -5,6 +5,8 @@ extends Node
 ## thinking, talking, mouth moving; with the mic), off 5 s after both end. Not for DanceExcited.
 ## Beanbag: appears under her while she sits (Sit) and squashes as she settles.
 ## Futon: appears under her while she sleeps (Sleep), laid along her body, blanket raised.
+## Switched off for now (SHOW_FUTON; Kryo, 25 October 2026): she sleeps on the floor until a
+## futon v02 fits her poses (D:/Character Design/output/3d/props/requests/futon-v02-requirements.md).
 ## They pop in and out by scale; the headset follows her Head bone (props/scripts/
 ## headphone_attachment.gd), the furniture sits on the floor under her (children of the model,
 ## so they move and turn with her). Clicks pass through them: the hull is her bones only.
@@ -17,6 +19,7 @@ const POP := 0.2  # s to pop a prop in or out
 const SETTLE := 0.4  # s for the beanbag to squash as she sits
 const BEANBAG_BACK := 0.15  # m behind her feet: hips on the seat, legs over its front
 const PILLOW_FROM_CENTRE := 0.635  # futon: Pillow_Surface along -Z from its centre
+const SHOW_FUTON := false  # true: the futon under her sleep takes (re-fit their lifts in clip_sources.cfg)
 
 var body: Node
 var model: Node3D
@@ -38,8 +41,10 @@ func attach(b: Node) -> void:
 	headset = HEADSET.instantiate()
 	headset.set("head_bone", &"Head")  # godot-vrm's humanoid name (the helper defaults to VRoid's)
 	beanbag = BEANBAG.instantiate()
-	futon = FUTON.instantiate()
+	futon = FUTON.instantiate() if SHOW_FUTON else null
 	for prop in [headset, beanbag, futon]:
+		if prop == null:
+			continue
 		model.add_child(prop)
 		prop.visible = false
 		_shown[prop] = 0.0
@@ -65,6 +70,8 @@ func update(delta: float, clip: String, listening: bool, mouth: float) -> void:
 	_settle = move_toward(_settle, 1.0 if sitting else 0.0, delta / SETTLE)
 	beanbag.call("set_occupied", _settle)
 
+	if futon == null:
+		return
 	var sleeping := clip == "Sleep"
 	if sleeping or _shown[futon] > 0.0:
 		_lay_futon()

@@ -296,17 +296,18 @@ func _update_hull() -> void:
 
 
 ## --pose-report: her bones' extent in the futon's own space (x across, y up from the floor,
-## z along, -z = pillow end), to brief prop makers.
+## z along, -z = pillow end), to brief prop makers; in her model's space while the futon is off.
 func _pose_report() -> void:
 	var sk: Skeleton3D = body.skeleton
+	var space: Node3D = props.futon if props.futon != null else model
 	var lo := Vector3.INF
 	var hi := -Vector3.INF
-	for i in sk.get_bone_count():
-		var p: Vector3 = props.futon.to_local(sk.to_global(sk.get_bone_global_pose(i).origin))
+	for bone in body._profile:  # her humanoid bones: hair and scarf tips droop below her
+		var p: Vector3 = space.to_local(sk.to_global(sk.get_bone_global_pose(sk.find_bone(bone)).origin))
 		lo = Vector3(minf(lo.x, p.x), minf(lo.y, p.y), minf(lo.z, p.z))
 		hi = Vector3(maxf(hi.x, p.x), maxf(hi.y, p.y), maxf(hi.z, p.z))
-	var head: Vector3 = props.futon.to_local(sk.to_global(sk.get_bone_global_pose(sk.find_bone("Head")).origin))
-	var hips: Vector3 = props.futon.to_local(sk.to_global(sk.get_bone_global_pose(sk.find_bone("Hips")).origin))
+	var head: Vector3 = space.to_local(sk.to_global(sk.get_bone_global_pose(sk.find_bone("Head")).origin))
+	var hips: Vector3 = space.to_local(sk.to_global(sk.get_bone_global_pose(sk.find_bone("Hips")).origin))
 	print("RAPHAEL3D pose-report take=%s bones x %.2f..%.2f y %.2f..%.2f z %.2f..%.2f head %s hips %s" % [
 		body.take_meta(), lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, head.snapped(Vector3.ONE * 0.01), hips.snapped(Vector3.ONE * 0.01)])
 

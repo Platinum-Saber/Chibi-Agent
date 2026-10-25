@@ -139,9 +139,9 @@ Verification evidence/backup is in `D:/Character Design/output/godot/coat-cleara
   - **On without the mic** for slow music (DanceVibe, Mixamo "Listening To Music"). Not for DanceExcited.
   - **Off** 5 s after either ends.
 - **Slime beanbag:** under her while she sits (Sit). It squashes over 0.4 s as she settles. Sit plays the chair take "Sitting Idle", with her hips held at the squashed seat (`keep_height`, `lift=-0.415`).
-- **Futon:** under her while she sleeps (Sleep), laid feet-to-head along her body, with the pillow under her head.
+- **Futon: switched off for now** (`SHOW_FUTON` in `props.gd`); she sleeps on the floor. When on, it lies under her while she sleeps (Sleep), laid feet-to-head along her body, with the pillow under her head.
   - **One take per sleep** (`vary=false`): Female Laying Pose (on her front), Female Laying Pose - 2 (propped up) or Sleeping Idle (on her side).
-  - **Per-take fit:** each has its own lift, and Sleeping Idle lies on top of a flat blanket. Both come from `per_file` in `clip_sources.cfg`.
+  - **Per-take fit:** each has its own lift (`per_file` in `clip_sources.cfg`), now fitted to the floor; the comment there keeps the mattress values for when the futon returns.
   - **Futon v02:** what a better-fitting futon needs (blanket shapes per pose, a longer head end) is in `D:\Character Design\output\3d\props\requests\futon-v02-requirements.md`.
 - **Clicks:** they pass through the props; the click hull is her bones only.
 
