@@ -18,13 +18,14 @@ from chibi_shared.protocol import (Bubble, Confirm, ConfirmResult, FormReq, Hud,
                                    MoodReq, OutfitReq, OutfitState, Quit, Touch, Visibility)
 
 from .body import motion, music
-from .body.brain import Brain, Mood
+from .body.brain import Brain, Moment, Mood, moment_ms
 from .body.motion import Clip, RigMap
 from .body.physics import Physics, Rect
 from .character import Character, apply_to_map
 from .core_fx import CoreFX
 from .env import Ground, MediaWatcher
 from .outfits import Wardrobe
+from .wheel import POSES, PoseWheel
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +40,17 @@ BUBBLE_HOLD_S = 6.0
 BUBBLE_AFTER_SPEECH_S = 3.0
 CONFIRM_TIMEOUT_S = 60.0
 ROTATE_DEG_PER_PX = 0.5  # middle-drag on her: degrees she turns per px of horizontal drag
+# the pose wheel (right-click on her): key -> (mood, moment, ms); ms None: until something ends it
+PERFORM = {
+    "wave": (Mood.MOMENT, Moment.WAVE, moment_ms(Moment.WAVE)),
+    "cheer": (Mood.HAPPY, None, 2_000),
+    "think": (Mood.THINKING, None, 6_000),
+    "look_around": (Mood.MOMENT, Moment.LOOK_AROUND, moment_ms(Moment.LOOK_AROUND)),
+    "stretch": (Mood.MOMENT, Moment.STRETCH, moment_ms(Moment.STRETCH)),
+    "dance": (Mood.DANCING, None, 15_000),
+    "sit": (Mood.MOMENT, Moment.SIT, 20_000),
+    "sleep": (Mood.SLEEPING, None, None),  # until a poke, a drag or the agent wakes her
+}
 GRAB_LOW = 0.5  # grabbed below this fraction of her height (her waist): the "held_low" clip, if the rig has one
 
 
@@ -113,6 +125,7 @@ class Stage:
         self.yaw = 0.0  # degrees she faces at rest (3D body), set by middle-dragging her; + turns her left
         self._rotate_from: tuple[float, float] | None = None  # cursor x, yaw when the middle drag began
         self.long_pressed = False
+        self.wheel = PoseWheel()  # right-click on her: pick a pose
         self.drag_trail: deque[tuple[float, float, float]] = deque(maxlen=8)
         self._last_ground = 0.0
         self._t = time.monotonic()
@@ -195,6 +208,8 @@ class Stage:
         self.cursor = cursor
         if pressed and not self._was_pressed:
             self.look_at = (cursor[0], cursor[1], now_s)
+            if self.wheel.open and self.hit_overlay(*cursor) is None and not self.cursor_on_her:
+                self.close_wheel()  # a click anywhere else
         self._was_pressed = pressed
         b, ph = self.brain, self.physics
 
@@ -271,6 +286,10 @@ class Stage:
 
         if self.ov.confirm and now_s > self.ov.confirm_until:
             self._answer_confirm(False)
+        if self.wheel.open:
+            self.wheel.track(cursor)
+            if not self.wheel.open:  # timed out
+                self.close_wheel()
 
     def _start_transform(self, to: str, now_s: float) -> None:
         self.transform_t0 = now_s
@@ -462,6 +481,13 @@ class Stage:
         if hit in ("yes", "no"):
             self._answer_confirm(hit == "yes")
             return
+        if hit == "wheel":
+            i = self.wheel.segment_at(x, y)
+            if i is not None:
+                self.perform(POSES[i].key)
+            elif math.hypot(x - self.wheel.centre[0], y - self.wheel.centre[1]) < self.wheel.inner:
+                self.close_wheel()  # the hole: never mind
+            return
         if hit:  # bubble/HUD: swallow the click
             return
         self.press = (x, y, time.monotonic())
@@ -499,6 +525,36 @@ class Stage:
             self.brain.poke(now)
             self.link.send(Touch(t="poke", x=x, y=y))
         self.press, self.dragging = None, False
+
+    # --- right-click: the pose wheel -------------------------------------------------------
+    def open_wheel(self) -> None:
+        x, y = self.feet
+        m = self.ground.monitor_at(x, y - 1)
+        h, hw = self.size[self.form]
+        self.wheel.show((x, y), h, hw, self.scale, (m.left, m.top, m.right, m.bottom))
+        self.ov.rects["wheel"] = self.wheel.rect
+
+    def close_wheel(self) -> None:
+        self.wheel.close()
+        self.ov.rects.pop("wheel", None)
+
+    def toggle_wheel(self) -> None:
+        if self.wheel.open:
+            self.close_wheel()
+        else:
+            self.open_wheel()
+
+    def perform(self, key: str) -> bool:
+        """Play a pose Kryo picked on the wheel; False while she can't (held, falling, dizzy)."""
+        self.close_wheel()
+        mood, moment, ms = PERFORM[key]
+        now_s = time.monotonic()
+        if not self.brain.perform(mood, int(now_s * 1000), ms, moment):
+            return False
+        if mood != Mood.SLEEPING:  # a pose is a touch (idle timers restart); sleep wants quiet
+            self.last_touch = now_s
+        log.info("pose wheel: %s", key)
+        return True
 
     # --- middle-drag: turn her (the 3D body; the 2D art ignores it) ---------------------------
     @property

@@ -24,6 +24,7 @@ from . import win32
 from .hud import Painter
 from .puppet import Geom, Puppet, read_bbox
 from .stage import Stage
+from .wheel import paint_wheel
 
 log = logging.getLogger(__name__)
 FORMS = ("chibi", "serious")
@@ -207,6 +208,9 @@ class MonitorWindow(QOpenGLWidget):
         if self._near_me() or st.transform_progress() is not None:
             Painter(self, (l, t), self.dpr, st).paint()
             drew = True
+        if st.wheel.open:
+            paint_wheel(self, (l, t), self.dpr, st.wheel)
+            drew = True
         self.drew_last = drew
 
     def _alpha_at(self, x: int, y: int) -> int:
@@ -254,6 +258,8 @@ class MonitorWindow(QOpenGLWidget):
             self.stage.press_at(*win32.cursor_pos())
         elif e.button() == Qt.MouseButton.MiddleButton and self.stage.hit_overlay(*win32.cursor_pos()) is None:
             self.stage.rotate_press(win32.cursor_pos()[0])  # middle-drag on her: turn her
+        elif e.button() == Qt.MouseButton.RightButton and self.stage.hit_overlay(*win32.cursor_pos()) in (None, "wheel"):
+            self.stage.toggle_wheel()  # right-click on her: the pose wheel (again, or on it: close)
 
     def mouseMoveEvent(self, e) -> None:
         x, y = win32.cursor_pos()

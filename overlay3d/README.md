@@ -69,6 +69,7 @@ X:/Blender/blender.exe -b "D:/Character Design/output/3d/teen/vrm-appearance/v01
 - **Mood map:** `overlay/rigs/raphael_3d.toml` maps every brain mood and idle moment to a clip and a VRM expression (neutral, happy, angry, sad, relaxed, surprised). `height_dip` sets her size, which Customize can override.
 - **Facing:** she turns 70° toward where she walks, and at rest faces the way Kryo last turned her.
 - **Turning her:** hold the middle mouse button on her and drag left or right: 0.5° per px (`stage.py` `ROTATE_DEG_PER_PX`), drag right to turn her toward the screen's right. The turn lasts until restart. The 2D art ignores it.
+- **Pose wheel:** right-click her for a ring of 8 poses beside her (to her right, or her left at the monitor's edge): Wave, Cheer, Think, Look around, Stretch, Dance, Sit (on the beanbag, 20 s) and Sleep (until you poke or drag her, or the agent needs her). Click one to play it; right-click her again, click its centre or anywhere else to close it, and it closes 8 s after the cursor leaves it. The icons in `overlay/icons/wheel/` are her silhouettes rendered with `--offscreen --screenshot`; the poses are mapped in `stage.py` `PERFORM`. It works for the 2D art too.
 - **Walking pace:** `walk_speed` in `raphael_3d.toml` is in her heights per second, so it scales with her size. It's 0.5, 260 px/s at 520 px, which Kryo picked; the Mixamo walk's own stride would be 0.54.
   - **In the UI:** Customize → Look → Walking speed sets px/s per outfit (`walk_px_s` in `character.toml`).
   - **2D rigs:** they keep the stage's 90 px/s walk and 60 px/s wander unless set there.
@@ -145,6 +146,9 @@ Verification evidence/backup is in `D:/Character Design/output/godot/coat-cleara
   - **Per-take fit:** each has its own lift (`per_file` in `clip_sources.cfg`), now fitted to the floor; the comment there keeps the mattress values for when the futon returns.
   - **Futon v02:** what a better-fitting futon needs (blanket shapes per pose, a longer head end) is in `D:\Character Design\output\3d\props\requests\futon-v02-requirements.md`.
 - **Clicks:** they pass through the props; the click hull is her bones only.
+- **Prop colours:** the props were made under Blender's soft multi-light studio and its AgX view, which lifts and greys colours. Under her single key light the same PBR colours came out vivid cyan with near-black undersides. So `props.gd` gives the beanbag (and the futon) a front fill and a low bounce light on render layer 2, which only props are on, and desaturates and softens their materials (`DESATURATE`, `VALUE`, `SPECULAR`, `FILL_ENERGY`, `BOUNCE_ENERGY`).
+  - **Match:** measured against the delivery's preview: mid tone #A8CBDA against Blender's #AFCDDD, shade #86A2AE against #95BAD0.
+  - **Her look is untouched:** a test with both lights at strength 10 blew the beanbag to white and left her unchanged. The headset keeps its original look.
 
 Preview checks: `--take=<file>` plays one take of the slot, `--listen=S` pretends she's listening for S seconds, and `--pose-report` prints her extent in the futon's own space.
 

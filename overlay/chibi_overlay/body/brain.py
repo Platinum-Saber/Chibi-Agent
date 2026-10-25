@@ -125,6 +125,7 @@ class Brain:
         self._pokes: deque[int] = deque()
         # tunable from the Customize window (character.py)
         self._near_spent = False  # reacted to the pointer near her; reset when it leaves
+        self.performing = False  # playing a pose Kryo picked (perform)
         self.sleep_after_ms = SLEEP_AFTER_MS
         self.moment_gap_ms = (MOMENT_GAP_MIN_MS, MOMENT_GAP_MAX_MS)
 
@@ -153,7 +154,7 @@ class Brain:
         Near her she reacts once, for CURSOR_NEAR_MAX_MS: a pointer resting beside her
         kept her smiling until a click. She reacts again only after it has left
         (`cursor_left`)."""
-        if self.mood not in CURSOR_MOODS:
+        if self.mood not in CURSOR_MOODS or self.performing:  # a picked pose isn't interrupted
             return
         if near:
             if self.mood == Mood.CURSOR_NEAR or self._near_spent:
@@ -224,6 +225,21 @@ class Brain:
             self._set(mood, now, ttl_ms)
         return True
 
+    def perform(self, mood: Mood, now: int, ms: int | None, moment: Moment | None = None) -> bool:
+        """Kryo picked a pose (the right-click wheel): play ``mood`` (with ``moment`` for
+        MOMENT) for ``ms``, or until something else happens if None. Refused while she's held,
+        falling or dizzy. While performing, the automatic rules leave her be: a dance needs no
+        music, a sleep isn't ended by the cursor lingering near her (a poke or a drag still
+        is), and no idle moment or music interrupts. The next transition ends it."""
+        if self.mood in REFUSE_REQUESTS:
+            return False
+        if moment is not None:
+            self.moment = moment
+        self._pokes.clear()
+        self._set(mood, now, ms)
+        self.performing = True
+        return True
+
     def long_press(self, now: int) -> None:
         if self.busy:
             return
@@ -252,6 +268,8 @@ class Brain:
         ``music``: whether media is playing."""
         if now >= self._until:
             self._set(Mood.WALKING if self.away_from_home else Mood.IDLE, now, None)
+        if self.performing:
+            return  # a pose Kryo picked: it runs its time (or until a poke, a drag, the agent)
         m = self.mood
         if m == Mood.SLEEPING:
             if quiet_for_ms < WAKE_TOUCH_MS:
@@ -296,6 +314,7 @@ class Brain:
         return lo + self._rng.randrange(max(1, hi - lo))
 
     def _set(self, mood: Mood, now: int, duration_ms: int | None) -> None:
+        self.performing = False  # any transition ends a picked pose (perform sets it again)
         self.mood = mood
         self.since = now
         self._until = NEVER if duration_ms is None else now + duration_ms

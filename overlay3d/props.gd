@@ -20,6 +20,16 @@ const SETTLE := 0.4  # s for the beanbag to squash as she sits
 const BEANBAG_BACK := 0.15  # m behind her feet: hips on the seat, legs over its front
 const PILLOW_FROM_CENTRE := 0.635  # futon: Pillow_Surface along -Z from its centre
 const SHOW_FUTON := false  # true: the futon under her sleep takes (re-fit their lifts in clip_sources.cfg)
+# The props were made and previewed in Blender: soft light from several sides and its AgX view,
+# which lifts and desaturates colour. Under her one sharp key light the same PBR colours come out
+# vivid and dark-sided. So the furniture gets a fill light of its own (render layer 2: it can't
+# reach her toon-shaded body) and its colours are lifted toward the Blender look.
+const PROP_LAYER := 2
+const DESATURATE := 0.4  # albedo saturation kept (Blender's AgX greys bright colours)
+const VALUE := 0.92  # albedo brightness kept
+const SPECULAR := 0.2  # softer sheen than the PBR default 0.5
+const FILL_ENERGY := 0.45  # front-left fill
+const BOUNCE_ENERGY := 0.6  # from below: the floor bounce Blender's studio had
 
 var body: Node
 var model: Node3D
@@ -53,6 +63,16 @@ func attach(b: Node) -> void:
 	headset.set("_head", skeleton.find_bone("Head"))
 	_mic = headset.find_child("Microphone_Boom", true, false) as Node3D
 	beanbag.position = Vector3(0, 0, -BEANBAG_BACK)
+	for prop in [beanbag, futon]:
+		if prop != null:
+			_studio_look(prop)
+	for light in [["PropFill", FILL_ENERGY, Vector3(-20, -35, 0)], ["PropBounce", BOUNCE_ENERGY, Vector3(35, 15, 0)]]:
+		var l := DirectionalLight3D.new()
+		l.name = light[0]
+		l.light_energy = light[1]
+		l.light_cull_mask = 1 << (PROP_LAYER - 1)
+		l.rotation_degrees = light[2]  # fill: front-left, a little above; bounce: front, from below
+		add_child(l)
 
 
 ## Once per frame, after the body has posed. `listening`: the agent's listening mood.
@@ -78,6 +98,22 @@ func update(delta: float, clip: String, listening: bool, mouth: float) -> void:
 	if sleeping:  # raised over her, unless the take lies on top of it (clip_sources.cfg `blanket`)
 		futon.call("set_occupied", float(body.take_meta().get("blanket", 1.0)))
 	_pop(futon, sleeping, delta)
+
+
+## Put a prop on the prop render layer (her key light still reaches it, the fill reaches only
+## props) and lift its colours toward how it looked in Blender.
+func _studio_look(prop: Node3D) -> void:
+	for mi in prop.find_children("*", "MeshInstance3D", true, false):
+		mi.layers = 1 | (1 << (PROP_LAYER - 1))
+		for s in mi.mesh.get_surface_count():
+			var mat := mi.get_active_material(s) as StandardMaterial3D
+			if mat == null:
+				continue
+			mat = mat.duplicate()
+			var c := mat.albedo_color
+			mat.albedo_color = Color.from_hsv(c.h, c.s * DESATURATE, minf(1.0, c.v * VALUE), c.a)
+			mat.metallic_specular = SPECULAR
+			mi.set_surface_override_material(s, mat)
 
 
 func _pop(prop: Node3D, wanted: bool, delta: float) -> void:
