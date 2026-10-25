@@ -19,10 +19,15 @@ extends Node3D
 ##   --expr=happy                 hold an expression
 ##   --gaze=X,Y                   look at this window point
 ##   --turn=DEG                   turn her about the vertical axis (180 = back view)
+##   --take=NAME                  play this Mixamo take of the clip slot (file name without .fbx)
+##   --listen=S                   pretend the agent is listening for the first S seconds (headset)
+##   --offscreen                  keep the window off-screen (measuring)
+##   --height=PX                  her height in the preview (default 850; in the overlay she's 520 at 100 %)
 ##   --seconds=S                  run S seconds, print the average fps, then quit
 ##   --screenshot=PATH            with --seconds: save the last frame (with alpha) as PNG
 
 const Body = preload("res://raphael.gd")
+const Props = preload("res://props.gd")
 const DEFAULT_MODEL := "res://models/raphael_teen.vrm"
 const PREVIEW_PX := 850.0  # her height in the preview window
 const MARGIN := 30.0  # px of hull around her outline points (bones sit inside the mesh)
@@ -36,6 +41,8 @@ const STATS_S := 10.0  # how often the link's timing goes to the log
 @onready var camera: Camera3D = $Camera
 
 var body: Body
+var props: Props
+var _listening := false  # the agent's listening mood (from the overlay's frames)
 var model: Node3D
 var args := {}
 var height_m := 1.0  # her mesh height at rest
@@ -78,7 +85,12 @@ func _ready() -> void:
 	add_child(model)
 	add_child(body)
 	_measure()
+	props = Props.new()  # after measuring: props don't count toward her size
+	props.name = "Props"
+	add_child(props)
+	props.attach(body)
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	_quality()
 
 	if args.has("renderer"):
 		_link = StreamPeerTCP.new()
@@ -86,11 +98,26 @@ func _ready() -> void:
 		model.visible = false  # until the first frame places her
 	else:
 		body.play(args.get("clip", "Idle"))
+		if args.has("take") and not body.force_take(args["take"]):
+			push_warning("No take %s in %s" % [args["take"], body.clip_name()])
 		if args.has("expr"):
 			body.hold(args["expr"])
-		var w := get_window()
-		var usable := DisplayServer.screen_get_usable_rect(DisplayServer.get_primary_screen())
-		w.position = Vector2i(usable.end.x - w.size.x - 40, usable.end.y - w.size.y)
+		if not args.has("offscreen"):
+			var w := get_window()
+			var usable := DisplayServer.screen_get_usable_rect(DisplayServer.get_primary_screen())
+			w.position = Vector2i(usable.end.x - w.size.x - 40, usable.end.y - w.size.y)
+
+
+## Render quality, from the overlay's [overlay] render_scale / msaa (godot3d.py passes them).
+## Supersampling renders the 3D view larger and filters it down: her eyes, lashes and mouth
+## get more pixels before they're shrunk, so they read clearer at the same size.
+func _quality() -> void:
+	var vp := get_viewport()
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	vp.scaling_3d_scale = clampf(float(args.get("render-scale", "1.0")), 0.5, 2.0)
+	var msaa := {"0": Viewport.MSAA_DISABLED, "2": Viewport.MSAA_2X, "4": Viewport.MSAA_4X, "8": Viewport.MSAA_8X}
+	vp.msaa_3d = msaa.get(args.get("msaa", "0"), Viewport.MSAA_DISABLED)
+	print("RAPHAEL3D quality: render scale %.2f, msaa %s" % [vp.scaling_3d_scale, args.get("msaa", "0")])
 
 
 func _measure() -> void:
@@ -113,6 +140,8 @@ func _process(delta: float) -> void:
 		_pump(delta)
 	else:
 		_preview()
+		_listening = args.has("listen") and _elapsed < float(args["listen"])
+	props.update(delta, body.clip_name(), _listening, body.mouth)
 	_update_hull()
 	if args.has("seconds"):
 		_elapsed += delta
@@ -124,7 +153,7 @@ func _process(delta: float) -> void:
 # --- preview ------------------------------------------------------------------------------
 func _preview() -> void:
 	var view := get_viewport().get_visible_rect().size
-	_place(Vector2(view.x / 2.0, view.y - 30.0), PREVIEW_PX, view)
+	_place(Vector2(view.x / 2.0, view.y - 30.0), float(args.get("height", PREVIEW_PX)), view)
 	var g := Vector2(view.x / 2.0, 0)
 	if args.has("gaze"):
 		var p: PackedStringArray = args["gaze"].split(",")
@@ -224,6 +253,7 @@ func _apply(f: Dictionary, delta: float) -> void:
 	var params: Dictionary = f.get("params", {})
 	body.params = params
 	body.mouth = params.get("ParamMouthOpenY", 0.0)
+	_listening = f.get("listening", false)
 	body.eyes_closed = params.get("ParamEyeLOpen", 1.0) < 0.5
 	var gaze = f.get("gaze")
 	var head := camera.unproject_position(body.head_position())
@@ -265,7 +295,25 @@ func _update_hull() -> void:
 		_send({"t": "hull", "pts": flat})
 
 
+## --pose-report: her bones' extent in the futon's own space (x across, y up from the floor,
+## z along, -z = pillow end), to brief prop makers.
+func _pose_report() -> void:
+	var sk: Skeleton3D = body.skeleton
+	var lo := Vector3.INF
+	var hi := -Vector3.INF
+	for i in sk.get_bone_count():
+		var p: Vector3 = props.futon.to_local(sk.to_global(sk.get_bone_global_pose(i).origin))
+		lo = Vector3(minf(lo.x, p.x), minf(lo.y, p.y), minf(lo.z, p.z))
+		hi = Vector3(maxf(hi.x, p.x), maxf(hi.y, p.y), maxf(hi.z, p.z))
+	var head: Vector3 = props.futon.to_local(sk.to_global(sk.get_bone_global_pose(sk.find_bone("Head")).origin))
+	var hips: Vector3 = props.futon.to_local(sk.to_global(sk.get_bone_global_pose(sk.find_bone("Hips")).origin))
+	print("RAPHAEL3D pose-report take=%s bones x %.2f..%.2f y %.2f..%.2f z %.2f..%.2f head %s hips %s" % [
+		body.take_meta(), lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, head.snapped(Vector3.ONE * 0.01), hips.snapped(Vector3.ONE * 0.01)])
+
+
 func _finish() -> void:
+	if args.has("pose-report"):
+		_pose_report()
 	print("RAPHAEL3D fps_avg=%.1f frames=%d seconds=%.1f clip=%s" % [_frames / _elapsed, _frames, _elapsed, body.clip_name()])
 	if args.has("screenshot"):
 		var img := get_viewport().get_texture().get_image()

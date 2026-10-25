@@ -147,17 +147,24 @@ func load_sources(keyed := false) -> void:
 	var used := []
 	for slot in cfg.get_sections():
 		var takes := []
+		var per_file: Dictionary = cfg.get_value(slot, "per_file", {})
 		for f in cfg.get_value(slot, "files", []):
 			var path := "res://anims/mixamo/%s" % f
 			if not ResourceLoader.exists(path):
 				continue
-			var b := Mixamo.bake(path, skeleton, cfg.get_value(slot, "start", 0.0),
-					cfg.get_value(slot, "end", 0.0), cfg.get_value(slot, "lift", 0.0),
-					cfg.get_value(slot, "keep_height", false))
+			var o := {}  # the slot's settings, then this file's own on top
+			for key in ["start", "end", "lift", "keep_height", "blanket"]:
+				if cfg.has_section_key(slot, key):
+					o[key] = cfg.get_value(slot, key)
+			o.merge(per_file.get(f, {}), true)
+			var b := Mixamo.bake(path, skeleton, o.get("start", 0.0), o.get("end", 0.0),
+					o.get("lift", 0.0), o.get("keep_height", false))
 			if b:
+				b.meta = o
 				takes.append(b)
 		if not takes.is_empty():
-			_sources[slot] = {"takes": takes, "loop": cfg.get_value(slot, "loop", Clips.LOOPING.get(slot, true))}
+			_sources[slot] = {"takes": takes, "loop": cfg.get_value(slot, "loop", Clips.LOOPING.get(slot, true)),
+					"vary": cfg.get_value(slot, "vary", true)}
 			used.append("%s(%d)" % [slot, takes.size()])
 	print("RAPHAEL3D clips: Mixamo for %s; keyed for the rest; baked in %d ms" % [
 		", ".join(used), Time.get_ticks_msec() - t0])
@@ -187,6 +194,22 @@ func _take(slot: String) -> Mixamo.Baked:
 func _looping(slot: String) -> bool:
 	var s = _sources.get(slot)
 	return s["loop"] if s != null else Clips.LOOPING.get(slot, true)
+
+
+## Play this take of the current slot (preview checks): its file name without .fbx.
+func force_take(take: String) -> bool:
+	var s = _sources.get(_clip)
+	for b in (s["takes"] if s != null else []):
+		if b.name == take:
+			_src = b
+			_clip_t = 0.0
+			return true
+	return false
+
+
+## The playing Mixamo take's clip_sources.cfg settings ({} for a keyed clip).
+func take_meta() -> Dictionary:
+	return _src.meta if _src else {}
 
 
 func clip_name() -> String:
@@ -245,7 +268,7 @@ func _pose(delta: float) -> void:
 	_clip_t += delta
 	_fade = minf(1.0, _fade + delta / CROSSFADE)
 	var loop := _looping(_clip)
-	if _src and loop and _clip_t >= _src.length and _sources[_clip]["takes"].size() > 1:
+	if _src and loop and _clip_t >= _src.length and _sources[_clip]["takes"].size() > 1 			and _sources[_clip]["vary"]:
 		_restart(_clip)  # another take of the same slot (variety while she talks or idles)
 	var p := _src.sample(_clip_t, loop) if _src else _keyed(_clip, _clip_t)
 	if _fade < 1.0 and not _prev_pose.is_empty():

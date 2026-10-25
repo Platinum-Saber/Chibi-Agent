@@ -131,3 +131,39 @@ The scarf's Blender shader is unlit emission, which exports with no alpha. `raph
 Smooth release preserves small corrections across frames. The blended arm pose is projected back outside the fitted volumes to prevent smoothing from carrying hands through the coat. Corrections are bounded (`max_offset`, default 0.16 m at this model's scale); unsuitable/missing coat or bone mappings fail closed by leaving original animation alone, and active Godot physical-bone simulation bypasses this animation correction. `--coat-clearance=off` provides baseline comparison. The model, Mixamo files, Blender masters, app protocol and configuration are unchanged.
 
 Verification evidence/backup is in `D:/Character Design/output/godot/coat-clearance-v01/`. Tests enumerate actual configured Mixamo takes sampled at 30 fps, plus 60 fps transitions, missing-bone/disable/T-pose/root-transform checks. Penetration numbers describe the fitted probe boundaries, not a universal triangle-level cloth guarantee. Very different outfits/animations may need refitting/tuning, and this module requires the loaded coat material name `Tops_01_CLOTH_01` and Godot humanoid bone names.
+
+## Props (25 October 2026)
+`props/` holds Character Design's `Raphael_Props_v01`: three GLBs, their scene wrappers and helper scripts, unchanged. `props.gd` shows each prop only while it's used, popping it in and out over 0.2 s:
+- **Headset:** follows her Head bone.
+  - **On with the mic** during a conversation: the agent's listening mood (the frame's `listening`), the Think and Talk clips, or her mouth moving.
+  - **On without the mic** for slow music (DanceVibe, Mixamo "Listening To Music"). Not for DanceExcited.
+  - **Off** 5 s after either ends.
+- **Slime beanbag:** under her while she sits (Sit). It squashes over 0.4 s as she settles. Sit plays the chair take "Sitting Idle", with her hips held at the squashed seat (`keep_height`, `lift=-0.415`).
+- **Futon:** under her while she sleeps (Sleep), laid feet-to-head along her body, with the pillow under her head.
+  - **One take per sleep** (`vary=false`): Female Laying Pose (on her front), Female Laying Pose - 2 (propped up) or Sleeping Idle (on her side).
+  - **Per-take fit:** each has its own lift, and Sleeping Idle lies on top of a flat blanket. Both come from `per_file` in `clip_sources.cfg`.
+  - **Futon v02:** what a better-fitting futon needs (blanket shapes per pose, a longer head end) is in `D:\Character Design\output\3d\props\requests\futon-v02-requirements.md`.
+- **Clicks:** they pass through the props; the click hull is her bones only.
+
+Preview checks: `--take=<file>` plays one take of the slot, `--listen=S` pretends she's listening for S seconds, and `--pose-report` prints her extent in the futon's own space.
+
+## Render quality
+`[overlay] render_scale` (supersampling, 1.0–2.0) and `msaa` (0/2/4/8) in `config.toml` go to the renderer (`--render-scale`, `--msaa`).
+- **Default: 2.0 and 2.** Her eyes, lashes and mouth read cleanly at her normal 520 px. At 1.0 her hair breaks into jagged noise and her mouth is a single harsh line.
+- **Budget:** Kryo's limit for her render is 800 MB of GPU memory.
+- **Measured** (Godot alone, 2560×1439 window, RTX 4060 Laptop, 25 October 2026):
+
+| Supersampling | MSAA | GPU memory |
+|---|---|---|
+| 1.0 | off | 234 MiB |
+| 1.0 | 2× | 295 MiB |
+| 1.0 | 4× | 350 MiB |
+| 1.5 | off | 298 MiB |
+| 1.5 | 2× | 426 MiB |
+| 1.5 | 4× | 554 MiB |
+| 2.0 | off | 350 MiB |
+| **2.0** | **2×** | **580 MiB** |
+| 2.0 | 4× | 800 MiB |
+
+- **CPU:** stays at about 45–50% of one core whatever the setting.
+- **GPU used:** the renderer draws on whichever GPU drives the screen she's on; here that's the 4060.

@@ -29,6 +29,7 @@ const SIDED := {
 ## plus the hip drop per frame (metres, + = lower).
 class Baked:
 	var name := ""
+	var meta := {}  # the take's clip_sources.cfg settings (lift, blanket...), for props.gd
 	var frames := 0
 	var length := 0.0
 	var bones := {}

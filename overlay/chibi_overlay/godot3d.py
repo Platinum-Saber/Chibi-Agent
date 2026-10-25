@@ -39,6 +39,8 @@ MODEL = "raphael_teen.vrm"  # in the project's models/; exported by overlay3d/to
 DEFAULT_EXE = r"X:\Godot\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe"
 START_TIMEOUT_MS = 30_000  # first import of the VRM can take a while
 QUIT_GRACE_MS = 500
+RENDER_SCALE = 2.0  # [overlay] render_scale: supersampling for a clearer face (overlay3d/README.md: budgets)
+MSAA = 2            # [overlay] msaa: 0, 2, 4 or 8
 SWP_NOACTIVATE = 0x0010
 SWP_SHOWWINDOW = 0x0040
 SW_HIDE, SW_SHOWNOACTIVATE = 0, 4
@@ -140,9 +142,12 @@ class Bridge:
         if not self.server.listen(QHostAddress.SpecialAddress.LocalHost, 0):
             self._fail(f"can't listen: {self.server.errorString()}")
             return
-        exe = exe or config.load()["overlay"].get("godot_exe") or DEFAULT_EXE
+        ocfg = config.load()["overlay"]
+        exe = exe or ocfg.get("godot_exe") or DEFAULT_EXE
         self._focus = user32.GetForegroundWindow()  # Godot activates its window: handed back on hello
         cmd = [exe, "--path", project, "--", f"--model=res://models/{model}",
+               f"--render-scale={float(ocfg.get('render_scale', RENDER_SCALE))}",
+               f"--msaa={int(ocfg.get('msaa', MSAA))}",
                f"--renderer={self.server.serverPort()}", f"--token={self.token}"]
         try:
             paths.LOGS.mkdir(parents=True, exist_ok=True)
@@ -374,6 +379,7 @@ class GodotModel:
                 "walking": self.motion == "Walk", "facing_left": self.facing_left,
                 "params": {k: round(v, 3) for k, v in self.params.items()},
                 "gaze": [round(self.gaze[0], 1), round(self.gaze[1], 1)] if self.gaze else None,
+                "listening": bool(getattr(getattr(self.widget, "stage", None), "listening", False)),  # headset
                 "visible": True}
 
     def _sync_window(self) -> None:

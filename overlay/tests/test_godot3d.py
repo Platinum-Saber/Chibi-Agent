@@ -165,6 +165,7 @@ def test_bridge_handshake_frames_and_quit(qapp, monkeypatch, tmp_path):
     b.users = 1
     assert started[0][:3] == ["godot.exe", "--path", str(tmp_path)]
     assert "--model=res://models/raphael_teen.vrm" in started[0]
+    assert any(a.startswith("--render-scale=") for a in started[0]) and any(a.startswith("--msaa=") for a in started[0])
     assert _wait(lambda: b.ready and b.hull), b.failed
     assert (b.hwnd, b.height_m, b.half_width_m) == (4242, 1.5, 0.3)
     assert godot3d.in_hull(b.hull, 5, 5)
@@ -372,3 +373,13 @@ def test_switching_back_to_3d_wears_the_last_3d_variant(st):
     assert st.switch_body() == "casual_coat"
     _run_puff(st)
     assert st.switch_body() == "ruby_3d"  # not [overlay.bodies]' teen_3d: the variant she last wore
+
+
+def test_frames_say_when_the_agent_is_listening(fake_bridge):
+    """The headset goes on while she listens (overlay3d/props.gd); the flag comes from the stage."""
+    class W:
+        hwnd = 0
+        stage = type("S", (), {"listening": True})()
+    m = godot3d.GodotModel("X:/nowhere", widget=W(), bridge=fake_bridge)
+    assert m.frame()["listening"] is True
+    assert _puppet().model.frame()["listening"] is False  # no window/stage: never listening
