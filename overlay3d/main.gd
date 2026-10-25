@@ -13,7 +13,8 @@ extends Node3D
 ## never takes focus (no_focus: the overlay's fullscreen watcher must not mistake it for a
 ## game), so there are no keys; use the arguments.
 ##   --model=res://models/x.vrm   another model (default raphael_teen.vrm)
-##   --clip=NAME                  play a clips.gd clip (default Idle)
+##   --clip=NAME                  play a clip slot (default Idle)
+##   --source=keyed               the keyed clips (clips.gd) only, no Mixamo takes
 ##   --expr=happy                 hold an expression
 ##   --gaze=X,Y                   look at this window point
 ##   --turn=DEG                   turn her about the vertical axis (180 = back view)
@@ -27,6 +28,9 @@ const MARGIN := 30.0  # px of hull around her outline points (bones sit inside t
 const HULL_RING := 8  # points per outline point when padding the hull
 const TURN := 70.0  # degrees she turns while walking
 const LINK_TIMEOUT_S := 15.0
+const SMOOTH := 30.0  # 1/s: how fast her shown position closes on the predicted one (~8 px behind at 260 px/s)
+const SNAP_PX := 60.0  # further than this (a drag, a throw, a monitor hop): jump there at once
+const STATS_S := 10.0  # how often the link's timing goes to the log
 
 @onready var camera: Camera3D = $Camera
 
@@ -42,6 +46,10 @@ var _linked := false
 var _since := 0.0
 var _rx := ""
 var _frame := {}
+var _frame_at := 0  # usec when _frame arrived
+var _shown := Vector2.INF  # where her feet are drawn (window px), smoothed
+var _new := 0  # frames that arrived this Godot frame
+var _stats := {"t": 0.0, "frames": 0, "ticks": 0, "none": 0, "multi": 0, "gap": 0, "last": 0}
 var _yaw := 0.0
 var _elapsed := 0.0
 var _frames := 0
@@ -65,7 +73,7 @@ func _ready() -> void:
 	# first see, and arms swung down through hanging hair would trap it outside the arm colliders.
 	body = Body.new()
 	body.name = "Body"
-	body.attach(model)
+	body.attach(model, args.get("source", "") == "keyed")
 	add_child(model)
 	add_child(body)
 	_measure()
@@ -131,6 +139,7 @@ func _pump(delta: float) -> void:
 	if st == StreamPeerTCP.STATUS_CONNECTED:
 		if not _linked:
 			_linked = true
+			_link.set_no_delay(true)  # the hull every frame: no Nagle batching
 			_send({"t": "hello", "token": args.get("token", ""),
 				"hwnd": DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE),
 				"height_m": height_m, "half_width_m": half_width_m})
@@ -148,9 +157,29 @@ func _pump(delta: float) -> void:
 		print("RAPHAEL3D overlay link closed: quitting")  # the overlay quit, crashed or never came
 		get_tree().quit()
 		return
+	_link_stats(delta)
 	if _frame.is_empty():
 		return
 	_apply(_frame, delta)
+
+
+## How evenly frames arrive, to the log every STATS_S: frames/s, the longest gap, and the share
+## of Godot frames that got no new frame (she'd stand still) or several (she'd jump).
+func _link_stats(delta: float) -> void:
+	_stats["t"] += delta
+	_stats["ticks"] += 1
+	_stats["frames"] += _new
+	if _new == 0:
+		_stats["none"] += 1
+	elif _new > 1:
+		_stats["multi"] += 1
+	_new = 0
+	if _stats["t"] >= STATS_S:
+		var k: int = _stats["ticks"]
+		print("RAPHAEL3D link: %.1f frames/s, %.1f draws/s, longest gap %.1f ms, draws with no new frame %.0f%%, with 2+ %.0f%%" % [
+			_stats["frames"] / _stats["t"], k / _stats["t"], _stats["gap"] / 1000.0,
+			100.0 * _stats["none"] / k, 100.0 * _stats["multi"] / k])
+		_stats = {"t": 0.0, "frames": 0, "ticks": 0, "none": 0, "multi": 0, "gap": 0, "last": _stats["last"]}
 
 
 func _on_message(msg: Dictionary) -> void:
@@ -159,6 +188,11 @@ func _on_message(msg: Dictionary) -> void:
 			if _frame.is_empty():
 				print("RAPHAEL3D first frame: ", msg)
 			_frame = msg
+			_frame_at = Time.get_ticks_usec()
+			_new += 1
+			if _stats["last"] > 0:
+				_stats["gap"] = maxi(_stats["gap"], _frame_at - _stats["last"])
+			_stats["last"] = _frame_at
 		"quit":
 			get_tree().quit()
 
@@ -169,7 +203,17 @@ func _apply(f: Dictionary, delta: float) -> void:
 		return
 	var view := get_viewport().get_visible_rect().size
 	var feet: Array = f.get("feet", [view.x / 2, view.y])
-	_place(Vector2(feet[0], feet[1]), float(f.get("h", PREVIEW_PX)), view)
+	var vel: Array = f.get("vel", [0, 0])
+	# the overlay's frames and this window's vsync aren't in step: carry her on at her velocity
+	# since the frame came (at most 50 ms, so a stalled overlay can't fling her)
+	var ahead := minf((Time.get_ticks_usec() - _frame_at) / 1e6, 0.05)
+	var target := Vector2(feet[0] + vel[0] * ahead, feet[1] + vel[1] * ahead)
+	# and close on that prediction smoothly, so uneven arrivals don't show as steps
+	if _shown == Vector2.INF or _shown.distance_to(target) > SNAP_PX:
+		_shown = target
+	else:
+		_shown = _shown.lerp(target, 1.0 - exp(-delta * SMOOTH))
+	_place(_shown, float(f.get("h", PREVIEW_PX)), view)
 	# she turns while walking (2D flips; she faces front again at rest)
 	var goal := (-TURN if f.get("facing_left", false) else TURN) if f.get("walking", false) else 0.0
 	_yaw = lerpf(_yaw, goal, 1.0 - exp(-delta * 8.0))

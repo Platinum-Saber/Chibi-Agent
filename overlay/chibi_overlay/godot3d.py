@@ -20,11 +20,12 @@ import json
 import logging
 import secrets
 import subprocess
+import time
 from ctypes import wintypes
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
-from PySide6.QtNetwork import QHostAddress, QTcpServer
+from PySide6.QtNetwork import QAbstractSocket, QHostAddress, QTcpServer
 
 from chibi_shared import config, paths
 
@@ -165,6 +166,8 @@ class Bridge:
             sock.close()
             return
         self.sock = sock
+        # one small line per frame: without this Windows batches them (Nagle) and she stutters
+        sock.setSocketOption(QAbstractSocket.SocketOption.LowDelayOption, 1)
         sock.readyRead.connect(self._read)
         sock.disconnected.connect(lambda: self._fail("renderer link closed") if self.users else None)
 
@@ -262,6 +265,7 @@ class GodotModel:
         self.expression = ""
         self.params: dict[str, float] = {}
         self.gaze: tuple[float, float] | None = None
+        self._last_feet: tuple[float, float, float] | None = None  # x, y, time: her velocity for Godot
         self._placed: tuple | None = None
         self._frames = 0
         self._closed = False
@@ -345,7 +349,16 @@ class GodotModel:
         w, h = self.fb
         u = h / 2
         feet = (w / 2 + self.offset[0] * u, h / 2 - self.offset[1] * u)
-        return {"t": "frame", "feet": [round(feet[0], 1), round(feet[1], 1)], "h": round(self.scale * u, 1),
+        # Godot draws on its own vsync, not in step with these frames: with her velocity it carries
+        # her on between them instead of standing still one frame and jumping two the next
+        now = time.monotonic()
+        vel = (0.0, 0.0)
+        if self._last_feet is not None and 0.0 < now - self._last_feet[2] < 0.1:
+            dt = now - self._last_feet[2]
+            vel = ((feet[0] - self._last_feet[0]) / dt, (feet[1] - self._last_feet[1]) / dt)
+        self._last_feet = (feet[0], feet[1], now)
+        return {"t": "frame", "feet": [round(feet[0], 1), round(feet[1], 1)],
+                "vel": [round(vel[0], 1), round(vel[1], 1)], "h": round(self.scale * u, 1),
                 "motion": self.motion, "expression": self.expression,
                 "walking": self.motion == "Walk", "facing_left": self.facing_left,
                 "params": {k: round(v, 3) for k, v in self.params.items()},

@@ -4,6 +4,10 @@
 # angry, sad, relaxed, surprised (blink is driven by the body).
 # Every brain mood and moment has a clip, so nothing falls back by accident.
 height_dip = 520  # feet to head top in DIPs (Kryo, 2026-10-25; was 680, then 476)
+# Her walking pace in her heights per second (scales with her size; Customize -> Look can set px/s).
+# The Mixamo "Walking" clip's own stride is 0.54 (1.05 m/s on its rig, 0.79 m/s on her legs, / her
+# 1.471 m); Kryo picked 0.5 (260 px/s at 520 px): smoother, the feet slide a little. Change with the clip.
+walk_speed = 0.5
 
 [moods]
 idle         = { motion = "Idle", expression = "neutral" }
@@ -11,7 +15,8 @@ surprised    = { motion = "Surprised", expression = "surprised" }
 pout         = { motion = "Pout", expression = "angry" }
 crying       = { motion = "Upset", expression = "sad" }
 happy        = { motion = "Happy", expression = "happy" }
-held         = { motion = "Held", expression = "surprised" }
+held         = { motion = "Held", expression = "surprised" }      # picked up at the waist or above: hanging
+held_low     = { motion = "Carried", expression = "surprised" }   # picked up below the waist: carried flat
 falling      = { motion = "Fall", expression = "surprised" }
 soft_landing = { motion = "Land", expression = "happy" }
 dizzy        = { motion = "Dizzy", expression = "sad" }

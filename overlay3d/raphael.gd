@@ -1,6 +1,12 @@
 extends Node
-## Her body for a VRM imported by godot-vrm: clips (clips.gd) with crossfades, and over them
-## breath, blinks, gaze, the Live2D-style params the overlay sends, and an expression mixer.
+## Her body for a VRM imported by godot-vrm: clips with crossfades, and over them breath,
+## blinks, gaze, the Live2D-style params the overlay sends, and an expression mixer.
+##
+## A clip slot (Idle, Talk, Walk...) plays Mixamo motion when clip_sources.cfg names files for
+## it that are in anims/mixamo/ (baked onto her skeleton at load, mixamo.gd; several files =
+## a random one each time it starts or loops), else the clip keyed in clips.gd. Poses are her
+## local bone rotations over the humanoid profile bones only: spring-bone hair and scarf are
+## left to their physics.
 ##
 ## godot-vrm renames the bones to Godot's humanoid profile (Head, LeftUpperArm, ...),
 ## faces the model +Z and turns each VRM expression into an animation of blend-shape
@@ -8,6 +14,8 @@ extends Node
 ## several expressions (a held mood, a blink, a mouth shape) can mix.
 
 const Clips = preload("res://clips.gd")
+const Mixamo = preload("res://mixamo.gd")
+const SOURCES := "res://clip_sources.cfg"
 const BREATH_PERIOD := 4.2
 const CROSSFADE := 0.25  # s between clips
 const FADE := 8.0  # expression weight change per second
@@ -21,10 +29,14 @@ var params := {}  # Live2D-style ids from the overlay's Stage.params
 
 var _clip := "Idle"
 var _clip_t := 0.0
-var _prev := ""
-var _prev_t := 0.0
-var _fade := 1.0  # 0 -> 1 from the previous clip to this one
+var _src: Mixamo.Baked = null  # the Mixamo take playing now; null: the keyed clip
+var _prev_pose := {}  # the pose when the last clip change started, faded out from
+var _last_pose := {}
+var _fade := 1.0  # 0 -> 1 from _prev_pose to the clip
 var _hips_rest := Vector3.ZERO
+var _sources := {}  # slot -> {"takes": [Baked...], "loop": bool}
+var _profile: Array[String] = []  # her humanoid bones, the only ones poses touch
+var _axes := {}  # bone index -> [x, y, z] model axes in the bone's rest frame
 
 var _binds := {}  # expression -> [[MeshInstance3D, shape index, weight], ...]
 var _weight := {}  # expression -> current weight
@@ -40,15 +52,23 @@ var _blink_t := -1.0
 var _bone := {}
 
 
-func attach(m: Node3D) -> void:
+func attach(m: Node3D, keyed := false) -> void:
 	model = m
 	skeleton = m.find_children("*", "Skeleton3D", true, false)[0]
 	for i in skeleton.get_bone_count():  # profile names: Hips, LeftUpperArm, RightIndexDistal, ...
 		_bone[skeleton.get_bone_name(i)] = i
 		_rest[i] = skeleton.get_bone_rest(i).basis.get_rotation_quaternion()
+		var to_local := skeleton.get_bone_global_rest(i).basis.orthonormalized().inverse()
+		_axes[i] = [(to_local * Vector3.RIGHT).normalized(), (to_local * Vector3.UP).normalized(),
+				(to_local * Vector3.BACK).normalized()]
+	var profile := SkeletonProfileHumanoid.new()
+	for k in profile.bone_size:
+		if _bone.has(profile.get_bone_name(k)):
+			_profile.append(profile.get_bone_name(k))
 	_hips_rest = skeleton.get_bone_rest(_bone["Hips"]).origin
 	_read_expressions(m)
 	_fix_alpha(m)
+	load_sources(keyed)
 	_pose(0.0)
 	process_priority = -10  # pose before the spring bones read it
 
@@ -106,15 +126,59 @@ func _read_expressions(m: Node3D) -> void:
 	print("RAPHAEL3D expressions: ", ", ".join(_binds.keys()))
 
 
-## Play a clip (clips.gd name; unknown names play Idle). The same name keeps running.
+## Bake the Mixamo takes named in clip_sources.cfg (skipped with `keyed`: clips.gd only).
+func load_sources(keyed := false) -> void:
+	_sources = {}
+	if keyed:
+		return
+	var cfg := ConfigFile.new()
+	if cfg.load(SOURCES) != OK:
+		push_warning("No %s: keyed clips only" % SOURCES)
+		return
+	var t0 := Time.get_ticks_msec()
+	var used := []
+	for slot in cfg.get_sections():
+		var takes := []
+		for f in cfg.get_value(slot, "files", []):
+			var path := "res://anims/mixamo/%s" % f
+			if not ResourceLoader.exists(path):
+				continue
+			var b := Mixamo.bake(path, skeleton, cfg.get_value(slot, "start", 0.0),
+					cfg.get_value(slot, "end", 0.0), cfg.get_value(slot, "lift", 0.0),
+					cfg.get_value(slot, "keep_height", false))
+			if b:
+				takes.append(b)
+		if not takes.is_empty():
+			_sources[slot] = {"takes": takes, "loop": cfg.get_value(slot, "loop", Clips.LOOPING.get(slot, true))}
+			used.append("%s(%d)" % [slot, takes.size()])
+	print("RAPHAEL3D clips: Mixamo for %s; keyed for the rest; baked in %d ms" % [
+		", ".join(used), Time.get_ticks_msec() - t0])
+	_src = _take(_clip)
+
+
+## Play a clip slot (clips.gd names; unknown names play Idle). The same name keeps running.
 func play(clip: String) -> void:
 	if clip == _clip:
 		return
-	_prev = _clip
-	_prev_t = _clip_t
+	_restart(clip)
+
+
+func _restart(clip: String) -> void:
+	_prev_pose = _last_pose
 	_fade = 0.0
 	_clip = clip
 	_clip_t = 0.0
+	_src = _take(clip)
+
+
+func _take(slot: String) -> Mixamo.Baked:
+	var s = _sources.get(slot)
+	return null if s == null else s["takes"].pick_random()
+
+
+func _looping(slot: String) -> bool:
+	var s = _sources.get(slot)
+	return s["loop"] if s != null else Clips.LOOPING.get(slot, true)
 
 
 func clip_name() -> String:
@@ -171,69 +235,75 @@ func _process(delta: float) -> void:
 
 func _pose(delta: float) -> void:
 	_clip_t += delta
-	_prev_t += delta
 	_fade = minf(1.0, _fade + delta / CROSSFADE)
-	var p := Clips.pose(_clip, _clip_t)
-	if _fade < 1.0 and _prev != "":
-		p = _blend(Clips.pose(_prev, _prev_t), p, smoothstep(0.0, 1.0, _fade))
+	var loop := _looping(_clip)
+	if _src and loop and _clip_t >= _src.length and _sources[_clip]["takes"].size() > 1:
+		_restart(_clip)  # another take of the same slot (variety while she talks or idles)
+	var p := _src.sample(_clip_t, loop) if _src else _keyed(_clip, _clip_t)
+	if _fade < 1.0 and not _prev_pose.is_empty():
+		p = _blend(_prev_pose, p, smoothstep(0.0, 1.0, _fade))
+	_last_pose = p
 
-	# layers over the clip: breath, the overlay's params, gaze
+	# layers over the clip, in degrees about the model axes: breath, the overlay's params, gaze
 	var breath := sin(_t * TAU / BREATH_PERIOD)
 	_gaze = _gaze.lerp(_gaze_goal, 1.0 - exp(-delta * 4.0))
-	_add(p, "Spine", Vector3(breath * 0.6, 0, 0))
-	_add(p, "Chest", Vector3(breath * 0.9, 0, 0))
-	_add(p, "LeftUpperArm", Vector3(0, 0, breath * 0.8))
-	_add(p, "RightUpperArm", Vector3(0, 0, -breath * 0.8))
-	_add(p, "Hips", Vector3(0, 0, params.get("ParamBodyAngleX", 0.0)))  # dance sway, held tilt
-	_add(p, "Head", Vector3(-params.get("ParamAngleY", 0.0) - breath * 0.4,
+	var lay := {}
+	_add(lay, "Spine", Vector3(breath * 0.6, 0, 0))
+	_add(lay, "Chest", Vector3(breath * 0.9, 0, 0))
+	_add(lay, "LeftUpperArm", Vector3(0, 0, breath * 0.8))
+	_add(lay, "RightUpperArm", Vector3(0, 0, -breath * 0.8))
+	_add(lay, "Hips", Vector3(0, 0, params.get("ParamBodyAngleX", 0.0)))  # dance sway, held tilt
+	_add(lay, "Head", Vector3(-params.get("ParamAngleY", 0.0) - breath * 0.4,
 			params.get("ParamAngleX", 0.0), -params.get("ParamAngleZ", 0.0)))
-	_add(p, "Neck", Vector3(_gaze.y * 0.4, _gaze.x * 0.4, 0))
-	_add(p, "Head", Vector3(_gaze.y * 0.6, _gaze.x * 0.6, 0))
+	_add(lay, "Neck", Vector3(_gaze.y * 0.4, _gaze.x * 0.4, 0))
+	_add(lay, "Head", Vector3(_gaze.y * 0.6, _gaze.x * 0.6, 0))
 	if _bone.has("LeftEye"):
-		p["LeftEye"] = Vector3(_gaze.y * 0.5, _gaze.x * 0.5, 0)
-		p["RightEye"] = p["LeftEye"]
+		lay["LeftEye"] = Vector3(_gaze.y * 0.5, _gaze.x * 0.5, 0)
+		lay["RightEye"] = lay["LeftEye"]
 	elif _binds.has("lookleft"):
 		_target["lookleft"] = clampf(_gaze.x / 22.0, 0, 1)
 		_target["lookright"] = clampf(-_gaze.x / 22.0, 0, 1)
 		_target["lookdown"] = clampf(_gaze.y / 14.0, 0, 1)
 		_target["lookup"] = clampf(-_gaze.y / 14.0, 0, 1)
 
-	for bone in p:
-		if bone != "_drop":
-			_rot(bone, p[bone])
+	for bone in _profile:  # every humanoid bone each frame, so nothing from the last clip sticks
+		var i: int = _bone[bone]
+		var q: Quaternion = p.get(bone, _rest[i])
+		if lay.has(bone):
+			q = q * _turn(i, lay[bone])
+		skeleton.set_bone_pose_rotation(i, q)
 	skeleton.set_bone_pose_position(_bone["Hips"], _hips_rest - Vector3(0, p.get("_drop", 0.0), 0))
+
+
+## A keyed clip (clips.gd degrees) as local rotations.
+func _keyed(clip: String, t: float) -> Dictionary:
+	var deg := Clips.pose(clip, t)
+	var out := {"_drop": deg.get("_drop", 0.0)}
+	for bone in deg:
+		if bone != "_drop" and _bone.has(bone):
+			var i: int = _bone[bone]
+			out[bone] = _rest[i] * _turn(i, deg[bone])
+	return out
 
 
 static func _add(p: Dictionary, bone: String, v: Vector3) -> void:
 	p[bone] = p.get(bone, Vector3.ZERO) + v
 
 
-static func _blend(a: Dictionary, b: Dictionary, w: float) -> Dictionary:
-	var out := {}
-	for k in a:
-		out[k] = a[k]
-	for k in b:
-		out[k] = b[k]
-	for k in out:
-		if k == "_drop":
-			out[k] = lerpf(a.get(k, 0.0), b.get(k, 0.0), w)
-		else:
-			out[k] = a.get(k, Vector3.ZERO).lerp(b.get(k, Vector3.ZERO), w)
+func _blend(a: Dictionary, b: Dictionary, w: float) -> Dictionary:
+	var out := {"_drop": lerpf(a.get("_drop", 0.0), b.get("_drop", 0.0), w)}
+	for bone in _profile:
+		if a.has(bone) or b.has(bone):
+			var r: Quaternion = _rest[_bone[bone]]
+			out[bone] = (a.get(bone, r) as Quaternion).slerp(b.get(bone, r), w)
 	return out
 
 
-## Rotate a bone relative to its rest pose by degrees about the model axes at rest:
-## Z first, then Y, then X (see clips.gd).
-func _rot(bone: String, deg: Vector3) -> void:
-	if not _bone.has(bone):
-		return
-	var i: int = _bone[bone]
-	var to_local := skeleton.get_bone_global_rest(i).basis.orthonormalized().inverse()
-	var q: Quaternion = _rest[i]
-	q = q * Quaternion((to_local * Vector3.RIGHT).normalized(), deg_to_rad(deg.x))
-	q = q * Quaternion((to_local * Vector3.UP).normalized(), deg_to_rad(deg.y))
-	q = q * Quaternion((to_local * Vector3.BACK).normalized(), deg_to_rad(deg.z))
-	skeleton.set_bone_pose_rotation(i, q)
+## Degrees about the model axes at rest, Z first, then Y, then X (see clips.gd).
+func _turn(i: int, deg: Vector3) -> Quaternion:
+	var ax: Array = _axes[i]
+	return Quaternion(ax[0], deg_to_rad(deg.x)) * Quaternion(ax[1], deg_to_rad(deg.y)) \
+			* Quaternion(ax[2], deg_to_rad(deg.z))
 
 
 func _blink(delta: float) -> void:

@@ -38,6 +38,7 @@ TRANSFORM_S = 0.6
 BUBBLE_HOLD_S = 6.0
 BUBBLE_AFTER_SPEECH_S = 3.0
 CONFIRM_TIMEOUT_S = 60.0
+GRAB_LOW = 0.5  # grabbed below this fraction of her height (her waist): the "held_low" clip, if the rig has one
 
 
 @dataclass
@@ -107,6 +108,7 @@ class Stage:
         self.press: tuple[float, float, float] | None = None  # x, y, t
         self.grab_offset = (0.0, 0.0)
         self.dragging = False
+        self.grab_low = False  # this drag picked her up below the waist
         self.long_pressed = False
         self.drag_trail: deque[tuple[float, float, float]] = deque(maxlen=8)
         self._last_ground = 0.0
@@ -131,6 +133,8 @@ class Stage:
         rig = self.rigs[form]
         if self.brain.mood == Mood.DANCING and self.music_style == music.EXCITED and "dancing_excited" in rig.moods:
             return rig.moods["dancing_excited"]  # EDM and the like: the energetic dance
+        if self.brain.mood == Mood.HELD and self.grab_low and "held_low" in rig.moods:
+            return rig.moods["held_low"]  # picked up by the legs: carried, not hanging
         return rig.clip(self.brain.mood, self.brain.moment)
 
     @property
@@ -217,14 +221,15 @@ class Stage:
                     ph.y = floor
         hx, hy = self.home
         b.away_from_home = abs(ph.x - hx) > 30 * self.scale or abs(ph.y - hy) > 2
+        rig = self.rigs[self.form]
         if b.mood == Mood.WALKING and not ph.airborne:
             self.facing_left = hx < ph.x
-            if ph.walk_toward(hx, WALK_SPEED, dt) and abs(ph.y - hy) <= 2:
+            if ph.walk_toward(hx, rig.walk_dip_s(WALK_SPEED), dt) and abs(ph.y - hy) <= 2:
                 b.arrived(now)
         elif b.mood == Mood.WANDER and not ph.airborne:
             target = hx + b.wander_px * self.scale
             self.facing_left = target < ph.x
-            if ph.walk_toward(target, WANDER_SPEED, dt):
+            if ph.walk_toward(target, rig.walk_dip_s(WANDER_SPEED), dt):  # one walk clip: one pace
                 b.arrived(now)
 
         # cursor near her (hovering close) -> she reaches for it
@@ -464,6 +469,8 @@ class Stage:
         now_s = time.monotonic()
         if not self.dragging and math.hypot(x - self.press[0], y - self.press[1]) > DRAG_PX:
             self.dragging = True
+            h = self.size[self.form][0]
+            self.grab_low = h > 0 and self.grab_offset[1] < GRAB_LOW * h  # grab point's height above her feet
             self.brain.grab(int(now_s * 1000))
             self.link.send(Touch(t="hold", x=x, y=y))
         if self.dragging:

@@ -200,6 +200,7 @@ class CustomizeDialog(QDialog):
         self.body_button.setEnabled(self.stage.other_body_outfit() is not None)
         tw = self.ch.outfits.get(name)
         self.height.setValue((tw.height_dip if tw and tw.height_dip else None) or (self.base.height_dip if self.base else 320))
+        self.walk_speed.setValue(self._walk_px_s(tw))
         sprite = self.preview.model is not None
         self.wear_mask.setChecked(tw.mask if tw else False)
         self.wear_sword.setChecked(tw.sword if tw else True)
@@ -306,6 +307,13 @@ class CustomizeDialog(QDialog):
         self.height.valueChanged.connect(slider.setValue)
         slider.valueChanged.connect(self.height.setValue)
         self.height.valueChanged.connect(self._height_set)
+        self.walk_speed = QSpinBox()
+        self.walk_speed.setRange(20, 800)
+        self.walk_speed.setSingleStep(10)
+        self.walk_speed.setSuffix(" px/s (at 100 % scaling)")
+        self.walk_speed.setToolTip("How fast she walks home and wanders. Too far from her walk "
+                                   "animation's own stride and her feet slide.")
+        self.walk_speed.valueChanged.connect(self._walk_speed_set)
         w = QWidget()
         f = QFormLayout(w)
         self.wear_mask = QCheckBox("Mask worn on her head")
@@ -318,6 +326,7 @@ class CustomizeDialog(QDialog):
         f.addRow("Outfit", self.outfit_combo)
         f.addRow("Height (feet to head)", self.height)
         f.addRow("", slider)
+        f.addRow("Walking speed", self.walk_speed)
         self.walk_combo = QComboBox()
         self.walk_combo.currentIndexChanged.connect(self._walk_set)
         f.addRow("Drawn outfits", self.wear_sword)
@@ -441,6 +450,19 @@ class CustomizeDialog(QDialog):
     def _height_set(self, v: int) -> None:
         if not self._filling:
             self.ch.tweaks(self.outfit).height_dip = int(v)
+
+    def _walk_px_s(self, tw) -> int:
+        """Her walking speed now: Kryo's, else the rig map's (3D: matched to its walk clip), else the stage's."""
+        from .stage import WALK_SPEED
+        if tw and tw.walk_px_s:
+            return int(tw.walk_px_s)
+        if self.base is None:
+            return int(WALK_SPEED)
+        return round(character.apply_to_map(self.base, tw).walk_dip_s(WALK_SPEED))
+
+    def _walk_speed_set(self, v: int) -> None:
+        if not self._filling:
+            self.ch.tweaks(self.outfit).walk_px_s = int(v)
 
     # --- Behaviour -------------------------------------------------------------------------------
     def _behaviour_tab(self) -> QWidget:

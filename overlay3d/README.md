@@ -54,14 +54,24 @@ X:/Blender/blender.exe -b "D:/Character Design/output/3d/teen/vrm-appearance/v01
   - record the lineage in `D:\Character Design\history\`.
 
 ## Her clips and expressions
-- **Clips:** `clips.gd` holds her body clips, keyed in code for now:
+- **Mixamo motion first:** `clip_sources.cfg` names the Mixamo FBX takes for each slot. They live in `anims/mixamo/`, which is out of git: they're Adobe content, fine to use in this project but not to redistribute as raw files. Kryo's downloads are in `D:\Projects\Chibi-Agent-Project\ChibiAgent\3d\anims\mixamo\`.
+  - **Baking:** `mixamo.gd` retargets each take onto her skeleton and bakes it at load, about 1 s for all of them. It applies each bone's world-space change from the T-pose to her rest, then converts that to her local rotations. Only the hips' height carries over.
+  - **Variety:** a slot with several takes plays a random one each time it starts or loops, which keeps talking and idling varied.
+  - **Fallback:** a slot without takes plays its keyed clip.
+  - **Adding a take:** download it from Mixamo (FBX, Without Skin, 30 fps, In Place for walks), copy it to `anims/mixamo/`, and list it under a slot.
+  - **Comparing:** `--source=keyed` turns Mixamo off.
+- **Keyed clips:** `clips.gd` holds the fallback clips, keyed in code:
   - moods: Idle, Talk, Think, Analyse, Notice, Happy, Surprised, Pout, Upset, Held, Fall, Land, Dizzy, Walk, Sleep, Sit, DanceVibe, DanceExcited;
   - idle moments: LookAround, Stretch, Wave.
 - **Pose format:** degrees about the model axes per bone, applied Z, then Y, then X. Right-side bones mirror the left ones. `_drop` lowers her hips.
-- **Blending:** `raphael.gd` crossfades between clips over 0.25 s. On top it layers breath, blinks, gaze, the overlay's params, and an expression mixer that reads godot-vrm's per-expression blend-shape tracks, so a mood, a blink and a mouth shape can mix.
+- **Blending:** `raphael.gd` crossfades between clips over 0.25 s (quaternion slerp). It sets only the humanoid bones; the spring-bone hair and scarf stay free. On top it layers breath, blinks, gaze, the overlay's params, and an expression mixer that reads godot-vrm's per-expression blend-shape tracks, so a mood, a blink and a mouth shape can mix.
 - **Mood map:** `overlay/rigs/raphael_3d.toml` maps every brain mood and idle moment to a clip and a VRM expression (neutral, happy, angry, sad, relaxed, surprised). `height_dip` sets her size, which Customize can override.
-- **Better clips later:** a Mixamo or VRMA clip can replace a keyed one under the same name.
 - **Facing:** she turns 70° toward where she walks, and faces front again at rest.
+- **Walking pace:** `walk_speed` in `raphael_3d.toml` is in her heights per second, so it scales with her size. It's 0.5, 260 px/s at 520 px, which Kryo picked; the Mixamo walk's own stride would be 0.54.
+  - **In the UI:** Customize → Look → Walking speed sets px/s per outfit (`walk_px_s` in `character.toml`).
+  - **2D rigs:** they keep the stage's 90 px/s walk and 60 px/s wander unless set there.
+- **Smooth movement:** each frame carries her velocity. Godot draws on its own vsync, out of step with the overlay's frames, so it carries her on at that velocity (up to 50 ms) instead of stepping unevenly.
+- **Being held:** picked up at the waist or above, she hangs (`Held`, Mixamo "Hanging Idle"). Picked up below the waist, she's carried flat (`Carried`, "Being Carried"). The overlay decides this when the drag starts (`stage.py` `GRAB_LOW`, half her height) through the rig map's `held_low` entry; rigs without one, like the 2D art, always use `held`.
 
 ## Run it on its own (preview)
 ```bash
@@ -89,7 +99,9 @@ Godot_v4.7.2-stable_win64.exe --path overlay3d -- --clip=Wave --seconds=2 --scre
   - breath, blinks, gaze and params;
   - the expression mixer;
   - the scarf alpha fix.
-- **`clips.gd`:** the keyed clips.
+- **`clips.gd`:** the keyed clips, used where a slot has no Mixamo take.
+- **`mixamo.gd`:** the Mixamo retarget and bake.
+- **`clip_sources.cfg`:** which Mixamo takes play each slot.
 - **`addons/`:** godot-vrm and its MToon shader, vendored (`addons/VENDORED.md`).
 - **`tools/export_vrm.py`:** the Blender → VRM export and its check.
 
@@ -102,7 +114,8 @@ The scarf's Blender shader is unlit emission, which exports with no alpha. `raph
 - **3D body in the overlay** (Raphael v02, 2026-10-25):
   - CPU, steady: overlay about 17% of one core, Godot 33–37%.
   - CPU during a throw and landing: overlay about 27%.
-  - One earlier run read 100% for the overlay; it didn't recur in four later runs.
+  - Readings near 100% for the overlay come from running a second (test) overlay beside Kryo's: the 2D body shows the same there. That overlay holds 60 fps, but its main thread busy-waits about 15 ms per frame in the GL swap, a graphics-driver vsync wait. Measure the cost with only one overlay running.
+  - Mixamo takes bake in about 1 s at renderer start; at runtime they're interpolated, with no extra cost seen.
   - Memory: overlay about 207 MB, Godot about 204 MB.
   - GPU memory: overlay 126 MiB, Godot 267 MiB, so **393 MiB, over the ~300 MiB overlay budget**.
   - Renderer start: about 3 s.

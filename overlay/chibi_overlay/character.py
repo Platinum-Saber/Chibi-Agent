@@ -9,8 +9,9 @@ layers over the repo's rig maps and defaults:
     gaze = true
     sleep_after_s = 60.0
 
-    [outfits.casual_coat]             # per outfit: size and mood -> clip overrides
+    [outfits.casual_coat]             # per outfit: size, walking speed and mood -> clip overrides
     height_dip = 320
+    walk_px_s = 90                    # px/s at 100 % scaling (walking home and wandering)
     [outfits.casual_coat.moods]
     walking = { motion = "Dance", expression = "happy" }
 
@@ -73,6 +74,7 @@ class OutfitTweaks:
     walk: str = ""      # drawn outfits: the walk set (a folder with walk.json); "" = the newest
     moods: dict[str, dict] = field(default_factory=dict)    # mood -> {motion, expression}
     moments: dict[str, dict] = field(default_factory=dict)  # moment -> {motion, expression}
+    walk_px_s: int | None = None  # walking speed in DIPs/s; None: the rig map's (or the stage default)
 
 
 @dataclass
@@ -96,9 +98,11 @@ def apply_to_map(rig: RigMap, tw: OutfitTweaks | None) -> RigMap:
     """The outfit's rig map with Kryo's size and clip overrides on top."""
     if tw is None:
         return rig
+    height = int(tw.height_dip) if tw.height_dip else rig.height_dip
     return replace(
         rig,
-        height_dip=int(tw.height_dip) if tw.height_dip else rig.height_dip,
+        height_dip=height,
+        walk_speed=tw.walk_px_s / height if tw.walk_px_s else rig.walk_speed,
         moods={**rig.moods, **{k: _clip(v) for k, v in tw.moods.items()}},
         moments={**rig.moments, **{k: _clip(v) for k, v in tw.moments.items()}},
     )
@@ -130,6 +134,10 @@ def _clips(d) -> dict[str, dict]:
             for k, v in d.items() if isinstance(v, dict)}
 
 
+def _positive_int(v) -> int | None:
+    return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
+
+
 def parse(d: dict) -> Character:
     outfits = {}
     for name, t in (d.get("outfits") or {}).items():
@@ -138,7 +146,8 @@ def parse(d: dict) -> Character:
             outfits[name] = OutfitTweaks(int(h) if isinstance(h, (int, float)) and h > 0 else None,
                                          bool(t.get("mask", False)), bool(t.get("sword", True)),
                                          str(t.get("walk", "")),
-                                         _clips(t.get("moods")), _clips(t.get("moments")))
+                                         _clips(t.get("moods")), _clips(t.get("moments")),
+                                         _positive_int(t.get("walk_px_s")))
     seqs = {}
     for name, t in (d.get("sequences") or {}).items():
         if isinstance(t, dict) and isinstance(t.get("frames"), list):
@@ -213,6 +222,8 @@ def dumps(ch: Character) -> str:
         out += ["", f"[outfits.{_key(name)}]"]
         if tw.height_dip:
             out.append(f"height_dip = {int(tw.height_dip)}")
+        if tw.walk_px_s:
+            out.append(f"walk_px_s = {int(tw.walk_px_s)}")
         out += [f"mask = {_value(tw.mask)}", f"sword = {_value(tw.sword)}"]
         if tw.walk:
             out.append(f"walk = {_value(tw.walk)}")

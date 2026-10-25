@@ -6,10 +6,12 @@ config_version=5
 [application]
 
 config/name="Raphael 3D"
-config/description="Full-size 3D Raphael on the desktop (experiment; the Live2D overlay stays the main body)."
+config/description="Raphael's full-size 3D body: a renderer driven by the Python overlay (overlay/chibi_overlay/godot3d.py)."
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 run/max_fps=60
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0, 0, 0, 0)
 
 [display]
 
@@ -19,6 +21,9 @@ window/size/borderless=true
 window/size/always_on_top=true
 window/size/transparent=true
 window/size/no_focus=true
+; off-screen until placed: the overlay moves the renderer; the preview places itself
+window/size/initial_position_type=0
+window/size/initial_position=Vector2i(-6000, -6000)
 window/per_pixel_transparency/allowed=true
 
 [editor_plugins]

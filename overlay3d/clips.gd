@@ -19,7 +19,7 @@ const FINGERS := ["Index", "Middle", "Ring", "Little"]
 const LOOPING := {
 	"Idle": true, "Talk": true, "Think": true, "Analyse": true, "Notice": true, "Happy": true,
 	"Surprised": false, "Pout": true, "Upset": true, "Held": true, "Fall": true, "Land": false,
-	"Dizzy": true, "Walk": true, "Sleep": true, "DanceVibe": true, "DanceExcited": true,
+	"Carried": false, "Dizzy": true, "Walk": true, "Sleep": true, "DanceVibe": true, "DanceExcited": true,
 	"LookAround": true, "Stretch": false, "Sit": true, "Wave": true,
 }
 
@@ -39,7 +39,7 @@ static func pose(name: String, t: float) -> Dictionary:
 		"Surprised": _surprised(p, t)
 		"Pout": _pout(p, t)
 		"Upset": _upset(p, t)
-		"Held": _held(p, t)
+		"Held", "Carried": _held(p, t)  # Carried: picked up by the legs (Mixamo "Being Carried")
 		"Fall": _fall(p, t)
 		"Land": _land(p, t)
 		"Dizzy": _dizzy(p, t)

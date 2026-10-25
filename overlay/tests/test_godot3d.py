@@ -280,3 +280,74 @@ def test_params_last_one_frame(fake_bridge):
     m.Update()
     assert fake_bridge.sent[0]["params"] == {"ParamEyeLOpen": 0.0}
     assert fake_bridge.sent[1]["params"] == {}
+
+
+def _grab_at(st, frac):
+    """Press at `frac` of her height above her feet, then drag."""
+    x, y = st.feet
+    h = st.size[st.form][0]
+    st.press_at(x, y - frac * h)
+    st.move_to(x + 20, y - frac * h - 20)
+
+
+def test_held_from_the_torso_up_hangs(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.75)
+    assert st.brain.mood == Mood.HELD and not st.grab_low
+    assert st.clip("chibi").motion == "Held"
+
+
+def test_held_below_the_waist_is_carried(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.3)
+    assert st.brain.mood == Mood.HELD and st.grab_low
+    assert st.clip("chibi").motion == "Carried"
+
+
+def test_a_rig_without_held_low_just_hangs(st):
+    _grab_at(st, 0.3)  # the 2D art has a single held clip
+    assert st.grab_low and st.clip("chibi").motion == "Held"
+
+
+def test_3d_walk_pace_matches_the_walk_clip(st):
+    """She walks at the Mixamo walk's own pace (in her heights per second), not the chibi's 90 px/s."""
+    rig = motion.load(PKG / "rigs" / "raphael_3d.toml")
+    assert rig.walk_dip_s(90.0) == pytest.approx(0.5 * rig.height_dip)
+    sprites = motion.load(PKG / "rigs" / "raphael_sprites.toml")
+    assert sprites.walk_dip_s(90.0) == 90.0  # rigs without walk_speed keep the stage default
+    st.switch_body()
+    _run_puff(st)
+    st.physics.place(st.home[0] - 400, st.home[1])
+    st.brain.mood = Mood.WALKING
+    x0 = st.physics.x
+    st._t -= 0.05  # one 50 ms frame
+    st.tick((0, 0))
+    assert st.physics.x - x0 == pytest.approx(0.5 * 520 * 0.05, rel=0.05)
+
+
+def test_walk_speed_tweak_is_px_per_second_whatever_her_size():
+    from chibi_overlay import character
+    rig = motion.load(PKG / "rigs" / "raphael_3d.toml")
+    assert rig.walk_dip_s(90.0) == pytest.approx(260)  # the default: 0.5 heights/s at 520
+    tw = character.OutfitTweaks(height_dip=400, walk_px_s=200)
+    assert character.apply_to_map(rig, tw).walk_dip_s(90.0) == pytest.approx(200)
+    ch = character.Character(outfits={"teen_3d": tw})
+    back = character.parse(__import__("tomllib").loads(character.dumps(ch)))
+    assert back.outfits["teen_3d"].walk_px_s == 200
+
+
+def test_frames_carry_her_velocity(fake_bridge, monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr(godot3d.time, "monotonic", lambda: clock[0])
+    fb = (2000, 1000)
+    pup = _puppet(fb, dpr=1.0)
+    pup.configure(pup.model.geom(), fb)
+    pup.place(500, 1000)
+    pup.model.Update()
+    clock[0] += 1 / 60
+    pup.place(504, 1000)  # 240 px/s
+    pup.model.Update()
+    assert fake_bridge.sent[0]["vel"] == [0.0, 0.0]
+    assert fake_bridge.sent[1]["vel"][0] == pytest.approx(240, abs=1)

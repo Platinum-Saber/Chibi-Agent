@@ -25,6 +25,11 @@ class RigMap:
     height_dip: int
     moods: dict[str, Clip]
     moments: dict[str, Clip]
+    walk_speed: float = 0.0  # her heights per second while walking, to match the walk clip; 0: the stage default
+
+    def walk_dip_s(self, default: float) -> float:
+        """Walking speed in DIPs per second: the rig's own (scales with her size), else `default`."""
+        return self.walk_speed * self.height_dip if self.walk_speed > 0 else default
 
     def clip(self, mood: Mood, moment: Moment | None = None) -> Clip:
         if mood == Mood.MOMENT and moment is not None and moment.value in self.moments:
@@ -38,7 +43,8 @@ def _clips(table: dict) -> dict[str, Clip]:
 
 def load(path: str | Path) -> RigMap:
     d = tomllib.loads(Path(path).read_text(encoding="utf-8"))
-    return RigMap(d.get("height_dip", 300), _clips(d.get("moods", {})), _clips(d.get("moments", {})))
+    return RigMap(d.get("height_dip", 300), _clips(d.get("moods", {})), _clips(d.get("moments", {})),
+                  float(d.get("walk_speed", 0.0)))
 
 
 def looping_groups(model_json: str | Path) -> frozenset[str]:
