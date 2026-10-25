@@ -52,6 +52,7 @@ PERFORM = {
     "sleep": (Mood.SLEEPING, None, None),  # until a poke, a drag or the agent wakes her
 }
 GRAB_LOW = 0.5  # grabbed below this fraction of her height (her waist): the "held_low" clip, if the rig has one
+FLAT_IMPACT_S = 1.6  # after a flat fall: lying on the floor this long ("hard_landing"), then "hard_landing_up"
 
 
 @dataclass
@@ -122,6 +123,7 @@ class Stage:
         self.grab_offset = (0.0, 0.0)
         self.dragging = False
         self.grab_low = False  # this drag picked her up below the waist
+        self.fall_flat = False  # dropped while carried flat: falls lying down, lands hard
         self.yaw = 0.0  # degrees she faces at rest (3D body), set by middle-dragging her; + turns her left
         self._rotate_from: tuple[float, float] | None = None  # cursor x, yaw when the middle drag began
         self.long_pressed = False
@@ -152,6 +154,11 @@ class Stage:
             return rig.moods["dancing_excited"]  # EDM and the like, or picked on the wheel: the real dance
         if self.brain.mood == Mood.HELD and self.grab_low and "held_low" in rig.moods:
             return rig.moods["held_low"]  # picked up by the legs: carried, not hanging
+        if self.brain.mood == Mood.FALLING and self.fall_flat and "falling_flat" in rig.moods:
+            return rig.moods["falling_flat"]  # still lying flat in the air, not flung upright
+        if self.brain.mood == Mood.HARD_LANDING and "hard_landing_up" in rig.moods \
+                and time.monotonic() * 1000 - self.brain.since >= FLAT_IMPACT_S * 1000:
+            return rig.moods["hard_landing_up"]  # flat on the floor long enough: getting up
         return rig.clip(self.brain.mood, self.brain.moment)
 
     @property
@@ -231,7 +238,8 @@ class Stage:
         if not self.dragging:
             impact = ph.step(dt)
             if impact is not None:
-                b.land(impact, now)
+                b.land(impact, now, flat=self.fall_flat and "hard_landing" in self.rigs[self.form].moods)
+                self.fall_flat = False
             if not ph.airborne:
                 floor = self.ground(ph.x)
                 if floor > ph.y + 1:
@@ -518,6 +526,7 @@ class Stage:
         self.last_touch = now_s
         if self.dragging:
             vx, vy = self._drag_v()
+            self.fall_flat = self.grab_low and "held_low" in self.rigs[self.form].moods
             self.brain.release(now)
             self.physics.throw_at(vx, vy)
             self.link.send(Touch(t="drop", x=x, y=y, speed=math.hypot(vx, vy) / self.scale))

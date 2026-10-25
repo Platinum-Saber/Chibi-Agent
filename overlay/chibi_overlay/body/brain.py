@@ -24,6 +24,8 @@ class Mood(Enum):
     HELD = "held"
     FALLING = "falling"
     SOFT_LANDING = "soft_landing"
+    HARD_LANDING = "hard_landing"
+    """Dropped while carried flat: she lands flat on her front and gets up (``land(flat=True)``)."""
     DIZZY = "dizzy"
     WALKING = "walking"
     MOMENT = "moment"
@@ -64,6 +66,7 @@ POUT_MS = 2_200
 CRY_MS = 3_000
 HAPPY_MS = 2_000
 SOFT_LANDING_MS = 600
+HARD_LANDING_MS = 2_700  # 3D body: flat impact and a moment lying (1.6 s), then getting up (1.1 s)
 DIZZY_MS = 2_500
 
 # Impact speeds in px/s at 96 dpi (physics divides out its scale). On the phone
@@ -91,7 +94,7 @@ CURSOR_MOODS = frozenset({
 AGENT_MOODS = frozenset({Mood.IDLE, Mood.THINKING, Mood.TALKING, Mood.HAPPY, Mood.WORKING, Mood.ALERT})
 """Moods the agent may request; IDLE ends an earlier request."""
 
-REFUSE_REQUESTS = frozenset({Mood.HELD, Mood.FALLING, Mood.DIZZY})
+REFUSE_REQUESTS = frozenset({Mood.HELD, Mood.FALLING, Mood.DIZZY, Mood.HARD_LANDING})
 """Agent requests wait until she has landed (docs/character.md)."""
 
 _MOMENT_MS = {
@@ -254,9 +257,13 @@ class Brain:
         if self.mood == Mood.HELD:
             self._set(Mood.FALLING, now, None)
 
-    def land(self, impact: float, now: int) -> None:
-        """She hit the floor (first contact of a fall) at peak speed ``impact`` px/s at 96 dpi."""
-        if impact >= CRY_IMPACT:
+    def land(self, impact: float, now: int, flat: bool = False) -> None:
+        """She hit the floor (first contact of a fall) at peak speed ``impact`` px/s at 96 dpi.
+        ``flat``: she fell lying flat (dropped while carried); the hard landing gets her up
+        whatever the speed, so no dizziness or tears on top."""
+        if flat:
+            self._set(Mood.HARD_LANDING, now, HARD_LANDING_MS)
+        elif impact >= CRY_IMPACT:
             self._set(Mood.CRYING, now, CRY_MS)
         elif impact >= DIZZY_IMPACT:
             self._set(Mood.DIZZY, now, DIZZY_MS)

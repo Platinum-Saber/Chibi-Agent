@@ -313,6 +313,51 @@ def test_held_below_the_waist_is_carried(st):
     assert st.clip("chibi").motion == "Carried"
 
 
+def _land_next_tick(st, impact=900.0):
+    """The next tick's physics step reports first contact with the floor."""
+    st.physics.step = lambda dt: impact
+    st.tick(st.feet)
+
+
+def test_dropped_while_carried_falls_flat_then_lands_hard(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.3)
+    st.release_at(*st.feet)
+    assert st.brain.mood == Mood.FALLING
+    assert st.clip("chibi").motion == "FallFlat"  # face down in the air, no upright Fall
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.HARD_LANDING and not st.fall_flat
+    assert st.clip("chibi").motion == "FlatImpact"
+    st.brain.since -= int(stage_mod.FLAT_IMPACT_S * 1000)
+    assert st.clip("chibi").motion == "GetUp"
+
+
+def test_flat_fall_clips_exist():
+    rig = motion.load(PKG / "rigs" / "raphael_3d.toml")
+    clips = set(re.findall(r'"(\w+)": (?:true|false)', CLIPS_GD.read_text(encoding="utf-8")))
+    for k in ("falling_flat", "hard_landing", "hard_landing_up"):
+        assert rig.moods[k].motion in clips, k
+
+
+def test_dropped_from_the_torso_up_falls_and_lands_as_before(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.75)
+    st.release_at(*st.feet)
+    assert st.clip("chibi").motion == "Fall"
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.DIZZY
+
+
+def test_a_carried_drop_on_the_2d_art_lands_as_before(st):
+    _grab_at(st, 0.3)  # the 2D art has no carried clip, so no flat fall
+    st.release_at(*st.feet)
+    assert not st.fall_flat
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.DIZZY
+
+
 def test_a_rig_without_held_low_just_hangs(st):
     _grab_at(st, 0.3)  # the 2D art has a single held clip
     assert st.grab_low and st.clip("chibi").motion == "Held"

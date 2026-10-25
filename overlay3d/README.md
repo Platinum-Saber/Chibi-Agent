@@ -75,6 +75,7 @@ X:/Blender/blender.exe -b "D:/Character Design/output/3d/teen/vrm-appearance/v01
   - **2D rigs:** they keep the stage's 90 px/s walk and 60 px/s wander unless set there.
 - **Smooth movement:** each frame carries her velocity. Godot draws on its own vsync, out of step with the overlay's frames, so it carries her on at that velocity (up to 50 ms) instead of stepping unevenly.
 - **Being held:** picked up at the waist or above, she hangs (`Held`, Mixamo "Hanging Idle"). Picked up below the waist, she's carried flat (`Carried`, "Being Carried"). The overlay decides this when the drag starts (`stage.py` `GRAB_LOW`, half her height) through the rig map's `held_low` entry; rigs without one, like the 2D art, always use `held`.
+  - **Dropped while carried:** she falls face down (`falling_flat` → `FallFlat`, Mixamo "Falling-facedown"), hits the floor flat (`hard_landing` → `FlatImpact`, "Falling Flat Impact" from touchdown) and after `stage.py` `FLAT_IMPACT_S` (1.6 s) gets up (`hard_landing_up` → `GetUp`, the end of "Hard Landing", from all fours). The brain's `HARD_LANDING` lasts 2.7 s whatever the speed: no dizziness or tears. `stage.py` `fall_flat` remembers the carried drop until she lands.
 
 ## Run it on its own (preview)
 ```bash

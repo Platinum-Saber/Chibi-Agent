@@ -56,6 +56,16 @@ def test_grab_release_fall_and_landing_reactions(brain):
     assert brain.mood == Mood.CRYING
 
 
+def test_a_flat_fall_lands_hard_whatever_the_speed_and_refuses_requests(brain):
+    brain.grab(0)
+    brain.release(100)
+    brain.land(b.CRY_IMPACT, 400, flat=True)
+    assert brain.mood == Mood.HARD_LANDING
+    assert not brain.request_mood(Mood.THINKING, 500)
+    brain.tick(400 + b.HARD_LANDING_MS)
+    assert brain.mood == Mood.IDLE
+
+
 def test_walks_home_after_a_reaction_when_moved(brain):
     brain.land(100.0, 0)
     brain.away_from_home = True

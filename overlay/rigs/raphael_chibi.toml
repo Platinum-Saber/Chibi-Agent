@@ -14,6 +14,7 @@ happy        = { motion = "Happy", index = 0, expression = "happy" }
 held         = { motion = "Held", index = 0, expression = "surprised" }
 falling      = { motion = "Fall", index = 0, expression = "surprised" }
 soft_landing = { motion = "Land", index = 0, expression = "happy" }
+hard_landing = { motion = "Land", index = 0, expression = "happy" }  # never reached: only the 3D body falls flat
 dizzy        = { motion = "Dizzy", index = 0, expression = "upset" }
 walking      = { motion = "Walk", index = 0, expression = "neutral" }
 wander       = { motion = "Walk", index = 0, expression = "neutral" }
