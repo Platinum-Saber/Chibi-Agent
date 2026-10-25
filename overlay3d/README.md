@@ -67,7 +67,8 @@ X:/Blender/blender.exe -b "D:/Character Design/output/3d/teen/vrm-appearance/v01
 - **Pose format:** degrees about the model axes per bone, applied Z, then Y, then X. Right-side bones mirror the left ones. `_drop` lowers her hips.
 - **Blending:** `raphael.gd` crossfades between clips over 0.25 s (quaternion slerp). It sets only the humanoid bones; the spring-bone hair and scarf stay free. On top it layers breath, blinks, gaze, the overlay's params, and an expression mixer that reads godot-vrm's per-expression blend-shape tracks, so a mood, a blink and a mouth shape can mix.
 - **Mood map:** `overlay/rigs/raphael_3d.toml` maps every brain mood and idle moment to a clip and a VRM expression (neutral, happy, angry, sad, relaxed, surprised). `height_dip` sets her size, which Customize can override.
-- **Facing:** she turns 70° toward where she walks, and faces front again at rest.
+- **Facing:** she turns 70° toward where she walks, and at rest faces the way Kryo last turned her.
+- **Turning her:** hold the middle mouse button on her and drag left or right: 0.5° per px (`stage.py` `ROTATE_DEG_PER_PX`), drag right to turn her toward the screen's right. The turn lasts until restart. The 2D art ignores it.
 - **Walking pace:** `walk_speed` in `raphael_3d.toml` is in her heights per second, so it scales with her size. It's 0.5, 260 px/s at 520 px, which Kryo picked; the Mixamo walk's own stride would be 0.54.
   - **In the UI:** Customize → Look → Walking speed sets px/s per outfit (`walk_px_s` in `character.toml`).
   - **2D rigs:** they keep the stage's 90 px/s walk and 60 px/s wander unless set there.

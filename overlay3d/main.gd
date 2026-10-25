@@ -244,9 +244,9 @@ func _apply(f: Dictionary, delta: float) -> void:
 	else:
 		_shown = _shown.lerp(target, 1.0 - exp(-delta * SMOOTH))
 	_place(_shown, float(f.get("h", PREVIEW_PX)), view)
-	# she turns while walking (2D flips; she faces front again at rest)
-	var goal := (-TURN if f.get("facing_left", false) else TURN) if f.get("walking", false) else 0.0
-	_yaw = lerpf(_yaw, goal, 1.0 - exp(-delta * 8.0))
+	# walking she turns toward where she goes; at rest she faces where Kryo turned her (middle-drag)
+	var goal: float = (-TURN if f.get("facing_left", false) else TURN) if f.get("walking", false) else f.get("yaw", 0.0)
+	_yaw = rad_to_deg(lerp_angle(deg_to_rad(_yaw), deg_to_rad(goal), 1.0 - exp(-delta * 12.0)))
 	model.rotation_degrees.y = _yaw
 	body.play(f.get("motion", "Idle"))
 	body.hold(f.get("expression", ""))

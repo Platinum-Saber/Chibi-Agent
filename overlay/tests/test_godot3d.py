@@ -27,6 +27,8 @@ class FakeBridge:
         self.ready = ready
         self.height_m, self.half_width_m = 1.47, 0.294
         self.hull = []
+        self.own = []
+        self.hwnd = 0
         self.sent = []
         self.released = 0
         self.shown = []
@@ -383,3 +385,22 @@ def test_frames_say_when_the_agent_is_listening(fake_bridge):
     m = godot3d.GodotModel("X:/nowhere", widget=W(), bridge=fake_bridge)
     assert m.frame()["listening"] is True
     assert _puppet().model.frame()["listening"] is False  # no window/stage: never listening
+
+
+def test_middle_drag_turns_her_and_frames_carry_it(st, fake_bridge):
+    st.rotate_press(1000)
+    assert st.rotating
+    st.rotate_move(1100)  # 100 px right
+    assert st.yaw == pytest.approx(100 * stage_mod.ROTATE_DEG_PER_PX)
+    st.rotate_move(1000 + 500)  # wraps into -180..180
+    assert st.yaw == pytest.approx(-110)  # 250 degrees, wrapped into -180..180
+    st.rotate_release()
+    assert not st.rotating
+    st.rotate_move(0)  # no drag: no change
+    assert st.yaw == pytest.approx(-110)
+
+    class W:
+        hwnd = 0
+        stage = st
+    m = godot3d.GodotModel("X:/nowhere", widget=W(), bridge=fake_bridge)
+    assert m.frame()["yaw"] == pytest.approx(-110)

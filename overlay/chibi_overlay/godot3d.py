@@ -380,6 +380,7 @@ class GodotModel:
                 "params": {k: round(v, 3) for k, v in self.params.items()},
                 "gaze": [round(self.gaze[0], 1), round(self.gaze[1], 1)] if self.gaze else None,
                 "listening": bool(getattr(getattr(self.widget, "stage", None), "listening", False)),  # headset
+                "yaw": round(float(getattr(getattr(self.widget, "stage", None), "yaw", 0.0)), 1),  # middle-drag turn
                 "visible": True}
 
     def _sync_window(self) -> None:

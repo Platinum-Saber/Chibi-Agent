@@ -78,7 +78,7 @@ class MonitorWindow(QOpenGLWidget):
 
     def _poll_cursor(self) -> None:
         st = self.stage
-        busy = st.press is not None or st.dragging
+        busy = st.press is not None or st.dragging or st.rotating
         on = not ((self.cursor_here and st.cursor_on_her) or busy)
         if on != self.transparent:
             win32.set_click_through(self.hwnd, on)
@@ -252,10 +252,16 @@ class MonitorWindow(QOpenGLWidget):
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.LeftButton:
             self.stage.press_at(*win32.cursor_pos())
+        elif e.button() == Qt.MouseButton.MiddleButton and self.stage.hit_overlay(*win32.cursor_pos()) is None:
+            self.stage.rotate_press(win32.cursor_pos()[0])  # middle-drag on her: turn her
 
     def mouseMoveEvent(self, e) -> None:
-        self.stage.move_to(*win32.cursor_pos())
+        x, y = win32.cursor_pos()
+        self.stage.move_to(x, y)
+        self.stage.rotate_move(x)
 
     def mouseReleaseEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.LeftButton:
             self.stage.release_at(*win32.cursor_pos())
+        elif e.button() == Qt.MouseButton.MiddleButton:
+            self.stage.rotate_release()

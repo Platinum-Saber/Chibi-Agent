@@ -38,6 +38,7 @@ TRANSFORM_S = 0.6
 BUBBLE_HOLD_S = 6.0
 BUBBLE_AFTER_SPEECH_S = 3.0
 CONFIRM_TIMEOUT_S = 60.0
+ROTATE_DEG_PER_PX = 0.5  # middle-drag on her: degrees she turns per px of horizontal drag
 GRAB_LOW = 0.5  # grabbed below this fraction of her height (her waist): the "held_low" clip, if the rig has one
 
 
@@ -109,6 +110,8 @@ class Stage:
         self.grab_offset = (0.0, 0.0)
         self.dragging = False
         self.grab_low = False  # this drag picked her up below the waist
+        self.yaw = 0.0  # degrees she faces at rest (3D body), set by middle-dragging her; + turns her left
+        self._rotate_from: tuple[float, float] | None = None  # cursor x, yaw when the middle drag began
         self.long_pressed = False
         self.drag_trail: deque[tuple[float, float, float]] = deque(maxlen=8)
         self._last_ground = 0.0
@@ -496,6 +499,24 @@ class Stage:
             self.brain.poke(now)
             self.link.send(Touch(t="poke", x=x, y=y))
         self.press, self.dragging = None, False
+
+    # --- middle-drag: turn her (the 3D body; the 2D art ignores it) ---------------------------
+    @property
+    def rotating(self) -> bool:
+        return self._rotate_from is not None
+
+    def rotate_press(self, x: float) -> None:
+        self._rotate_from = (x, self.yaw)
+
+    def rotate_move(self, x: float) -> None:
+        if self._rotate_from is not None:
+            x0, yaw0 = self._rotate_from
+            # drag right: she turns toward her left (the screen's right), like spinning a figure
+            self.yaw = (yaw0 + (x - x0) * ROTATE_DEG_PER_PX + 180.0) % 360.0 - 180.0
+            self.last_touch = time.monotonic()
+
+    def rotate_release(self) -> None:
+        self._rotate_from = None
 
     def _drag_v(self) -> tuple[float, float]:
         tr = [p for p in self.drag_trail if time.monotonic() - p[2] < 0.1]
