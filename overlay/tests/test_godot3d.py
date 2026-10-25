@@ -333,10 +333,34 @@ def test_dropped_while_carried_falls_flat_then_lands_hard(st):
     assert st.clip("chibi").motion == "GetUp"
 
 
-def test_flat_fall_clips_exist():
+def _mood(st, mood):
+    st.brain.request_mood(mood, int(time.monotonic() * 1000))
+    st.tick(st.feet)
+
+
+def test_an_answer_points_then_talks(st):
+    st.switch_body()
+    _run_puff(st)
+    _mood(st, Mood.THINKING)
+    _mood(st, Mood.TALKING)
+    assert st.clip("chibi").motion == "AnswerPoint"
+    st.answer_since -= stage_mod.ANSWER_POINT_S + 0.01  # margin: a large monotonic() rounds
+    assert st.clip("chibi").motion == "Answer"
+    _mood(st, Mood.IDLE)
+    assert st.answer_since is None
+
+
+def test_talking_without_thinking_first_keeps_the_talk_takes(st):
+    st.switch_body()
+    _run_puff(st)
+    _mood(st, Mood.TALKING)  # a briefing or an announcement
+    assert st.answer_since is None and st.clip("chibi").motion == "Talk"
+
+
+def test_flat_fall_and_answer_clips_exist():
     rig = motion.load(PKG / "rigs" / "raphael_3d.toml")
     clips = set(re.findall(r'"(\w+)": (?:true|false)', CLIPS_GD.read_text(encoding="utf-8")))
-    for k in ("falling_flat", "hard_landing", "hard_landing_up"):
+    for k in ("falling_flat", "hard_landing", "hard_landing_up", "answer_point", "answer"):
         assert rig.moods[k].motion in clips, k
 
 

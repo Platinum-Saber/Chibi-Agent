@@ -53,6 +53,7 @@ PERFORM = {
 }
 GRAB_LOW = 0.5  # grabbed below this fraction of her height (her waist): the "held_low" clip, if the rig has one
 FLAT_IMPACT_S = 1.6  # after a flat fall: lying on the floor this long ("hard_landing"), then "hard_landing_up"
+ANSWER_POINT_S = 2.7  # an answer opens with "answer_point" (Mixamo "Pointing", 2.77 s), then "answer"
 
 
 @dataclass
@@ -124,6 +125,8 @@ class Stage:
         self.dragging = False
         self.grab_low = False  # this drag picked her up below the waist
         self.fall_flat = False  # dropped while carried flat: falls lying down, lands hard
+        self.answer_since: float | None = None  # monotonic s when talking straight after thinking began
+        self._prev_mood = Mood.IDLE
         self.yaw = 0.0  # degrees she faces at rest (3D body), set by middle-dragging her; + turns her left
         self._rotate_from: tuple[float, float] | None = None  # cursor x, yaw when the middle drag began
         self.long_pressed = False
@@ -159,6 +162,10 @@ class Stage:
         if self.brain.mood == Mood.HARD_LANDING and "hard_landing_up" in rig.moods \
                 and time.monotonic() * 1000 - self.brain.since >= FLAT_IMPACT_S * 1000:
             return rig.moods["hard_landing_up"]  # flat on the floor long enough: getting up
+        if self.brain.mood == Mood.TALKING and self.answer_since is not None:
+            key = "answer_point" if time.monotonic() - self.answer_since < ANSWER_POINT_S else "answer"
+            if key in rig.moods:
+                return rig.moods[key]  # answering a question: point first, then talk
         return rig.clip(self.brain.mood, self.brain.moment)
 
     @property
@@ -273,6 +280,11 @@ class Stage:
                 b.cursor_gone(now)
 
         b.tick(now, quiet_for_ms=int((now_s - self.last_touch) * 1000), music=self.media.playing)
+        if b.mood == Mood.TALKING and self._prev_mood == Mood.THINKING:
+            self.answer_since = now_s  # an answer: it opens with "answer_point", then "answer"
+        elif b.mood != Mood.TALKING:
+            self.answer_since = None
+        self._prev_mood = b.mood
         # the thinking core above her: while she thinks, and while she speaks (it follows her voice)
         self.core.update(dt, thinking=b.mood == Mood.THINKING,
                          speaking=b.mood == Mood.TALKING or self.lip > 0.03, level=min(1.0, self.lip * 1.6))

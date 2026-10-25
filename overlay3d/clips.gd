@@ -17,7 +17,7 @@ const CURL := {"Proximal": 18.0, "Intermediate": 28.0, "Distal": 18.0}
 const FINGERS := ["Index", "Middle", "Ring", "Little"]
 
 const LOOPING := {
-	"Idle": true, "Talk": true, "Think": true, "Analyse": true, "Notice": true, "Happy": true,
+	"Idle": true, "Talk": true, "AnswerPoint": false, "Answer": true, "Think": true, "Analyse": true, "Notice": true, "Happy": true,
 	"Surprised": false, "Pout": true, "Upset": true, "Held": true, "Fall": true, "Land": false,
 	"FallFlat": true, "FlatImpact": false, "GetUp": false, "Carried": false, "Dizzy": true, "Walk": true, "Sleep": true, "DanceVibe": true, "DanceExcited": true,
 	"LookAround": true, "Stretch": false, "Sit": true, "Wave": true,
@@ -31,9 +31,9 @@ static func names() -> Array:
 static func pose(name: String, t: float) -> Dictionary:
 	var p := stance()
 	match name:
-		"Talk": _talk(p, t)
+		"Talk", "Answer": _talk(p, t)
 		"Think": _think(p, t)
-		"Analyse": _analyse(p, t)
+		"Analyse", "AnswerPoint": _analyse(p, t)
 		"Notice": _notice(p, t)
 		"Happy": _happy(p, t)
 		"Surprised": _surprised(p, t)

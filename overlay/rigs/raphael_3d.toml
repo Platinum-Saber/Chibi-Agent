@@ -33,6 +33,8 @@ dancing_excited = { motion = "DanceExcited", expression = "smile" }
 cursor_near  = { motion = "Idle", expression = "happy" }
 cursor_far   = { motion = "Idle", expression = "neutral" }
 talking      = { motion = "Talk", expression = "neutral" }
+answer_point = { motion = "AnswerPoint", expression = "neutral" }  # talking straight after thinking: points first...
+answer       = { motion = "Answer", expression = "neutral" }       # ...then talks (stage.py ANSWER_POINT_S)
 thinking     = { motion = "Think", expression = "neutral" }
 working      = { motion = "Analyse", expression = "neutral" }
 alert        = { motion = "Notice", expression = "surprised" }
