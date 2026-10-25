@@ -16,6 +16,9 @@ ICONS = Path(__file__).resolve().parents[1] / "icons" / "wheel"
 OUTER_DIP = 128.0  # ring radius at 100 % scaling
 INNER_DIP = 66.0   # the hole
 GAP_DIP = 26.0     # between her and the ring
+# her measured half width is generous (her widest pose, the scarf's swing): the ring sits this
+# share of it out from her centre (Kryo, 25 October 2026: 0.68 halved the gap she saw)
+HUG = 0.68
 GAP_DEG = 1.6      # between segments
 IDLE_CLOSE_S = 8.0  # closes this long after the cursor left it
 
@@ -53,9 +56,10 @@ class PoseWheel:
         self.outer, self.inner = OUTER_DIP * scale, INNER_DIP * scale
         gap = GAP_DIP * scale
         l, t, r, b = monitor
-        x = feet[0] + half_width + gap + self.outer
+        reach = half_width * HUG + gap + self.outer
+        x = feet[0] + reach
         if x + self.outer > r:
-            x = feet[0] - half_width - gap - self.outer
+            x = feet[0] - reach
         label_room = 40 * scale  # the pose name under the ring
         y = min(max(feet[1] - height * 0.55, t + self.outer + 8), b - self.outer - label_room)
         self.centre = (x, y)

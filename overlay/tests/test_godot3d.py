@@ -275,7 +275,7 @@ def test_3d_map_covers_every_mood_and_moment_with_real_clips():
     for mo in Moment:
         assert rig.moments[mo.value].motion in clips, mo
     assert rig.moods["dancing_excited"].motion in clips
-    vrm = {"neutral", "happy", "angry", "sad", "relaxed", "surprised"}
+    vrm = {"neutral", "happy", "angry", "sad", "relaxed", "surprised", "smile"}  # smile: raphael.gd builds it
     assert {c.expression for c in [*rig.moods.values(), *rig.moments.values()]} <= vrm
 
 

@@ -69,7 +69,7 @@ X:/Blender/blender.exe -b "D:/Character Design/output/3d/teen/vrm-appearance/v01
 - **Mood map:** `overlay/rigs/raphael_3d.toml` maps every brain mood and idle moment to a clip and a VRM expression (neutral, happy, angry, sad, relaxed, surprised). `height_dip` sets her size, which Customize can override.
 - **Facing:** she turns 70° toward where she walks, and at rest faces the way Kryo last turned her.
 - **Turning her:** hold the middle mouse button on her and drag left or right: 0.5° per px (`stage.py` `ROTATE_DEG_PER_PX`), drag right to turn her toward the screen's right. The turn lasts until restart. The 2D art ignores it.
-- **Pose wheel:** right-click her for a ring of 8 poses beside her (to her right, or her left at the monitor's edge): Wave, Cheer, Think, Look around, Stretch, Dance, Sit (on the beanbag, 20 s) and Sleep (until you poke or drag her, or the agent needs her). Click one to play it; right-click her again, click its centre or anywhere else to close it, and it closes 8 s after the cursor leaves it. The icons in `overlay/icons/wheel/` are her silhouettes rendered with `--offscreen --screenshot`; the poses are mapped in `stage.py` `PERFORM`. It works for the 2D art too.
+- **Pose wheel:** right-click her for a ring of 8 poses beside her (to her right, or her left at the monitor's edge): Wave, Cheer, Think, Look around, Stretch, Dance (DanceExcited, Mixamo "Snake Hip Hop Dance", 15 s, no music needed), Sit (on the beanbag, 20 s) and Sleep (until you poke or drag her, or the agent needs her). Click one to play it; right-click her again, click its centre or anywhere else to close it, and it closes 8 s after the cursor leaves it. The icons in `overlay/icons/wheel/` are her silhouettes rendered with `--offscreen --screenshot`; the poses are mapped in `stage.py` `PERFORM`. It works for the 2D art too.
 - **Walking pace:** `walk_speed` in `raphael_3d.toml` is in her heights per second, so it scales with her size. It's 0.5, 260 px/s at 520 px, which Kryo picked; the Mixamo walk's own stride would be 0.54.
   - **In the UI:** Customize → Look → Walking speed sets px/s per outfit (`walk_px_s` in `character.toml`).
   - **2D rigs:** they keep the stage's 90 px/s walk and 60 px/s wander unless set there.
@@ -139,6 +139,8 @@ Verification evidence/backup is in `D:/Character Design/output/godot/coat-cleara
 - **Headset:** follows her Head bone.
   - **On with the mic** during a conversation: the agent's listening mood (the frame's `listening`), the Think and Talk clips, or her mouth moving.
   - **On without the mic** for slow music (DanceVibe, Mixamo "Listening To Music"). Not for DanceExcited.
+  - DanceVibe is listening, not dancing: the overlay's dance sway (`ParamBodyAngleX`, `ParamAngleZ`) isn't layered over a Mixamo dance take (`raphael.gd`), only over the keyed fallback dances.
+  - Both dances wear `smile` (`raphael.gd` `_add_smile`): the Joy brows and mouth with her eyes open. VRoid's `happy` (Fcl_ALL_Joy) shuts her eyes.
   - **Off** 5 s after either ends.
 - **Slime beanbag:** under her while she sits (Sit). It squashes over 0.4 s as she settles. Sit plays the chair take "Sitting Idle", with her hips held at the squashed seat (`keep_height`, `lift=-0.415`).
 - **Futon: switched off for now** (`SHOW_FUTON` in `props.gd`); she sleeps on the floor. When on, it lies under her while she sleeps (Sleep), laid feet-to-head along her body, with the pillow under her head.

@@ -131,7 +131,26 @@ func _read_expressions(m: Node3D) -> void:
 			_binds[key] = binds
 			_weight[key] = 0.0
 			_target[key] = 0.0
+	_add_smile()
 	print("RAPHAEL3D expressions: ", ", ".join(_binds.keys()))
+
+
+## "smile": happy's brows and mouth with her eyes open (VRoid's happy, Fcl_ALL_Joy, shuts them),
+## for the dances: her eyes stay open while she moves.
+func _add_smile() -> void:
+	if not _binds.has("happy"):
+		return
+	var face: MeshInstance3D = _binds["happy"][0][0]
+	var binds := []
+	for shape in ["Fcl_BRW_Joy", "Fcl_MTH_Joy"]:
+		var idx := face.find_blend_shape_by_name(shape)
+		if idx >= 0:
+			binds.append([face, idx, 1.0])
+			_shapes["%d:%d" % [face.get_instance_id(), idx]] = [face, idx]
+	if not binds.is_empty():
+		_binds["smile"] = binds
+		_weight["smile"] = 0.0
+		_target["smile"] = 0.0
 
 
 ## Bake the Mixamo takes named in clip_sources.cfg (skipped with `keyed`: clips.gd only).
@@ -283,9 +302,13 @@ func _pose(delta: float) -> void:
 	_add(lay, "Chest", Vector3(breath * 0.9, 0, 0))
 	_add(lay, "LeftUpperArm", Vector3(0, 0, breath * 0.8))
 	_add(lay, "RightUpperArm", Vector3(0, 0, -breath * 0.8))
-	_add(lay, "Hips", Vector3(0, 0, params.get("ParamBodyAngleX", 0.0)))  # dance sway, held tilt
+	# the overlay's dance sway is for the 2D art and the keyed dances: a Mixamo take moves by itself
+	var own_moves: bool = _src != null and _clip.begins_with("Dance")
+	var tilt: float = 0.0 if own_moves else params.get("ParamBodyAngleX", 0.0)
+	var roll: float = 0.0 if own_moves else params.get("ParamAngleZ", 0.0)
+	_add(lay, "Hips", Vector3(0, 0, tilt))  # dance sway, held tilt
 	_add(lay, "Head", Vector3(-params.get("ParamAngleY", 0.0) - breath * 0.4,
-			params.get("ParamAngleX", 0.0), -params.get("ParamAngleZ", 0.0)))
+			params.get("ParamAngleX", 0.0), -roll))
 	_add(lay, "Neck", Vector3(_gaze.y * 0.4, _gaze.x * 0.4, 0))
 	_add(lay, "Head", Vector3(_gaze.y * 0.6, _gaze.x * 0.6, 0))
 	if _bone.has("LeftEye"):

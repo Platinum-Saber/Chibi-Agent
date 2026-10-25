@@ -148,8 +148,8 @@ class Stage:
 
     def clip(self, form: str) -> Clip:
         rig = self.rigs[form]
-        if self.brain.mood == Mood.DANCING and self.music_style == music.EXCITED and "dancing_excited" in rig.moods:
-            return rig.moods["dancing_excited"]  # EDM and the like: the energetic dance
+        if self.brain.mood == Mood.DANCING and (self.brain.performing or self.music_style == music.EXCITED)                 and "dancing_excited" in rig.moods:
+            return rig.moods["dancing_excited"]  # EDM and the like, or picked on the wheel: the real dance
         if self.brain.mood == Mood.HELD and self.grab_low and "held_low" in rig.moods:
             return rig.moods["held_low"]  # picked up by the legs: carried, not hanging
         return rig.clip(self.brain.mood, self.brain.moment)

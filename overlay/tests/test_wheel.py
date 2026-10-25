@@ -45,10 +45,10 @@ def test_segments_clockwise_from_the_top():
 def test_placed_to_her_right_and_flips_at_the_edge():
     w = PoseWheel()
     w.show((500, 800), 400, 60, 1.0, MON)
-    assert w.centre[0] - w.outer > 500 + 60  # clear of her, to her right
+    assert w.centre[0] - w.outer == pytest.approx(500 + 60 * wheel_mod.HUG + wheel_mod.GAP_DIP)  # to her right
     assert w.centre[1] == pytest.approx(800 - 400 * 0.55)
     w.show((1850, 800), 400, 60, 1.0, MON)
-    assert w.centre[0] + w.outer < 1850 - 60  # no room on the right: her left
+    assert w.centre[0] + w.outer == pytest.approx(1850 - 60 * wheel_mod.HUG - wheel_mod.GAP_DIP)  # no room: her left
     w.show((500, 150), 400, 60, 1.0, MON)  # high up: kept on the monitor
     assert w.rect[1] >= 0
     w.show((500, 1080), 100, 30, 1.0, MON)  # short and low: the name still fits under it
@@ -155,3 +155,9 @@ def test_refused_while_held(st):  # noqa: F811
     st.brain.grab(int(time.monotonic() * 1000))
     assert not st.perform("dance")
     assert st.brain.mood == Mood.HELD
+
+
+def test_a_picked_dance_is_the_real_dance(st):  # noqa: F811
+    st.rigs["chibi"].moods["dancing_excited"] = "excited-clip"
+    st.perform("dance")
+    assert st.clip("chibi") == "excited-clip"
