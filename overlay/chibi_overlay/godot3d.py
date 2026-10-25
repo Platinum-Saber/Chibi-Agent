@@ -1,6 +1,7 @@
 """Her 3D body (overlay3d/, Godot 4.7) as a puppet model the stage drives like a Live2D rig.
 
-`godot:<overlay3d dir>` in a rig path picks it. `GodotModel` takes the calls `Puppet` makes on
+`godot:<overlay3d dir>` in a rig path picks it; `godot:<dir>#<file>.vrm` picks another model in
+its models/ folder (a variant, e.g. her ruby-red eyes). `GodotModel` takes the calls `Puppet` makes on
 live2d models (SetScale/SetOffset/StartMotion/SetExpression/SetSaveParamById/Drag/Update...)
 and, on Update, sends one frame to a Godot renderer process: her feet and height in window
 px, the clip and expression names (overlay/rigs/raphael_3d.toml -> overlay3d/clips.gd),
@@ -34,7 +35,7 @@ from . import win32
 log = logging.getLogger(__name__)
 
 PREFIX = "godot:"
-MODEL = Path("models") / "raphael_teen.vrm"  # inside the project; exported by overlay3d/tools/export_vrm.py
+MODEL = "raphael_teen.vrm"  # in the project's models/; exported by overlay3d/tools/export_vrm.py
 DEFAULT_EXE = r"X:\Godot\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe"
 START_TIMEOUT_MS = 30_000  # first import of the VRM can take a while
 QUIT_GRACE_MS = 500
@@ -83,10 +84,17 @@ def _tie_to_us(pid: int) -> None:
         k32.CloseHandle(wintypes.HANDLE(proc))
 
 
-def missing(project: str) -> list[str]:
+def split(spec: str) -> tuple[str, str]:
+    """`<project dir>[#<model file>]` -> (project dir, model file in its models/)."""
+    project, _, model = spec.partition("#")
+    return project, model or MODEL
+
+
+def missing(spec: str) -> list[str]:
     """What the 3D body needs on disk that isn't there."""
+    project, model = split(spec)
     p = Path(project)
-    return [str(f) for f in (p / "project.godot", p / MODEL) if not f.exists()]
+    return [str(f) for f in (p / "project.godot", p / "models" / model) if not f.exists()]
 
 
 def in_hull(pts: list[tuple[float, float]], x: float, y: float) -> bool:
@@ -108,15 +116,17 @@ class Bridge:
     _open: dict[str, Bridge] = {}
 
     @classmethod
-    def get(cls, project: str) -> Bridge:
-        b = cls._open.get(project)
+    def get(cls, spec: str) -> Bridge:
+        """The renderer for a project and model (one per model: switching variants restarts it)."""
+        b = cls._open.get(spec)
         if b is None or b.failed:
-            b = cls._open[project] = cls(project)
+            b = cls._open[spec] = cls(spec)
         b.users += 1
         return b
 
-    def __init__(self, project: str, exe: str | None = None):
-        self.project, self.users = project, 0
+    def __init__(self, spec: str, exe: str | None = None):
+        self.spec, self.users = spec, 0
+        project, model = split(spec)
         self.token = secrets.token_urlsafe(16)
         self.hwnd = 0
         self.height_m = self.half_width_m = 0.0
@@ -132,7 +142,8 @@ class Bridge:
             return
         exe = exe or config.load()["overlay"].get("godot_exe") or DEFAULT_EXE
         self._focus = user32.GetForegroundWindow()  # Godot activates its window: handed back on hello
-        cmd = [exe, "--path", project, "--", f"--renderer={self.server.serverPort()}", f"--token={self.token}"]
+        cmd = [exe, "--path", project, "--", f"--model=res://models/{model}",
+               f"--renderer={self.server.serverPort()}", f"--token={self.token}"]
         try:
             paths.LOGS.mkdir(parents=True, exist_ok=True)
             with open(paths.LOGS / "godot3d.log", "w", encoding="utf-8") as out:  # the renderer's own log
@@ -228,8 +239,8 @@ class Bridge:
             self.close()
 
     def close(self) -> None:
-        if Bridge._open.get(self.project) is self:
-            del Bridge._open[self.project]
+        if Bridge._open.get(self.spec) is self:
+            del Bridge._open[self.spec]
         if self.hwnd:
             user32.ShowWindow(self.hwnd, SW_HIDE)  # gone now, not when Godot gets round to quitting
         if self.sock is not None:
@@ -248,9 +259,9 @@ class Bridge:
 class GodotModel:
     """The live2d-model calls `Puppet` makes, turned into frames for the renderer."""
 
-    def __init__(self, project: str, widget=None, bridge: Bridge | None = None):
+    def __init__(self, spec: str, widget=None, bridge: Bridge | None = None):
         self.widget = widget  # the overlay MonitorWindow: its hwnd and rect place the renderer
-        self.bridge = bridge or Bridge.get(project)
+        self.bridge = bridge or Bridge.get(spec)
         ground = getattr(getattr(widget, "stage", None), "ground", None)
         if ground is not None and ground.own not in self.bridge.own:
             # ours, like the overlay window: not a fullscreen app to hide from, not a window to stand on

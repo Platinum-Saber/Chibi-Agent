@@ -14,6 +14,7 @@ extends Node3D
 ## game), so there are no keys; use the arguments.
 ##   --model=res://models/x.vrm   another model (default raphael_teen.vrm)
 ##   --clip=NAME                  play a clip slot (default Idle)
+##   --coat-clearance=off        disable post-animation coat/arm correction for comparison
 ##   --source=keyed               the keyed clips (clips.gd) only, no Mixamo takes
 ##   --expr=happy                 hold an expression
 ##   --gaze=X,Y                   look at this window point
@@ -73,7 +74,7 @@ func _ready() -> void:
 	# first see, and arms swung down through hanging hair would trap it outside the arm colliders.
 	body = Body.new()
 	body.name = "Body"
-	body.attach(model, args.get("source", "") == "keyed")
+	body.attach(model, args.get("source", "") == "keyed", args.get("coat-clearance", "on") != "off")
 	add_child(model)
 	add_child(body)
 	_measure()

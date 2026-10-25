@@ -115,6 +115,7 @@ class Stage:
         self._t = time.monotonic()
         self._quit_cb = None
         self.bodies: dict[str, str] = {}  # [overlay.bodies]: "2d"/"3d" -> the outfit each body wears
+        self._last_of: dict[str, str] = {wardrobe.outfits[self.outfit].body: self.outfit}  # body -> last outfit worn
 
     # --- what the windows draw ------------------------------------------------------------
     @property
@@ -323,6 +324,7 @@ class Stage:
     def _wear(self, name: str, maps: dict[str, RigMap]) -> None:
         """Midway through the puff: swap the maps and model paths; the windows reload."""
         self.outfit, self.rigs = name, self._tweaked(name, maps)
+        self._last_of[self.wardrobe.outfits[name].body] = name
         self.rig_paths = dict(self.wardrobe.outfits[name].rigs)
         self.geom = {}
         self.outfit_gen += 1
@@ -359,9 +361,10 @@ class Stage:
         return self.wardrobe.outfits[self.outfit].body
 
     def other_body_outfit(self) -> str | None:
-        """The outfit to wear for the other body: [overlay.bodies], else the first of that kind."""
+        """The outfit to wear for the other body: the last one worn of that kind this session (e.g.
+        her ruby-eyed 3D variant), else [overlay.bodies], else the first of that kind."""
         want = "2d" if self.body == "3d" else "3d"
-        name = self.bodies.get(want)
+        name = self._last_of.get(want) or self.bodies.get(want)
         if name in self.wardrobe.outfits and self.wardrobe.outfits[name].body == want:
             return name
         return next((n for n, o in self.wardrobe.outfits.items() if o.body == want), None)

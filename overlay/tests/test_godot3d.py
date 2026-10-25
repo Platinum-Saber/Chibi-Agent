@@ -164,6 +164,7 @@ def test_bridge_handshake_frames_and_quit(qapp, monkeypatch, tmp_path):
     b = godot3d.Bridge(str(tmp_path), exe="godot.exe")
     b.users = 1
     assert started[0][:3] == ["godot.exe", "--path", str(tmp_path)]
+    assert "--model=res://models/raphael_teen.vrm" in started[0]
     assert _wait(lambda: b.ready and b.hull), b.failed
     assert (b.hwnd, b.height_m, b.half_width_m) == (4242, 1.5, 0.3)
     assert godot3d.in_hull(b.hull, 5, 5)
@@ -203,6 +204,7 @@ def st(monkeypatch, tmp_path):
     (proj / "models").mkdir(parents=True)
     (proj / "project.godot").write_text("")
     (proj / "models" / "raphael_teen.vrm").write_bytes(b"")
+    (proj / "models" / "ruby.vrm").write_bytes(b"")
     w = outfits.parse({
         "outfit": "casual_coat",
         "outfits": {
@@ -210,6 +212,8 @@ def st(monkeypatch, tmp_path):
                             "serious_rig": f"sprites:{pack}", "serious_map": "rigs/raphael_sprites.toml"},
             "teen_3d": {"chibi_rig": f"godot:{proj}", "chibi_map": "rigs/raphael_3d.toml",
                         "serious_rig": f"godot:{proj}", "serious_map": "rigs/raphael_3d.toml"},
+            "ruby_3d": {"chibi_rig": f"godot:{proj}#ruby.vrm", "chibi_map": "rigs/raphael_3d.toml",
+                        "serious_rig": f"godot:{proj}#ruby.vrm", "serious_map": "rigs/raphael_3d.toml"},
             "lost_3d": {"chibi_rig": f"godot:{tmp_path / 'gone'}", "chibi_map": "rigs/raphael_3d.toml",
                         "serious_rig": f"godot:{tmp_path / 'gone'}", "serious_map": "rigs/raphael_3d.toml"},
         },
@@ -351,3 +355,20 @@ def test_frames_carry_her_velocity(fake_bridge, monkeypatch):
     pup.model.Update()
     assert fake_bridge.sent[0]["vel"] == [0.0, 0.0]
     assert fake_bridge.sent[1]["vel"][0] == pytest.approx(240, abs=1)
+
+
+def test_a_rig_path_can_name_its_model(tmp_path):
+    assert godot3d.split("D:/x/overlay3d") == ("D:/x/overlay3d", "raphael_teen.vrm")
+    assert godot3d.split("D:/x/overlay3d#raphael_teen_ruby.vrm") == ("D:/x/overlay3d", "raphael_teen_ruby.vrm")
+    (tmp_path / "project.godot").write_text("")
+    assert godot3d.missing(f"{tmp_path}#ruby.vrm") == [str(tmp_path / "models" / "ruby.vrm")]
+
+
+def test_switching_back_to_3d_wears_the_last_3d_variant(st):
+    assert st.wardrobe.outfits["ruby_3d"].body == "3d"
+    st.request_outfit("ruby_3d")
+    _run_puff(st)
+    assert st.outfit == "ruby_3d"
+    assert st.switch_body() == "casual_coat"
+    _run_puff(st)
+    assert st.switch_body() == "ruby_3d"  # not [overlay.bodies]' teen_3d: the variant she last wore

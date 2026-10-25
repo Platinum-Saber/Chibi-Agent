@@ -17,6 +17,7 @@ agent ──WS (unchanged)── overlay (Python, Qt)                     Godot 
                           hit test (point in her hull)    ◀──TCP──  hull of her bones, window handle
 ```
 - **The 3D body is a body kind:** an outfit whose rig path is `godot:<this folder>` (`[overlay.outfits.teen_3d]` in `config.toml`; `[overlay] bodies` names the 2D and 3D outfits).
+- **Variants:** `godot:<this folder>#<file>.vrm` picks another model in `models/`. `teen_3d_ruby` is her ruby-eyed variant (`raphael_teen_ruby.vrm`), worn from tray → Outfit. Switching between 3D variants restarts the renderer (about 3 s), and switching back from 2D returns to the 3D variant she last wore.
 - **`overlay/chibi_overlay/godot3d.py`:**
   - **Starting the renderer:** it starts Godot (`[overlay] godot_exe`) with `--renderer=PORT --token=T`.
   - **Taking the calls:** `GodotModel` accepts the same calls `Puppet` makes on a Live2D model.
@@ -121,3 +122,12 @@ The scarf's Blender shader is unlit emission, which exports with no alpha. `raph
   - Renderer start: about 3 s.
 - **2D body in the same isolated setup:** overlay about 22% of one core.
 - **For comparison:** the three-vrm spike used 60–97% of a core.
+
+
+## Coat/hand clearance (25 October 2026)
+
+`coat_clearance.gd` fits three hidden convex coat volumes to the loaded torso/hem mesh (sleeves/cuffs excluded), following Hips, Spine and UpperChest. Forty-eight spherical forearm, palm, finger-joint and fingertip probes feed a skeleton-local analytic collision/IK solve. It is called at the end of `raphael.gd` `_pose`, after Mixamo/keyed playback, crossfades and body layers, before spring hair/scarf. It changes upper/lower-arm and compensating wrist rotations only; hand orientation, finger articulation and limb lengths are preserved. It does not deform or simulate the coat.
+
+Smooth release preserves small corrections across frames. The blended arm pose is projected back outside the fitted volumes to prevent smoothing from carrying hands through the coat. Corrections are bounded (`max_offset`, default 0.16 m at this model's scale); unsuitable/missing coat or bone mappings fail closed by leaving original animation alone, and active Godot physical-bone simulation bypasses this animation correction. `--coat-clearance=off` provides baseline comparison. The model, Mixamo files, Blender masters, app protocol and configuration are unchanged.
+
+Verification evidence/backup is in `D:/Character Design/output/godot/coat-clearance-v01/`. Tests enumerate actual configured Mixamo takes sampled at 30 fps, plus 60 fps transitions, missing-bone/disable/T-pose/root-transform checks. Penetration numbers describe the fitted probe boundaries, not a universal triangle-level cloth guarantee. Very different outfits/animations may need refitting/tuning, and this module requires the loaded coat material name `Tops_01_CLOTH_01` and Godot humanoid bone names.

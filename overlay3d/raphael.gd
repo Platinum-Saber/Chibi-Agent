@@ -15,6 +15,7 @@ extends Node
 
 const Clips = preload("res://clips.gd")
 const Mixamo = preload("res://mixamo.gd")
+const CoatClearance = preload("res://coat_clearance.gd")
 const SOURCES := "res://clip_sources.cfg"
 const BREATH_PERIOD := 4.2
 const CROSSFADE := 0.25  # s between clips
@@ -22,6 +23,7 @@ const FADE := 8.0  # expression weight change per second
 
 var model: Node3D
 var skeleton: Skeleton3D
+var coat_clearance: CoatClearance
 var talking := false  # fake lip sync (standalone key M)
 var mouth := -1.0  # 0..1 from the overlay (ParamMouthOpenY); -1: not driven
 var eyes_closed := false
@@ -52,7 +54,7 @@ var _blink_t := -1.0
 var _bone := {}
 
 
-func attach(m: Node3D, keyed := false) -> void:
+func attach(m: Node3D, keyed := false, clearance_enabled := true) -> void:
 	model = m
 	skeleton = m.find_children("*", "Skeleton3D", true, false)[0]
 	for i in skeleton.get_bone_count():  # profile names: Hips, LeftUpperArm, RightIndexDistal, ...
@@ -69,6 +71,12 @@ func attach(m: Node3D, keyed := false) -> void:
 	_read_expressions(m)
 	_fix_alpha(m)
 	load_sources(keyed)
+	coat_clearance = CoatClearance.new()
+	if not coat_clearance.setup(skeleton, model):
+		push_warning("Coat clearance unavailable: expected coat/arm bones not found")
+		coat_clearance = null
+	elif not clearance_enabled:
+		coat_clearance.enabled = false
 	_pose(0.0)
 	process_priority = -10  # pose before the spring bones read it
 
@@ -273,6 +281,10 @@ func _pose(delta: float) -> void:
 			q = q * _turn(i, lay[bone])
 		skeleton.set_bone_pose_rotation(i, q)
 	skeleton.set_bone_pose_position(_bone["Hips"], _hips_rest - Vector3(0, p.get("_drop", 0.0), 0))
+	# Last humanoid layer: preserve Mixamo/keyed motion while keeping hands outside the coat.
+	# Spring-bone hair/scarf run later, and read this final arm pose.
+	if coat_clearance != null:
+		coat_clearance.apply(delta)
 
 
 ## A keyed clip (clips.gd degrees) as local rotations.

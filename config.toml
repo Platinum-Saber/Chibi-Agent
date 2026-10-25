@@ -71,6 +71,14 @@ chibi_map = 'rigs/raphael_3d.toml'
 serious_rig = 'godot:D:\Projects\Chibi-Agent-Project\Chibi-Agent\overlay3d'
 serious_map = 'rigs/raphael_3d.toml'
 
+[overlay.outfits.teen_3d_ruby]
+# The same 3D body with ruby-red eyes and 5 % darker skin (D:\Character Design ... ruby-red-v01,
+# history 061; exported as raphael_teen_ruby_v01.vrm). Wear it from tray -> Outfit.
+chibi_rig = 'godot:D:\Projects\Chibi-Agent-Project\Chibi-Agent\overlay3d#raphael_teen_ruby.vrm'
+chibi_map = 'rigs/raphael_3d.toml'
+serious_rig = 'godot:D:\Projects\Chibi-Agent-Project\Chibi-Agent\overlay3d#raphael_teen_ruby.vrm'
+serious_map = 'rigs/raphael_3d.toml'
+
 [overlay.outfits.aniya]
 # Free ANIYA model by DG_studio: personal use only, no for-profit streaming, no
 # redistribution. Working copy made by tools/prepare_aniya.py (outside git).
