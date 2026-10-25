@@ -29,11 +29,36 @@ log = logging.getLogger(__name__)
 # sentences would otherwise each wait out a ~15 s load that fails the same way).
 TTS_RETRY_S = 30.0
 
+# The last voice the Customize window chose. The overlay only sends it once it has connected,
+# ~15 s in, so without this a start loads config.toml's F5 (40-100 s) only to swap it out.
+LAST_VOICE = paths.LOCAL / "voice_tune.json"
+
+
+def saved_voice(path: Path = LAST_VOICE) -> VoiceTune | None:
+    try:
+        return VoiceTune.model_validate_json(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except Exception:
+        log.warning("ignoring unreadable %s", path, exc_info=True)
+        return None
+
+
+def save_voice(msg: VoiceTune, path: Path = LAST_VOICE) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(msg.model_dump_json(include={"engine", "voice", "speed", "nfe"}), encoding="utf-8")
+    except OSError:
+        log.warning("could not save the voice choice to %s", path, exc_info=True)
+
 
 class VoiceApp:
-    def __init__(self, vcfg: dict, send):
+    def __init__(self, vcfg: dict, send, last_voice: Path = LAST_VOICE):
         self._send = send
+        self._last_voice = last_voice
         self.tts = Tts(vcfg)
+        if (saved := saved_voice(last_voice)) is not None:
+            self.tts.tune(saved.engine, saved.voice, saved.speed, saved.nfe)
         self.stt = Stt(vcfg.get("stt_model", "small.en"))
         self.clips = ClipCache(paths.CLIPS, self.tts.voice_key())
         self.recorder = Recorder()
@@ -69,13 +94,19 @@ class VoiceApp:
         try:
             await self._on(self._tts_pool, self.tts.load)
             self._tts_failed_at = None
-            made = await self._on(self._tts_pool, self.clips.ensure, self.tts.synth)
+            made = await self._on(self._tts_pool, self._ensure_clips)
             if made:
                 log.info("rendered %d clips", len(made))
         except Exception:
             if not self.tts.loaded:
                 self._tts_failed_at = time.monotonic()
             log.exception("tts load failed")
+
+    def _ensure_clips(self) -> list[str]:
+        """Render missing clips (on the tts thread). The cache key is read here, beside the
+        synth: a voice switch queued behind a load once had the old voice's cache filled with
+        the new voice's audio, then rendered all ten clips again under the right key."""
+        return ClipCache(paths.CLIPS, self.tts.voice_key()).ensure(self.tts.synth)
 
     async def _retry_tts(self) -> None:
         """A failed load (once: a CUDA error reading the checkpoint) left F5 unloaded and
@@ -105,10 +136,11 @@ class VoiceApp:
             self._tts_failed_at = time.monotonic()
             return
         self.clips = ClipCache(paths.CLIPS, self.tts.voice_key())
+        save_voice(msg, self._last_voice)
         log.info("voice -> %s %s (speed %.2f)", self.tts.engine,
                  self.tts.kvoice if self.tts.engine == "kokoro" else Path(self.tts.ref).name, self.tts.speed)
         if loaded:
-            made = await self._on(self._tts_pool, self.clips.ensure, self.tts.synth)
+            made = await self._on(self._tts_pool, self._ensure_clips)
             if made:
                 log.info("rendered %d clips", len(made))
 

@@ -2,12 +2,27 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+# The Hub repos her models load from (F5, its vocoder, Whisper as "Systran/faster-whisper-<size>").
+HUB_REPOS = ["SWivid/F5-TTS", "charactr/vocos-mel-24khz"]
+
+
+def cached(hf_home: str, repos: list[str]) -> bool:
+    """Every repo already has a snapshot in HF_HOME's hub cache."""
+    hub = Path(hf_home) / "hub"
+    return all(any((hub / f"models--{r.replace('/', '--')}" / "snapshots").glob("*")) for r in repos)
 
 
 def configure(vcfg: dict) -> None:
-    """Model downloads go to F: (HF_HOME); call before importing torch or the models."""
+    """Model downloads go to HF_HOME; call before importing torch or the models.
+    Once every model is cached the Hub goes offline: its per-file HEAD checks cost ~20 s of
+    a cold start and fail without internet. A missing model leaves it online to download."""
     if vcfg.get("hf_home"):
         os.environ.setdefault("HF_HOME", vcfg["hf_home"])
+        repos = HUB_REPOS + [f"Systran/faster-whisper-{vcfg.get('stt_model', 'small.en')}"]
+        if cached(vcfg["hf_home"], repos):
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 

@@ -43,6 +43,7 @@ class FakeClips:
 def app(tts) -> main.VoiceApp:
     a = main.VoiceApp.__new__(main.VoiceApp)
     a.tts, a.clips, a._bg = tts, FakeClips(), set()
+    a._ensure_clips = lambda: []
     a._tts_pool = ThreadPoolExecutor(1)
     a._tts_failed_at = None
     return a
