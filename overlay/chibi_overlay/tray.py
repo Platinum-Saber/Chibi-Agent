@@ -1,19 +1,26 @@
-"""Tray icon and menu: show/hide, mute, gaming mode, outfit, customize, memory, settings, Google
-accounts, notification access, autostart, quit.
+"""Tray icon and menu: show/hide, mute, gaming mode, body (2D art / 3D model), outfit, customize,
+memory, settings, Google accounts, notification access, autostart, quit.
 
-Show/hide, the outfit and Customize Raphael (customize.py: moods, size, behaviour, sequences,
+Show/hide, the body, the outfit and Customize Raphael (customize.py: moods, size, behaviour, sequences,
 voice) are handled here (they're about her look); everything else is a
 `Command` to the agent, which owns the state and echoes it back as `State` so
 the check marks always match what is really happening.
 """
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu,
                                QPushButton, QSystemTrayIcon, QVBoxLayout)
 
+from chibi_shared import paths
 from chibi_shared.protocol import Command, MemoryItems, State
+
+from . import character
+
+log = logging.getLogger(__name__)
 
 
 def _icon() -> QIcon:
@@ -84,6 +91,9 @@ class Tray:
         self.a_mute = self._action(m, "Mute voice", lambda on: self._cmd("mute" if on else "unmute"), True)
         self.a_gaming = self._action(m, "Gaming mode (free GPU memory)",
                                      lambda on: self._cmd("gaming_on" if on else "gaming_off"), True)
+        self.a_body = self._action(m, "", self.switch_body)  # her 2D art <-> her 3D model
+        m.aboutToShow.connect(self._body_label)
+        self._body_label()
         self.outfit_menu = m.addMenu("Outfit")
         self.outfit_menu.aboutToShow.connect(self._outfit_items)
         m.addSeparator()
@@ -129,6 +139,18 @@ class Tray:
             a.blockSignals(True)
             a.setChecked(name == self.stage.outfit)
             a.blockSignals(False)
+
+    def _body_label(self) -> None:
+        self.a_body.setText("Switch to 2D art" if self.stage.body == "3d" else "Switch to 3D model")
+        self.a_body.setEnabled(self.stage.other_body_outfit() is not None)
+
+    def switch_body(self) -> None:
+        """One body at a time; she starts in the last one chosen (saved with Customize)."""
+        if self.stage.switch_body():
+            try:
+                character.save(self.stage.character, paths.DATA / character.FILE_NAME)
+            except OSError as e:
+                log.warning("can't save the body choice: %s", e)
 
     def _customize(self) -> None:
         if self.customize is None:

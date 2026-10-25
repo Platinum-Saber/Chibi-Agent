@@ -16,6 +16,7 @@ import numpy as np
 import OpenGL.GL as gl
 
 from .body.motion import Clip, RigMap, looping_groups
+from .godot3d import PREFIX as GODOT, GodotModel
 from .sprites import PREFIX as SPRITES, SpriteModel
 from .vector import PREFIX as VECTOR
 from .vector.model import VectorModel
@@ -53,6 +54,8 @@ class Puppet:
             self.model = SpriteModel(model_json[len(SPRITES):], widget)
         elif model_json.startswith(VECTOR):  # the code-drawn vector rig (svg-rig branch)
             self.model = VectorModel(model_json[len(VECTOR):], widget)
+        elif model_json.startswith(GODOT):  # her 3D body, drawn by a Godot renderer under this window
+            self.model = GodotModel(model_json[len(GODOT):], widget)
         else:
             self.model = live2d.Model()
             self.model.LoadModelJson(model_json)

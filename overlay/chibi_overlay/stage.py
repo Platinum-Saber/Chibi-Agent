@@ -112,6 +112,7 @@ class Stage:
         self._last_ground = 0.0
         self._t = time.monotonic()
         self._quit_cb = None
+        self.bodies: dict[str, str] = {}  # [overlay.bodies]: "2d"/"3d" -> the outfit each body wears
 
     # --- what the windows draw ------------------------------------------------------------
     @property
@@ -346,6 +347,38 @@ class Stage:
     def _tweaked(self, outfit: str, maps: dict[str, RigMap]) -> dict[str, RigMap]:
         """The chibi map with Kryo's size and clip overrides for this outfit."""
         return {**maps, "chibi": apply_to_map(maps["chibi"], self.character.outfits.get(outfit))}
+
+    # --- bodies: her 2D art or her 3D model, one at a time (tray / Customize switch) ------------
+    @property
+    def body(self) -> str:
+        return self.wardrobe.outfits[self.outfit].body
+
+    def other_body_outfit(self) -> str | None:
+        """The outfit to wear for the other body: [overlay.bodies], else the first of that kind."""
+        want = "2d" if self.body == "3d" else "3d"
+        name = self.bodies.get(want)
+        if name in self.wardrobe.outfits and self.wardrobe.outfits[name].body == want:
+            return name
+        return next((n for n, o in self.wardrobe.outfits.items() if o.body == want), None)
+
+    def switch_body(self) -> str | None:
+        """Change to the other body (no form change: she keeps one form). Returns the outfit."""
+        name = self.other_body_outfit()
+        if name is None:
+            self.send_outfit_state("no outfit for the other body in [overlay.outfits]")
+            return None
+        self.character.outfit = name  # she starts in it next time (saved by the caller)
+        self.request_outfit(name)
+        return name
+
+    def body_failed(self, why: str) -> None:
+        """The 3D renderer didn't come up: wear the 2D body now (no puff; nothing is drawn)."""
+        fallback = self.other_body_outfit() if self.body == "3d" else None
+        if fallback is None:
+            return
+        log.error("3D body unavailable (%s): back to %s", why, fallback)
+        self._wear(fallback, self.wardrobe.outfits[fallback].load_maps(self.pkg))
+        self.send_outfit_state(f"3D body unavailable: {why}")
 
     def send_outfit_state(self, error: str = "") -> None:
         self.link.send(OutfitState(outfit=self.outfit, outfits=self.wardrobe.names,

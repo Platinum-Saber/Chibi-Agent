@@ -129,6 +129,14 @@ done by the overlay (window position, scale, flip), not by the rig.
 licensed VRM base model, instead of in VRoid Studio (`handoffs/blender-vrm-spike.md`).
 Its results decide whether 3D replaces or backs up the Live2D rigs.
 
+**Update (2026-10-24):** a full-size (not chibi) 3D Raphael now exists, made in Blender from
+a personal-use fan VRM (no redistribution, so it never goes into git or on the portfolio).
+**Update (2026-10-25):** it is now her second **body**, drawn by Godot 4.7 (`overlay3d/`) and
+driven by the same overlay, brain, physics and panels as the 2D art. One body at a time, with no
+transform when she speaks or works: tray → "Switch to 3D model" / "Switch to 2D art" (or
+Customize → Look), remembered for next start. Its clips are keyed in code until real ones exist
+(`overlay3d/clips.gd`, `overlay/rigs/raphael_3d.toml`). See `overlay3d/README.md`.
+
 v1 ships with the 2D Live2D rigs. After that we build our own Raphael in
 VRoid Studio:
 - one model, with a chibi-proportion variant for the chibi form;

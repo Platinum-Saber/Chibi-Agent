@@ -70,7 +70,7 @@ class Preview(QWidget):
                 log.warning("preview: %s", e)
                 self.note = f"Can't load this outfit's art:\n{e}"
         else:
-            self.note = "The live preview is for drawn (sprite) outfits.\nLive2D outfits show on the desktop after Apply."
+            self.note = "The live preview is for drawn (sprite) outfits.\nLive2D and 3D outfits show on the desktop after Apply."
         self.update()
 
     def play(self, motion: str | None, expression: str | None) -> None:
@@ -195,6 +195,9 @@ class CustomizeDialog(QDialog):
             self.preview.model.tune(self.ch, self.outfit)
         self._filling = True
         self.outfit_combo.setCurrentText(name)
+        is_3d = self.stage.wardrobe.outfits[name].body == "3d"
+        self.body_button.setText("Switch to 2D art" if is_3d else "Switch to 3D model")
+        self.body_button.setEnabled(self.stage.other_body_outfit() is not None)
         tw = self.ch.outfits.get(name)
         self.height.setValue((tw.height_dip if tw and tw.height_dip else None) or (self.base.height_dip if self.base else 320))
         sprite = self.preview.model is not None
@@ -309,6 +312,9 @@ class CustomizeDialog(QDialog):
         self.wear_sword = QCheckBox("Sword slung at her hip")
         for c in (self.wear_mask, self.wear_sword):
             c.toggled.connect(self._wear_set)
+        self.body_button = QPushButton()
+        self.body_button.clicked.connect(self._switch_body)
+        f.addRow("Body", self.body_button)
         f.addRow("Outfit", self.outfit_combo)
         f.addRow("Height (feet to head)", self.height)
         f.addRow("", slider)
@@ -399,6 +405,20 @@ class CustomizeDialog(QDialog):
         self._font_set()
         self.font_note.setText(f"Added {families[0]}" + (f" (kept in {dest_dir})" if dest_dir else
                                                        " (this session only: set [overlay] fonts_dir)"))
+
+    def _switch_body(self) -> None:
+        """Her 2D art <-> her 3D model, now (as the tray does), and remembered for next time."""
+        name = self.stage.switch_body()
+        if name is None:
+            self.status.setText("No outfit for the other body in [overlay.outfits].")
+            return
+        self.ch.outfit = name
+        self._load_outfit(name)
+        try:
+            character.save(self.stage.character, paths.DATA / character.FILE_NAME)
+            self.status.setText(f"Switching to {'her 3D model' if self.stage.wardrobe.outfits[name].body == '3d' else 'her 2D art'}.")
+        except OSError as e:
+            self.status.setText(f"Switched, but couldn't save the choice: {e}")
 
     def _outfit_picked(self, name: str) -> None:
         if not self._filling and name and name != self.outfit:

@@ -1,0 +1,235 @@
+extends Node3D
+## Her 3D body as a renderer for the Python overlay (overlay/chibi_overlay/godot3d.py), or a
+## small preview window on its own.
+##
+## Renderer (`--renderer=PORT --token=T`): the overlay starts this, owns the window (covers
+## the monitor she's on, sits just under the overlay's window, never takes clicks) and sends
+## one frame per tick over a local TCP line-JSON link: her feet and height in window px,
+## clip, expression, Live2D-style params, gaze. This sends back a hull around her in window
+## px, which the overlay hit-tests for clicks. Brain, physics, input and her panels all
+## stay in the overlay.
+##
+## Preview (no `--renderer`): a 520x1000 window bottom-right for checks and screenshots. It
+## never takes focus (no_focus: the overlay's fullscreen watcher must not mistake it for a
+## game), so there are no keys; use the arguments.
+##   --model=res://models/x.vrm   another model (default raphael_teen.vrm)
+##   --clip=NAME                  play a clips.gd clip (default Idle)
+##   --expr=happy                 hold an expression
+##   --gaze=X,Y                   look at this window point
+##   --turn=DEG                   turn her about the vertical axis (180 = back view)
+##   --seconds=S                  run S seconds, print the average fps, then quit
+##   --screenshot=PATH            with --seconds: save the last frame (with alpha) as PNG
+
+const Body = preload("res://raphael.gd")
+const DEFAULT_MODEL := "res://models/raphael_teen.vrm"
+const PREVIEW_PX := 850.0  # her height in the preview window
+const MARGIN := 30.0  # px of hull around her outline points (bones sit inside the mesh)
+const HULL_RING := 8  # points per outline point when padding the hull
+const TURN := 70.0  # degrees she turns while walking
+const LINK_TIMEOUT_S := 15.0
+
+@onready var camera: Camera3D = $Camera
+
+var body: Body
+var model: Node3D
+var args := {}
+var height_m := 1.0  # her mesh height at rest
+var _base_y := 0.0  # metres from her mesh bottom up to the model origin
+var half_width_m := 0.2
+var _hull := PackedVector2Array()
+var _link: StreamPeerTCP
+var _linked := false
+var _since := 0.0
+var _rx := ""
+var _frame := {}
+var _yaw := 0.0
+var _elapsed := 0.0
+var _frames := 0
+
+
+func _ready() -> void:
+	for a in OS.get_cmdline_user_args():
+		var kv := a.trim_prefix("--").split("=", true, 1)
+		args[kv[0]] = kv[1] if kv.size() > 1 else ""
+
+	var path: String = args.get("model", DEFAULT_MODEL)
+	if not ResourceLoader.exists(path):
+		push_error("No model at %s. Export it first (overlay3d/README.md)." % path)
+		get_tree().quit(1)
+		return
+	model = load(path).instantiate()
+	_yaw = float(args.get("turn", "0"))
+	model.rotation_degrees.y = _yaw
+
+	# Pose her before the model enters the tree: the spring bones start from the pose they
+	# first see, and arms swung down through hanging hair would trap it outside the arm colliders.
+	body = Body.new()
+	body.name = "Body"
+	body.attach(model)
+	add_child(model)
+	add_child(body)
+	_measure()
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+
+	if args.has("renderer"):
+		_link = StreamPeerTCP.new()
+		_link.connect_to_host("127.0.0.1", int(args["renderer"]))
+		model.visible = false  # until the first frame places her
+	else:
+		body.play(args.get("clip", "Idle"))
+		if args.has("expr"):
+			body.hold(args["expr"])
+		var w := get_window()
+		var usable := DisplayServer.screen_get_usable_rect(DisplayServer.get_primary_screen())
+		w.position = Vector2i(usable.end.x - w.size.x - 40, usable.end.y - w.size.y)
+
+
+func _measure() -> void:
+	var box := AABB()
+	var first := true
+	for m in model.find_children("*", "MeshInstance3D", true, false):
+		var b: AABB = model.global_transform.affine_inverse() * m.global_transform * m.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	height_m = box.size.y
+	_base_y = -box.position.y
+	var xs: Array = body.outline_points().map(func(p: Vector3) -> float: return absf(p.x - model.global_position.x))
+	half_width_m = xs.max() if not xs.is_empty() else 0.2
+
+
+func _process(delta: float) -> void:
+	if body == null:
+		return
+	if _link:
+		_pump(delta)
+	else:
+		_preview()
+	_update_hull()
+	if args.has("seconds"):
+		_elapsed += delta
+		_frames += 1
+		if _elapsed >= float(args["seconds"]):
+			_finish()
+
+
+# --- preview ------------------------------------------------------------------------------
+func _preview() -> void:
+	var view := get_viewport().get_visible_rect().size
+	_place(Vector2(view.x / 2.0, view.y - 30.0), PREVIEW_PX, view)
+	var g := Vector2(view.x / 2.0, 0)
+	if args.has("gaze"):
+		var p: PackedStringArray = args["gaze"].split(",")
+		g = Vector2(float(p[0]), float(p[1]))
+	body.look_toward(g - camera.unproject_position(body.head_position()) if args.has("gaze") else Vector2.ZERO)
+
+
+# --- renderer -----------------------------------------------------------------------------
+func _pump(delta: float) -> void:
+	_link.poll()
+	var st := _link.get_status()
+	_since += delta
+	if st == StreamPeerTCP.STATUS_CONNECTED:
+		if not _linked:
+			_linked = true
+			_send({"t": "hello", "token": args.get("token", ""),
+				"hwnd": DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE),
+				"height_m": height_m, "half_width_m": half_width_m})
+		var n := _link.get_available_bytes()
+		if n > 0:
+			_rx += _link.get_utf8_string(n)
+			var lines := _rx.split("\n")
+			_rx = lines[lines.size() - 1]
+			for i in lines.size() - 1:
+				var msg = JSON.parse_string(lines[i])
+				if msg is Dictionary:
+					_on_message(msg)
+	elif (_linked and st != StreamPeerTCP.STATUS_CONNECTING) or st == StreamPeerTCP.STATUS_ERROR \
+			or (not _linked and _since > LINK_TIMEOUT_S):
+		print("RAPHAEL3D overlay link closed: quitting")  # the overlay quit, crashed or never came
+		get_tree().quit()
+		return
+	if _frame.is_empty():
+		return
+	_apply(_frame, delta)
+
+
+func _on_message(msg: Dictionary) -> void:
+	match msg.get("t", ""):
+		"frame":
+			if _frame.is_empty():
+				print("RAPHAEL3D first frame: ", msg)
+			_frame = msg
+		"quit":
+			get_tree().quit()
+
+
+func _apply(f: Dictionary, delta: float) -> void:
+	model.visible = f.get("visible", true)
+	if not model.visible:
+		return
+	var view := get_viewport().get_visible_rect().size
+	var feet: Array = f.get("feet", [view.x / 2, view.y])
+	_place(Vector2(feet[0], feet[1]), float(f.get("h", PREVIEW_PX)), view)
+	# she turns while walking (2D flips; she faces front again at rest)
+	var goal := (-TURN if f.get("facing_left", false) else TURN) if f.get("walking", false) else 0.0
+	_yaw = lerpf(_yaw, goal, 1.0 - exp(-delta * 8.0))
+	model.rotation_degrees.y = _yaw
+	body.play(f.get("motion", "Idle"))
+	body.hold(f.get("expression", ""))
+	var params: Dictionary = f.get("params", {})
+	body.params = params
+	body.mouth = params.get("ParamMouthOpenY", 0.0)
+	body.eyes_closed = params.get("ParamEyeLOpen", 1.0) < 0.5
+	var gaze = f.get("gaze")
+	var head := camera.unproject_position(body.head_position())
+	body.look_toward(Vector2(gaze[0], gaze[1]) - head if gaze is Array else Vector2.ZERO)
+	if Engine.get_process_frames() % 600 == 0:
+		print("RAPHAEL3D view=%s feet=%s h=%s clip=%s model_at=%s" % [view, feet, f.get("h"), body.clip_name(), model.position])
+
+
+func _send(msg: Dictionary) -> void:
+	if _link and _link.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+		_link.put_data((JSON.stringify(msg) + "\n").to_utf8_buffer())
+
+
+# --- shared -------------------------------------------------------------------------------
+## Orthographic camera over the whole window (window px <-> metres, y up from the bottom),
+## her feet at `feet` px and `h_px` tall.
+func _place(feet: Vector2, h_px: float, view: Vector2) -> void:
+	var ppm := h_px / height_m
+	camera.size = view.y / ppm
+	camera.position = Vector3(view.x / 2.0 / ppm, view.y / 2.0 / ppm, 10.0)
+	model.position = Vector3(feet.x / ppm, (view.y - feet.y) / ppm + _base_y, 0)
+
+
+func _update_hull() -> void:
+	if not model.visible:
+		_hull = PackedVector2Array()
+	else:
+		var pts := PackedVector2Array()
+		for p in body.outline_points():
+			var s := camera.unproject_position(p)
+			for k in HULL_RING:
+				pts.append(s + Vector2.from_angle(TAU * k / HULL_RING) * MARGIN)
+		_hull = Geometry2D.convex_hull(pts)
+	if _linked:
+		var flat := []
+		for v in _hull:
+			flat.append(roundi(v.x))
+			flat.append(roundi(v.y))
+		_send({"t": "hull", "pts": flat})
+
+
+func _finish() -> void:
+	print("RAPHAEL3D fps_avg=%.1f frames=%d seconds=%.1f clip=%s" % [_frames / _elapsed, _frames, _elapsed, body.clip_name()])
+	if args.has("screenshot"):
+		var img := get_viewport().get_texture().get_image()
+		img.save_png(args["screenshot"])
+		var used := img.get_used_rect()
+		var outside := 0
+		for y in range(used.position.y, used.end.y, 2):
+			for x in range(used.position.x, used.end.x, 2):
+				if img.get_pixel(x, y).a > 0.0 and not Geometry2D.is_point_in_polygon(Vector2(x, y), _hull):
+					outside += 1
+		print("RAPHAEL3D screenshot %s drawn=%s drawn_px_outside_hull=%d" % [args["screenshot"], used, outside])
+	get_tree().quit()

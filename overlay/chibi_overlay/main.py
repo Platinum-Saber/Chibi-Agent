@@ -30,6 +30,9 @@ def main() -> None:
     import argparse
     ap = argparse.ArgumentParser(prog="chibi_overlay")
     ap.add_argument("--debug-throw", metavar="VX,VY", help="throw her at VX,VY px/s 4 s after start")
+    ap.add_argument("--outfit", help="start in this outfit (e.g. teen_3d), whatever was saved")
+    ap.add_argument("--debug-switch", metavar="S", type=float,
+                    help="switch body (2D art <-> 3D model) after S s and again after 2S s, as the tray does")
     args = ap.parse_args()
     paths.ensure()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -52,12 +55,15 @@ def main() -> None:
     custom = character.load(paths.DATA / character.FILE_NAME)  # tray -> Customize Raphael
     if custom.outfit in wardrobe.outfits and not wardrobe.outfits[custom.outfit].missing_models():
         wardrobe = replace(wardrobe, current=custom.outfit)
+    if args.outfit in wardrobe.outfits:
+        wardrobe = replace(wardrobe, current=args.outfit)
     log.info("outfits: %s; wearing %s", ", ".join(wardrobe.names), wardrobe.current)
     primary = QGuiApplication.primaryScreen()
 
     link = QtLink()
     stage = Stage(wardrobe, PKG, primary.devicePixelRatio(), link, own_windows=set())
     stage.apply_character(custom)
+    stage.bodies = dict(cfg.get("bodies") or {})  # her 2D art / 3D model (tray -> Switch to ...)
     stage.chibi_only = bool(cfg.get("chibi_only", False))
     if stage.chibi_only:
         log.info("chibi_only: the serious form is off")
@@ -115,6 +121,10 @@ def main() -> None:
     if args.debug_throw:
         vx, vy = (float(v) for v in args.debug_throw.split(","))
         QTimer.singleShot(4000, lambda: stage.physics.throw_at(vx, vy))
+
+    if args.debug_switch:
+        QTimer.singleShot(int(args.debug_switch * 1000), tray.switch_body)
+        QTimer.singleShot(int(args.debug_switch * 2000), tray.switch_body)
 
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     tick = QTimer()

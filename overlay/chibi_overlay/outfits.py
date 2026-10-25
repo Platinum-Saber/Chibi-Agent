@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .body import motion
 from .body.motion import RigMap
+from .godot3d import PREFIX as GODOT, missing as godot_missing
 from .sprites import PREFIX as SPRITES
 from .vector import PREFIX as VECTOR
 
@@ -32,8 +33,18 @@ class Outfit:
         return {form: motion.load(pkg / self.maps[form]) for form in FORMS}
 
     def missing_models(self) -> list[str]:
-        return [p for p in self.rigs.values()
-                if not p.startswith(VECTOR) and not Path(p.removeprefix(SPRITES)).exists()]
+        out = []
+        for p in self.rigs.values():
+            if p.startswith(GODOT):
+                out += godot_missing(p.removeprefix(GODOT))
+            elif not p.startswith(VECTOR) and not Path(p.removeprefix(SPRITES)).exists():
+                out.append(p)
+        return list(dict.fromkeys(out))
+
+    @property
+    def body(self) -> str:
+        """"3d" for her Godot body, else "2d" (Live2D, sprite pack, vector rig)."""
+        return "3d" if self.rigs["chibi"].startswith(GODOT) else "2d"
 
 
 @dataclass(frozen=True)

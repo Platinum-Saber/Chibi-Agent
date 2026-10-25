@@ -65,6 +65,16 @@ class MonitorWindow(QOpenGLWidget):
             self.stage.ground.own.add(self.hwnd)
             self.rect_px = win32.window_rect(self.hwnd)
             self.poll.start(16)
+        self._models_visible(True)
+
+    def hideEvent(self, e) -> None:
+        self._models_visible(False)  # hidden (tray, fullscreen app, gaming): the 3D body too
+        super().hideEvent(e)
+
+    def _models_visible(self, on: bool) -> None:
+        for p in self.puppets.values():
+            if hasattr(p.model, "set_visible"):
+                p.model.set_visible(on)
 
     def _poll_cursor(self) -> None:
         st = self.stage
@@ -106,6 +116,9 @@ class MonitorWindow(QOpenGLWidget):
     def _load_puppets(self) -> None:
         """Load the current outfit's models (GL context current) and queue their calibration."""
         st = self.stage
+        for p in self.puppets.values():
+            if hasattr(p.model, "close"):  # the 3D body's renderer process
+                p.model.close()
         self.puppets = {}  # drops the old outfit's models
         for form in FORMS:
             self.puppets[form] = Puppet(st.rig_paths[form], st.rigs[form], self.dpr, self._fb(), self)
@@ -170,6 +183,7 @@ class MonitorWindow(QOpenGLWidget):
         l, t, r, b = self.rect_px
         form = st.draw_form()
         drew = False
+        hit = None  # the 3D body answers hit tests itself (Godot draws her, not this window)
         if form and self._near_me():
             pup = self.puppets[form]
             x, y = st.feet
@@ -185,10 +199,11 @@ class MonitorWindow(QOpenGLWidget):
             pup.model.Update()
             pup.model.Draw()
             drew = True
+            hit = getattr(pup.model, "hit", None)
         self.cursor_here = l <= cx < r and t <= cy < b
         if self.cursor_here:
-            st.cursor_on_her = (drew and self._alpha_at(cx - l, cy - t) > 8) \
-                or st.hit_overlay(cx, cy) is not None
+            on_her = hit(cx - l, cy - t) if hit else drew and self._alpha_at(cx - l, cy - t) > 8
+            st.cursor_on_her = on_her or st.hit_overlay(cx, cy) is not None
         if self._near_me() or st.transform_progress() is not None:
             Painter(self, (l, t), self.dpr, st).paint()
             drew = True
@@ -206,6 +221,15 @@ class MonitorWindow(QOpenGLWidget):
         st = self.stage
         for form in list(self.calibrating):
             pup = self.puppets[form]
+            if getattr(pup.model, "failed", ""):  # the 3D renderer didn't start: back to 2D
+                st.body_failed(pup.model.failed)
+                return
+            if form not in st.geom and hasattr(pup.model, "geom"):  # the 3D body reports its size
+                g = pup.model.geom()
+                if g is None:
+                    return  # the renderer is still starting
+                st.geom[form] = g
+                log.info("%s 3D body measured: %s", form, g)
             if form not in st.geom:
                 if not self.primary:
                     return  # wait for the primary window's measurement

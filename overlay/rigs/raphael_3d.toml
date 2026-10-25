@@ -1,0 +1,38 @@
+# Mood -> clip/expression map for her 3D body (overlay3d/, Godot; chibi_overlay/godot3d.py).
+# Motion names are clips in overlay3d/clips.gd (keyed in code for now; a real Mixamo/VRMA clip
+# can replace one there under the same name). Expressions are the VRM's own: neutral, happy,
+# angry, sad, relaxed, surprised (blink is driven by the body).
+# Every brain mood and moment has a clip, so nothing falls back by accident.
+height_dip = 520  # feet to head top in DIPs (Kryo, 2026-10-25; was 680, then 476)
+
+[moods]
+idle         = { motion = "Idle", expression = "neutral" }
+surprised    = { motion = "Surprised", expression = "surprised" }
+pout         = { motion = "Pout", expression = "angry" }
+crying       = { motion = "Upset", expression = "sad" }
+happy        = { motion = "Happy", expression = "happy" }
+held         = { motion = "Held", expression = "surprised" }
+falling      = { motion = "Fall", expression = "surprised" }
+soft_landing = { motion = "Land", expression = "happy" }
+dizzy        = { motion = "Dizzy", expression = "sad" }
+walking      = { motion = "Walk", expression = "neutral" }
+wander       = { motion = "Walk", expression = "neutral" }
+moment       = { motion = "Idle", expression = "neutral" }
+sleeping     = { motion = "Sleep", expression = "relaxed" }
+dancing      = { motion = "DanceVibe", expression = "happy" }
+dancing_excited = { motion = "DanceExcited", expression = "happy" }
+cursor_near  = { motion = "Idle", expression = "happy" }
+cursor_far   = { motion = "Idle", expression = "neutral" }
+talking      = { motion = "Talk", expression = "neutral" }
+thinking     = { motion = "Think", expression = "neutral" }
+working      = { motion = "Analyse", expression = "neutral" }
+alert        = { motion = "Notice", expression = "surprised" }
+
+[moments]
+look_around = { motion = "LookAround", expression = "neutral" }
+stretch     = { motion = "Stretch", expression = "relaxed" }
+analyse     = { motion = "Analyse", expression = "neutral" }
+sit         = { motion = "Sit", expression = "relaxed" }
+wave        = { motion = "Wave", expression = "happy" }
+curious     = { motion = "Notice", expression = "neutral" }
+thinking    = { motion = "Think", expression = "neutral" }

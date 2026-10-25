@@ -38,6 +38,11 @@ outfit = "casual_coat"  # her own robe rig is "robe"; was "aniya"
 chibi_only = true
 # Extra fonts for her text panel (Electroharmonix), outside git; every .otf/.ttf here is loaded.
 fonts_dir = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\fonts'
+# Her bodies, one at a time (tray / Customize -> "Switch to 3D model" / "Switch to 2D art"):
+# the outfit each one wears. The choice is remembered in her Customize settings.
+bodies = { 2d = "casual_coat", 3d = "teen_3d" }
+# Godot 4.7 for the 3D body (overlay3d/); it draws her under this overlay's window.
+godot_exe = 'X:\Godot\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe'
 # Shared mood maps (relative to overlay/); an outfit may set its own chibi_map / serious_map.
 chibi_map = 'rigs/haru.toml'
 serious_map = 'rigs/mao.toml'
@@ -57,6 +62,14 @@ serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model
 chibi_rig = 'sprites:D:\Character Design\output\assets\chibi\casual-coat\v01'
 chibi_map = 'rigs/raphael_sprites.toml'
 serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
+
+[overlay.outfits.teen_3d]
+# Her full-size 3D model (Godot renderer, overlay3d/README.md). Personal use only: the VRM in
+# overlay3d/models/ stays out of git. One form: both names point at the same body.
+chibi_rig = 'godot:D:\Projects\Chibi-Agent-Project\Chibi-Agent\overlay3d'
+chibi_map = 'rigs/raphael_3d.toml'
+serious_rig = 'godot:D:\Projects\Chibi-Agent-Project\Chibi-Agent\overlay3d'
+serious_map = 'rigs/raphael_3d.toml'
 
 [overlay.outfits.aniya]
 # Free ANIYA model by DG_studio: personal use only, no for-profit streaming, no

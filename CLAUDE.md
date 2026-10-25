@@ -29,4 +29,5 @@ Budget: keep this file under ~500 tokens.
 - Tests: `uv run pytest` in each package; `agent/tests/test_cases_live.py` needs Ollama.
 - Google (M5): Kryo saves the Desktop OAuth client JSON as `%APPDATA%\ChibiAgent\google_client.json`, then tray → Google accounts → Add Google account… once per account. Refresh tokens in Credential Manager (`ChibiAgent`, `google:<email>` + `google:accounts`).
 - Debug: `python -m chibi_agent --without voice|overlay`; `python -m chibi_overlay --debug-throw VX,VY`.
+- 3D body (Godot 4.7 renderer driven by the overlay; tray switches 2D/3D): `overlay3d/README.md`. Test overlays get their own empty APPDATA/LOCALAPPDATA, or they knock the running overlay off the agent.
 - Processes started from the Claude app write AppData into `Packages\Claude_*\LocalCache` (MSIX); the user's real logs are in `%LOCALAPPDATA%\ChibiAgent\logs`.
