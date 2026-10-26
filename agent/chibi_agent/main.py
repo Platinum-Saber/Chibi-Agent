@@ -14,6 +14,7 @@ from .control import Controller
 from .google_auth import GoogleAuth
 from .hotkey import HoldHotkey
 from .mailwatch import Briefer, MailWatch, MorningBriefing
+from .memrelief import MemoryRelief
 from .notifywatch import NotifyWatch
 from .tools import files
 from .tools.runner import Gate, Runner
@@ -22,6 +23,7 @@ from .llm import Ollama
 from .memory import Memory
 from .memory.store import Store
 from .orchestrator import Orchestrator
+from .reactions import Reactor
 from .schedulers import Reminders
 from .vram import VramManager
 from .server import Hub
@@ -30,7 +32,8 @@ from .supervisor import Supervisor
 log = logging.getLogger("chibi_agent")
 
 
-async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> None:
+async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> bool:
+    """Runs until stopped; True when the tray asked for a restart."""
     paths.ensure()
     cfg = config.load()
     for name in without:
@@ -61,12 +64,26 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
     morning = MorningBriefing(store, orch.briefer, orch, vram, bcfg,
                               ready=lambda: "voice" in hub.clients or not voice_on)
     notifywatch = NotifyWatch(store, llm, orch, vram, hub, cfg.get("notifications", {}))
+    mcfg = {"embed_model": cfg["ollama"].get("embed_model", ""), **cfg.get("memory_relief", {})}
+    relief = MemoryRelief(hub, llm, orch, vram, mcfg) if mcfg.get("enabled", True) else None
+    orch.memrelief = relief
     mailwatch.start()
     morning.start()
     notifywatch.start()
+    if relief is not None:
+        relief.start()
     miner = asyncio.create_task(_mine_memories(memory))
     stop = stop or asyncio.Event()
-    Controller(hub, orch, vram, memory, stop.set, google=tools.CTX.google, notify=notifywatch)
+    restart = False
+
+    def restart_cb() -> None:
+        nonlocal restart
+        restart = True
+        stop.set()
+
+    Controller(hub, orch, vram, memory, stop.set, google=tools.CTX.google, notify=notifywatch,
+               restart_cb=restart_cb)
+    Reactor(hub, orch, vram)  # her short voice reactions to pokes, drops, sleep...
     hotkey = HoldHotkey(cfg["hotkeys"]["push_to_talk"], asyncio.get_running_loop(),
                         orch.ptt_down, orch.ptt_up)
     hotkey.start()
@@ -85,6 +102,8 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
         mailwatch.stop()
         morning.stop()
         notifywatch.stop()
+        if relief is not None:
+            relief.stop()
         miner.cancel()
         try:  # close today's conversation into memory before leaving
             await asyncio.wait_for(memory.extract_due(force=True), 30)
@@ -100,6 +119,7 @@ async def run(stop: asyncio.Event | None = None, without: list[str] = ()) -> Non
             await hub.send(role, Quit())
         await sup.stop()
         await hub.stop()
+    return restart
 
 
 async def _check_models(llm: Ollama, ocfg: dict) -> None:
@@ -142,6 +162,45 @@ def single_instance() -> object | None:
     return handle
 
 
+def relaunch(lock: object) -> None:
+    """Tray "Restart agent": once this agent has shut down, let go of the mutex and start a fresh
+    one (it starts its own overlay and voice). The new agent must leave KillOnExitJob, or Windows
+    kills it as soon as this process exits. Breaking away is refused ("Access is denied") when
+    she was started from a terminal whose own job forbids it (2026-10-26: Restart quit and never
+    came back), so then WMI starts it: a process WMI creates belongs to no job of ours."""
+    import ctypes
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from .supervisor import BREAKAWAY, NO_WINDOW
+    ctypes.windll.kernel32.CloseHandle(lock)
+    exe = Path(sys.executable)
+    pyw = exe.with_name("pythonw.exe")
+    args = [str(pyw if pyw.exists() else exe), "-m", "chibi_agent", *sys.argv[1:]]
+    cwd = Path(__file__).resolve().parents[1]
+    try:
+        subprocess.Popen(args, cwd=cwd, creationflags=NO_WINDOW | BREAKAWAY)
+        log.info("restarting: a fresh agent is starting")
+        return
+    except OSError as e:
+        log.info("restarting: can't leave the job (%s); starting the fresh agent through WMI", e)
+    try:
+        import win32com.client
+        proc = win32com.client.GetObject("winmgmts:").Get("Win32_Process")
+        inp = proc.Methods_("Create").InParameters.SpawnInstance_()
+        inp.Properties_.Item("CommandLine").Value = subprocess.list2cmdline(args)
+        inp.Properties_.Item("CurrentDirectory").Value = str(cwd)
+        out = proc.ExecMethod_("Create", inp)
+        code, pid = out.Properties_.Item("ReturnValue").Value, out.Properties_.Item("ProcessId").Value
+        if code == 0:
+            log.info("restarting: a fresh agent is starting (pid %s)", pid)
+        else:
+            log.error("restart failed: WMI Win32_Process.Create returned %s", code)
+    except Exception:
+        log.exception("restart failed: start Raphael again by hand")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="chibi_agent")
     ap.add_argument("--without", action="append", choices=["overlay", "voice"], default=[],
@@ -156,9 +215,11 @@ def main() -> None:
         handlers=[logging.StreamHandler(), logging.FileHandler(paths.LOGS / "agent.log", encoding="utf-8")])
     logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
-        asyncio.run(run(without=args.without))
+        restart = asyncio.run(run(without=args.without))
     except KeyboardInterrupt:
-        pass
+        return
+    if restart:
+        relaunch(lock)
 
 
 if __name__ == "__main__":

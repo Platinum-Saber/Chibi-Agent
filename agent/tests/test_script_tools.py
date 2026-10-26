@@ -91,10 +91,10 @@ class FakeShell:
 
 def test_recycle_bin_lists_items_and_total():
     sh = FakeShell([FakeItem("ANIYA", 84 * 1024 * 1024, "D:\\Rigs", "23/10/2026 10:00"),
-                    FakeItem("notes.txt", 2048, "C:\\Users\\Kryo", "22/10/2026 09:00")])
+                    FakeItem("notes.txt", 2048, "C:\\Users\\Saber", "22/10/2026 09:00")])
     r = recycle_bin.recycle_bin(shell=sh)
     assert r.text.startswith("2 items, 84.0 MB in all") and "ANIYA" in r.text and "from D:\\Rigs" in r.text
-    assert "emptying it is for Kryo" in r.text
+    assert "emptying it is for Saber" in r.text
     assert recycle_bin.recycle_bin(shell=FakeShell([])).text == "The Recycle Bin is empty."
 
 
@@ -104,7 +104,7 @@ def test_recycle_bin_restores_by_name_and_never_empties():
     assert "Restored ANIYA" in recycle_bin.recycle_bin_action("restore", "aniya", shell=sh).text
     assert item.done == ["&Restore"]  # only the Restore verb, never Delete
     assert "Nothing called" in recycle_bin.recycle_bin_action("restore", "zzz", shell=sh).text
-    assert "Emptying the bin is for Kryo" in recycle_bin.recycle_bin_action("empty", shell=sh).text
+    assert "Emptying the bin is for Saber" in recycle_bin.recycle_bin_action("empty", shell=sh).text
     assert REG["recycle_bin_action"].confirm and not REG["recycle_bin"].side_effect
 
 

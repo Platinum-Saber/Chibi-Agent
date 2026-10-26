@@ -1,14 +1,14 @@
 """Google sign-in for Calendar and Gmail, read-only (docs/scope.md -> M5).
 
-Kryo makes the Desktop OAuth client in the Google Cloud console, saves its JSON
+Saber makes the Desktop OAuth client in the Google Cloud console, saves its JSON
 as %APPDATA%\\ChibiAgent\\google_client.json and signs in from the tray: the
-browser opens Google's own page and Kryo completes it there (never automated).
+browser opens Google's own page and Saber completes it there (never automated).
 Several accounts can be signed in; each one's refresh token is kept in Windows
 Credential Manager (keyring, user "google:<email>"), with the list of accounts
 under "google:accounts" since keyring can't enumerate. Access tokens live in memory.
 
 The OAuth app is in Testing mode, so Google expires a sign-in after 7 days: that
-account is dropped and Kryo is told to sign in again.
+account is dropped and Saber is told to sign in again.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ PRIMARY = "https://www.googleapis.com/calendar/v3/calendars/primary"
 
 
 class NotConnected(Exception):
-    """No usable sign-in for an account: Kryo has to sign in from the tray."""
+    """No usable sign-in for an account: Saber has to sign in from the tray."""
 
 
 def short(email: str) -> str:
@@ -85,7 +85,7 @@ class GoogleAuth:
         return data.get("installed") or data.get("web") or data
 
     def _run_flow(self):
-        """Google's own page in Kryo's browser, with the account chooser every time."""
+        """Google's own page in Saber's browser, with the account chooser every time."""
         from google_auth_oauthlib.flow import InstalledAppFlow
         flow = InstalledAppFlow.from_client_secrets_file(str(self.client_file), SCOPES)
         return flow.run_local_server(port=0, open_browser=True, prompt="select_account consent",

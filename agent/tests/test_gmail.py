@@ -132,10 +132,10 @@ async def test_no_accounts(monkeypatch):
 
 def test_body_from_html_and_long_mail():
     msg = {"payload": {"mimeType": "text/html", "body": {"data": b64(
-        "<html><head><style>p{}</style></head><body><p>Hello&nbsp;Kryo</p><script>x()</script>"
+        "<html><head><style>p{}</style></head><body><p>Hello&nbsp;Saber</p><script>x()</script>"
         "<div>Line two</div></body></html>")}}}
     text, files = gmail.body_text(msg)
-    assert text == "Hello Kryo\n\nLine two" and files == []
+    assert text == "Hello Saber\n\nLine two" and files == []
 
 
 async def test_long_body_is_cut(api, monkeypatch):

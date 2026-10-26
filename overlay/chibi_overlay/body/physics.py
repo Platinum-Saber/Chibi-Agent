@@ -62,6 +62,10 @@ class Physics:
         self._peak_fall = 0.0
         """Fastest downward speed of the current fall, for the landing reaction (px/s at 96 dpi)."""
         self._hit_floor = False
+        self.top_y = 0.0
+        """Highest point (smallest y) of the current flight: how far she dropped when she lands."""
+        self.wall_hit = 0.0
+        """Fastest sideways speed she hit a wall (screen edge) at this flight (px/s at 96 dpi)."""
 
     def place(self, x: float, y: float) -> None:
         self.x = x
@@ -78,6 +82,8 @@ class Physics:
         self.airborne = True
         self._peak_fall = 0.0
         self._hit_floor = False
+        self.top_y = self.y
+        self.wall_hit = 0.0
 
     def leap_to(self, target_x: float, apex_y: float) -> bool:
         """Jumps so that her feet peak at ``apex_y`` right over ``target_x`` (px).
@@ -138,15 +144,14 @@ class Physics:
         self.vy += GRAVITY * self.scale * dt
         self.x += self.vx * dt
         self.y += self.vy * dt
-        if self.x < min_x:
-            self.x = min_x
-            self.vx = -self.vx * WALL_BOUNCE
-        if self.x > max_x:
-            self.x = max_x
+        if self.x < min_x or self.x > max_x:
+            self.x = min_x if self.x < min_x else max_x
+            self.wall_hit = max(self.wall_hit, abs(self.vx) / self.scale)
             self.vx = -self.vx * WALL_BOUNCE
         if self.y < ceiling:
             self.y = ceiling
             self.vy = abs(self.vy) * WALL_BOUNCE
+        self.top_y = min(self.top_y, self.y)
         if self.vy > 0:
             self._peak_fall = max(self._peak_fall, self.vy / self.scale)
         floor = self.floor_y(self.x)

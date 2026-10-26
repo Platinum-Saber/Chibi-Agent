@@ -13,7 +13,8 @@ from typing import Annotated, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 VERSION = 4  # 2: tray commands, state, memory items (M6); 3: Google sign-in (M5); 4: outfits
-# (voice_tune / voice_test were added without a bump: new types, no existing shape changed)
+# (voice_tune / voice_test / react / restart / Speak.only_cached were added without a bump: new types
+# or optional fields, no existing shape changed)
 
 Role = Literal["overlay", "voice"]
 Form = Literal["chibi", "serious"]
@@ -122,6 +123,15 @@ class Touch(Msg):
     speed: float = 0.0
 
 
+class React(Msg):
+    """Something happened to her body (poked, picked up, fell asleep, a wheel pose...): the agent
+    may answer with a short voice reaction (chibi_shared.reactions). `picked`: Saber chose it on
+    the pose wheel, so it always gets a line; automatic idle moments only sometimes."""
+    t: Literal["react"] = "react"
+    event: str
+    picked: bool = False
+
+
 class TextInput(Msg):
     t: Literal["text_input"] = "text_input"
     text: str
@@ -150,6 +160,7 @@ class OutfitState(Msg):
 CommandName = Literal[
     "toggle_visible", "mute", "unmute", "gaming_on", "gaming_off", "memory_list", "memory_delete",
     "open_settings", "autostart_on", "autostart_off", "google_signin", "google_signout", "notif_access", "quit",
+    "restart",  # quit, then a fresh agent (which restarts the overlay and voice)
     "voice_test",  # arg: a line for her to say in the current voice (Customize window)
 ]
 
@@ -204,6 +215,7 @@ class Speak(Msg):
     utt_id: str
     text: str
     clip: str | None = None  # name of a pre-rendered clip to play instead of synthesising
+    only_cached: bool = False  # a reaction: play the clip if it's rendered, else skip (never synthesise)
 
 
 class SpeakState(Msg):
@@ -219,6 +231,9 @@ class Stop(Msg):
 class Load(Msg):
     t: Literal["load", "unload"]
     what: Literal["stt", "tts", "all"] = "all"
+    # "memory": memory relief (agent memrelief.py). Only F5 goes (Kokoro stays) and it
+    # reloads by itself when speech needs it; gaming mode's plain unload stays unloaded.
+    reason: str = ""
 
 
 # --- voice -> overlay (relayed by the agent) -------------------------------------
@@ -229,7 +244,7 @@ class Lip(Msg):
 
 Message = Annotated[
     Union[Hello, Welcome, Quit, MoodReq, FormReq, OutfitReq, Bubble, Hud, Confirm, Cloud, Visibility,
-          MoodAck, ConfirmResult, Touch, TextInput, FileDrop, Fullscreen, OutfitState, Command, State,
+          MoodAck, ConfirmResult, Touch, React, TextInput, FileDrop, Fullscreen, OutfitState, Command, State,
           MemoryItems, VoiceTune,
           Ptt, Transcript, Speak, SpeakState, Stop, Load, Lip],
     Field(discriminator="t"),

@@ -1,12 +1,13 @@
 extends Node
-## Her props (props/, from Character Design's Raphael_Props_v01): shown only while they're used.
+## Her props (props/, from Character Design's Raphael_Props_v01; the futon is futon-v02): shown
+## only while they're used.
 ##
-## Headset: on for slow music (the DanceVibe clip, no mic) and for a conversation (listening,
-## thinking, talking, mouth moving; with the mic), off 5 s after both end. Not for DanceExcited.
+## Headset: on for a spoken conversation (push-to-talk until her reply ends; with the mic) and
+## while media plays (no mic), off 5 s after both end. The overlay decides (stage.py `headset`):
+## not for voice reactions, poses, briefings or typed chat (Saber, 2026-10-26).
 ## Beanbag: appears under her while she sits (Sit) and squashes as she settles.
-## Futon: appears under her while she sleeps (Sleep), laid along her body, blanket raised.
-## Switched off for now (SHOW_FUTON; Kryo, 25 October 2026): she sleeps on the floor until a
-## futon v02 fits her poses (D:/Character Design/output/3d/props/requests/futon-v02-requirements.md).
+## Futon (v02): appears under her while she sleeps (Sleep), laid along her body, the blanket
+## shaped for the take (clip_sources.cfg `cover`: Cover_Front, Cover_Side, Cover_SitUp...).
 ## They pop in and out by scale; the headset follows her Head bone (props/scripts/
 ## headphone_attachment.gd), the furniture sits on the floor under her (children of the model,
 ## so they move and turn with her). Clicks pass through them: the hull is her bones only.
@@ -19,7 +20,7 @@ const POP := 0.2  # s to pop a prop in or out
 const SETTLE := 0.4  # s for the beanbag to squash as she sits
 const BEANBAG_BACK := 0.15  # m behind her feet: hips on the seat, legs over its front
 const PILLOW_FROM_CENTRE := 0.635  # futon: Pillow_Surface along -Z from its centre
-const SHOW_FUTON := false  # true: the futon under her sleep takes (re-fit their lifts in clip_sources.cfg)
+const SHOW_FUTON := true  # false: she sleeps on the floor (set the Sleep lifts in clip_sources.cfg to 0)
 # The props were made and previewed in Blender: soft light from several sides and its AgX view,
 # which lifts and desaturates colour. Under her one sharp key light the same PBR colours come out
 # vivid and dark-sided. So the furniture gets a fill light of its own (render layer 2: it can't
@@ -42,6 +43,7 @@ var _t := 0.0
 var _headset_until := -INF
 var _shown := {}  # prop -> 0..1 popped in
 var _settle := 0.0
+var _cover := &""  # the blanket shape key set on the futon
 
 
 func attach(b: Node) -> void:
@@ -58,6 +60,8 @@ func attach(b: Node) -> void:
 		model.add_child(prop)
 		prop.visible = false
 		_shown[prop] = 0.0
+	if futon:
+		futon.call("set_shape", &"Pillow_Dent", 1.0)  # her head's dent, under every cover
 	# the helper looks its skeleton up by path in _ready, before it has a parent: hand it over
 	headset.set("_skeleton", skeleton)
 	headset.set("_head", skeleton.find_bone("Head"))
@@ -75,11 +79,11 @@ func attach(b: Node) -> void:
 		add_child(l)
 
 
-## Once per frame, after the body has posed. `listening`: the agent's listening mood.
-func update(delta: float, clip: String, listening: bool, mouth: float) -> void:
+## Once per frame, after the body has posed. `mode`: the headset's "talk", "music" or "" (the overlay's).
+func update(delta: float, clip: String, mode: String) -> void:
 	_t += delta
-	var talk := listening or clip == "Think" or clip == "Talk" or mouth > 0.03
-	if talk or clip == "DanceVibe":
+	var talk := mode == "talk"
+	if mode != "":
 		_headset_until = _t + HEADSET_OFF_AFTER
 		if _mic:
 			_mic.visible = talk  # the mic for a conversation, plain headphones for music
@@ -95,8 +99,11 @@ func update(delta: float, clip: String, listening: bool, mouth: float) -> void:
 	var sleeping := clip == "Sleep"
 	if sleeping or _shown[futon] > 0.0:
 		_lay_futon()
-	if sleeping:  # raised over her, unless the take lies on top of it (clip_sources.cfg `blanket`)
-		futon.call("set_occupied", float(body.take_meta().get("blanket", 1.0)))
+	if sleeping:  # the take's blanket shape; set_cover clears the others, so only on a change
+		var cover := StringName(body.take_meta().get("cover", "Occupied"))
+		if cover != _cover:
+			_cover = cover
+			futon.call("set_cover", cover)
 	_pop(futon, sleeping, delta)
 
 

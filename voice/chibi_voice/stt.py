@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 SR = 16000
 # Words she must hear right ("status report" runs the briefing; Whisper heard "briefing" as "breathing").
-HOTWORDS = "Raphael, Kryo, status report"
+HOTWORDS = "Raphael, Saber, status report"
 
 
 class Recorder:
@@ -65,11 +65,13 @@ class Stt:
         self.device: str | None = None
 
     def load(self, device: str = "cuda") -> None:
-        import torch  # loads the cuBLAS/cuDNN DLLs ctranslate2 needs
+        if device == "cuda":
+            from .env import load_cuda_dlls
+            ok = load_cuda_dlls()  # before ctranslate2 imports: its cuBLAS/cuDNN, without torch
+            import ctranslate2
+            if not ok or ctranslate2.get_cuda_device_count() == 0:
+                device = "cpu"
         from faster_whisper import WhisperModel
-
-        if device == "cuda" and not torch.cuda.is_available():
-            device = "cpu"
         if self.model is not None and self.device == device:
             return
         t0 = time.perf_counter()
@@ -88,11 +90,9 @@ class Stt:
     def unload(self) -> None:
         """Free the GPU copy and fall back to the CPU."""
         if self.device == "cuda":
-            self.model = None
+            self.model = None  # ctranslate2 frees its GPU memory with the model
             import gc
-            import torch
             gc.collect()
-            torch.cuda.empty_cache()
         self.load("cpu")
 
     def transcribe(self, audio: np.ndarray) -> str:

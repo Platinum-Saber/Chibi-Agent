@@ -12,7 +12,7 @@ happy        = { motion = "TapBody", index = 2, expression = "F05" }
 held         = { expression = "F06" }
 falling      = { expression = "F06" }
 soft_landing = { expression = "F05" }
-hard_landing = { expression = "F05" }  # never reached: only the 3D body falls flat
+hard_landing = { expression = "F05" }  # a high drop
 dizzy        = { expression = "F08" }
 walking      = { motion = "Idle", index = 0 }
 wander       = { motion = "Idle", index = 0 }

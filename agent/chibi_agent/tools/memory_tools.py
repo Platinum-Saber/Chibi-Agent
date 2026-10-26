@@ -1,6 +1,6 @@
 """Tools over her memory and reminders. All async: they run on the agent's loop,
 which owns the SQLite connection (worker threads may not use it). Remembering, reminders and forgetting are all
-confirmed first (Kryo's call, 2026-10-17)."""
+confirmed first (Saber's call, 2026-10-17)."""
 from __future__ import annotations
 
 import time
@@ -9,8 +9,8 @@ from ..schedulers import parse_when, say_when
 from . import CTX, Result, tool
 
 
-@tool("remember", "Store a lasting fact about Kryo.",
-      {"fact": ("One short sentence, e.g. 'Kryo's sister is called Nimi'", True)},
+@tool("remember", "Store a lasting fact about Saber.",
+      {"fact": ("One short sentence, e.g. 'Saber's sister is called Nimi'", True)},
       side_effect=True)
 async def remember(fact: str) -> Result:
     if CTX.memory is None:
@@ -41,14 +41,14 @@ async def forget_memory(topic: str) -> Result:
 
 @tool("set_reminder", "Set a reminder or timer.",
       {"text": ("What to remind about", True),
-       "when": ("When, in Kryo's words: 'in 20 minutes', 'at 6 pm', 'tomorrow 9am'", True)},
+       "when": ("When, in Saber's words: 'in 20 minutes', 'at 6 pm', 'tomorrow 9am'", True)},
       side_effect=True)
 async def set_reminder(text: str, when: str) -> Result:
     if CTX.reminders is None:
         return Result("Reminders are unavailable.")
     due = parse_when(when)
     if due is None:
-        return Result(f"I could not understand the time '{when}'. Ask Kryo for a clearer time.")
+        return Result(f"I could not understand the time '{when}'. Ask Saber for a clearer time.")
     CTX.reminders.add(text, due.timestamp())
     return Result(f"Reminder set for {say_when(due.timestamp())}: {text}")
 

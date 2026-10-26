@@ -172,7 +172,7 @@ func load_sources(keyed := false) -> void:
 			if not ResourceLoader.exists(path):
 				continue
 			var o := {}  # the slot's settings, then this file's own on top
-			for key in ["start", "end", "lift", "keep_height", "blanket"]:
+			for key in ["start", "end", "lift", "keep_height", "cover"]:
 				if cfg.has_section_key(slot, key):
 					o[key] = cfg.get_value(slot, key)
 			o.merge(per_file.get(f, {}), true)

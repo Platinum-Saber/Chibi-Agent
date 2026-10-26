@@ -21,7 +21,7 @@ def test_exam_reads_without_module_code():
     assert "Your Deep Learning for Vision exam is on Monday at 9 AM." in b.sentences
     assert "EN4554" not in b.text and b.items[0].urgency == Urgency.SOON
     assert b.sentences[0] in ("Notice.", "Report.") and b.sentences[-1] == CLOSER
-    assert b.sentences[1] == "One matter requires your attention, Kryo."
+    assert b.sentences[1] == "One matter requires your attention, Saber."
 
 
 def test_deadline_window_and_urgency():
@@ -66,7 +66,7 @@ def test_word_and_fact_limits():
     mails = [Mail(f"m{i}", f"Sender {i}", "a fairly long subject line about something important", "urgent", NOW)
              for i in range(8)]
     b = compose(NOW, mails=mails)
-    assert len(b.items) == 8 and b.sentences[1] == "Eight matters require your attention, Kryo."
+    assert len(b.items) == 8 and b.sentences[1] == "Eight matters require your attention, Saber."
     facts = b.sentences[2:-1]
     assert 1 <= len(facts) <= 4 and len(b.text.split()) <= MAX_WORDS
 

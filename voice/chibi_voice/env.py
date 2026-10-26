@@ -26,6 +26,33 @@ def configure(vcfg: dict) -> None:
     os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 
+# What ctranslate2 (Whisper) needs from CUDA 12: cuBLAS and cuDNN 9 (runtime first: the others import it).
+CUDA_DLLS = ("cudart64_12.dll", "cublasLt64_12.dll", "cublas64_12.dll", "cudnn64_9.dll")
+
+
+def load_cuda_dlls() -> bool:
+    """Load the CUDA DLLs Whisper needs from torch's wheel without importing torch. `import torch`
+    also maps torch_cuda, cuSPARSE, cuFFT, cuSOLVER and the rest of cuDNN, which Kokoro + Whisper
+    never use: 0.6 GB more private and 0.3 GB more working set (measured 2026-10-25, memory relief).
+    F5 imports torch itself later and gets these same files, already loaded. False: no torch wheel
+    or a DLL failed to load (Whisper then runs on the CPU)."""
+    import ctypes
+    import importlib.util
+    import logging
+
+    spec = importlib.util.find_spec("torch")
+    if spec is None or spec.origin is None:
+        return False
+    lib = Path(spec.origin).parent / "lib"
+    try:
+        for name in CUDA_DLLS:
+            ctypes.WinDLL(str(lib / name))
+    except OSError as e:
+        logging.getLogger(__name__).warning("CUDA DLLs for Whisper did not load from %s: %s", lib, e)
+        return False
+    return True
+
+
 _patched = False
 
 

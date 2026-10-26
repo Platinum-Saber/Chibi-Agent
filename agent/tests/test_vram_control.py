@@ -80,8 +80,8 @@ class FakeOrch:
 async def test_controller_commands(monkeypatch):
     hub = FakeHub()
     mem = Memory({}, Store(":memory:"), BagEmbedder())
-    await mem.remember("Kryo likes tea")
-    await mem.remember("Kryo's cat is Miso")
+    await mem.remember("Saber likes tea")
+    await mem.remember("Saber's cat is Miso")
     quit_called = []
     orch = FakeOrch()
     c = Controller(hub, orch, VramManager(hub, FakeLLM(), free_mb=lambda: 8000), mem,
@@ -90,9 +90,9 @@ async def test_controller_commands(monkeypatch):
     assert orch.muted and isinstance(hub.sent[-1][1], p.State) and hub.sent[-1][1].muted
     await c.command("memory_list", "")
     items = hub.sent[-1][1].items
-    assert [t for _, t in items] == ["Kryo likes tea.", "Kryo's cat is Miso."]
+    assert [t for _, t in items] == ["Saber likes tea.", "Saber's cat is Miso."]
     await c.command("memory_delete", str(items[0][0]))
-    assert [t for _, t in hub.sent[-1][1].items] == ["Kryo's cat is Miso."]
+    assert [t for _, t in hub.sent[-1][1].items] == ["Saber's cat is Miso."]
     await c.command("gaming_on", "")
     assert hub.sent[-1][1].gaming
     await c.command("quit", "")

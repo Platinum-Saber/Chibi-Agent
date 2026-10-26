@@ -19,7 +19,7 @@ const FINGERS := ["Index", "Middle", "Ring", "Little"]
 const LOOPING := {
 	"Idle": true, "Talk": true, "AnswerPoint": false, "Answer": true, "Think": true, "Analyse": true, "Notice": true, "Happy": true,
 	"Surprised": false, "Pout": true, "Upset": true, "Held": true, "Fall": true, "Land": false,
-	"FallFlat": true, "FlatImpact": false, "GetUp": false, "Carried": false, "Dizzy": true, "Walk": true, "Sleep": true, "DanceVibe": true, "DanceExcited": true,
+	"FallFlat": true, "FlatImpact": false, "GetUp": false, "HardLand": false, "Carried": false, "Dizzy": true, "Walk": true, "Sleep": true, "DanceVibe": true, "DanceExcited": true,
 	"LookAround": true, "Stretch": false, "Sit": true, "Wave": true,
 }
 
@@ -41,7 +41,7 @@ static func pose(name: String, t: float) -> Dictionary:
 		"Upset": _upset(p, t)
 		"Held", "Carried": _held(p, t)  # Carried: picked up by the legs (Mixamo "Being Carried")
 		"Fall", "FallFlat": _fall(p, t)  # FallFlat: Mixamo "Falling-facedown" after a carried drop
-		"Land", "FlatImpact", "GetUp": _land(p, t)  # FlatImpact/GetUp: its landing (clip_sources.cfg)
+		"Land", "FlatImpact", "GetUp", "HardLand": _land(p, t)  # the Mixamo takes in clip_sources.cfg
 		"Dizzy": _dizzy(p, t)
 		"Walk": _walk(p, t)
 		"Sleep": _sleep(p, t)

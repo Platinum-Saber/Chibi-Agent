@@ -16,7 +16,7 @@ T = TypeVar("T")
 
 
 def not_connected(service: str) -> str:
-    return (f"Google {service} is not connected. Kryo can choose 'Google accounts', "
+    return (f"Google {service} is not connected. Saber can choose 'Google accounts', "
             "then 'Add Google account' in the tray.")
 
 
@@ -51,7 +51,7 @@ async def each_account(base_url: str, transport: httpx.AsyncBaseTransport | None
     done, problems = [], []
     for email, res in zip(emails, results):
         if isinstance(res, (NotConnected, httpx.HTTPError)):
-            problems.append(f"Could not read {short(email)}: {reason(res)}. Kryo can sign in again from the tray.")
+            problems.append(f"Could not read {short(email)}: {reason(res)}. Saber can sign in again from the tray.")
         elif isinstance(res, BaseException):
             raise res
         else:

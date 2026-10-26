@@ -1,6 +1,6 @@
 """The Recycle Bin through Windows' Shell (namespace 10): see what's in it, open it, restore an
 item. Emptying it deletes files for good, which v1 doesn't do (scope.md): she opens the bin and
-Kryo empties it himself."""
+Saber empties it himself."""
 from __future__ import annotations
 
 import os
@@ -58,7 +58,7 @@ def recycle_bin(shell=None) -> Result:
     lines = [f"{r['name']}  {r['size']}  from {r['from']}  deleted {r['deleted']}" for r in rows[:40]]
     more = f"\n... and {len(rows) - 40} more" if len(rows) > 40 else ""
     return Result(f"{len(rows)} items, {_human(total)} in all:\n" + "\n".join(lines) + more +
-                  "\n(I can open the bin or restore an item; emptying it is for Kryo.)", untrusted=True)
+                  "\n(I can open the bin or restore an item; emptying it is for Saber.)", untrusted=True)
 
 
 @tool("recycle_bin_action", "Open the Recycle Bin, or restore an item.",
@@ -70,9 +70,9 @@ def recycle_bin_action(action: str, name: str = "", shell=None) -> Result:
     action = (action or "").lower()
     if action == "open":
         os.startfile("shell:RecycleBinFolder")  # noqa: S606 (confirmed by Kryo)
-        return Result("Opened the Recycle Bin. Kryo can empty it from there.")
+        return Result("Opened the Recycle Bin. Saber can empty it from there.")
     if action != "restore":
-        return Result("Use action 'open' or 'restore'. Emptying the bin is for Kryo to do.")
+        return Result("Use action 'open' or 'restore'. Emptying the bin is for Saber to do.")
     if not name:
         return Result("Which item? Give its name from the Recycle Bin list.")
     rows = items(shell)

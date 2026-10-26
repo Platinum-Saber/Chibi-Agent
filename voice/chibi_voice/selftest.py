@@ -76,7 +76,7 @@ async def selftest(vcfg: dict) -> None:
 
     print("speaking:")
     await say("clip", "Answer.", clip="Answer.")
-    await say("f5", "The capital of Japan is Tokyo, Kryo.")
+    await say("f5", "The capital of Japan is Tokyo, Saber.")
 
     t = time.perf_counter()
     app.queue.submit(Item("q1", "Your meeting starts in ten minutes."))

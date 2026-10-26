@@ -69,6 +69,7 @@ X:/Blender/blender.exe -b "D:/Character Design/output/3d/teen/vrm-appearance/v01
 - **Mood map:** `overlay/rigs/raphael_3d.toml` maps every brain mood and idle moment to a clip and a VRM expression (neutral, happy, angry, sad, relaxed, surprised). `height_dip` sets her size, which Customize can override.
 - **Facing:** she turns 70° toward where she walks, and at rest faces the way Kryo last turned her.
 - **Turning her:** hold the middle mouse button on her and drag left or right: 0.5° per px (`stage.py` `ROTATE_DEG_PER_PX`), drag right to turn her toward the screen's right. The turn lasts until restart. The 2D art ignores it.
+- **Home spot:** hold Alt and drag her, then let go: she's put down (not thrown) and the taskbar spot below her becomes her home, where she walks back to when idle. It's saved with her Customize settings (`behaviour.home_x/home_y`) and falls back to the default (12 % in from the right of the primary monitor) if that spot is no longer on a screen. Works for the 2D art too.
 - **Pose wheel:** right-click her for a ring of 8 poses beside her (to her right, or her left at the monitor's edge): Wave, Cheer, Think, Look around, Stretch, Dance (DanceExcited, Mixamo "Snake Hip Hop Dance", 15 s, no music needed), Sit (on the beanbag, 20 s) and Sleep (until you poke or drag her, or the agent needs her). Click one to play it; right-click her again, click its centre or anywhere else to close it, and it closes 8 s after the cursor leaves it. The icons in `overlay/icons/wheel/` are her silhouettes rendered with `--offscreen --screenshot`; the poses are mapped in `stage.py` `PERFORM`. It works for the 2D art too.
 - **Walking pace:** `walk_speed` in `raphael_3d.toml` is in her heights per second, so it scales with her size. It's 0.5, 260 px/s at 520 px, which Kryo picked; the Mixamo walk's own stride would be 0.54.
   - **In the UI:** Customize → Look → Walking speed sets px/s per outfit (`walk_px_s` in `character.toml`).
@@ -76,6 +77,7 @@ X:/Blender/blender.exe -b "D:/Character Design/output/3d/teen/vrm-appearance/v01
 - **Smooth movement:** each frame carries her velocity. Godot draws on its own vsync, out of step with the overlay's frames, so it carries her on at that velocity (up to 50 ms) instead of stepping unevenly.
 - **Being held:** picked up at the waist or above, she hangs (`Held`, Mixamo "Hanging Idle"). Picked up below the waist, she's carried flat (`Carried`, "Being Carried"). The overlay decides this when the drag starts (`stage.py` `GRAB_LOW`, half her height) through the rig map's `held_low` entry; rigs without one, like the 2D art, always use `held`.
   - **Answering:** talking straight after thinking opens with `answer_point` → `AnswerPoint` (Mixamo "Pointing", `stage.py` `ANSWER_POINT_S` 2.7 s), then `answer` → `Answer` ("Talking-normal") for the rest of the answer. Other talking (briefings, announcements) keeps the varied `Talk` takes.
+  - **Landings** (Saber, 2026-10-26): a drop of under half the screen's height lands softly (`soft_landing` → `Land`, "Falling To Landing"); a higher one lands hard feet first (`hard_landing_high` → `HardLand`, "Hard Landing" from touchdown at 0.6 s, since she already fell with `Fall`; 2.1 s back to standing, `brain.py` `HIGH_LANDING_MS`). She cries (`Upset`) only when thrown (let go faster than `stage.py` `THROW_SPEED`) or slammed into a screen edge (`WALL_HURT`). No dizziness after falls.
   - **Dropped while carried:** she falls face down (`falling_flat` → `FallFlat`, Mixamo "Falling-facedown"), hits the floor flat (`hard_landing` → `FlatImpact`, "Falling Flat Impact" from touchdown) and after `stage.py` `FLAT_IMPACT_S` (1.6 s) gets up (`hard_landing_up` → `GetUp`, the end of "Hard Landing", from all fours). The brain's `HARD_LANDING` lasts 2.7 s whatever the speed: no dizziness or tears. `stage.py` `fall_flat` remembers the carried drop until she lands.
 
 ## Run it on its own (preview)
@@ -139,22 +141,32 @@ Verification evidence/backup is in `D:/Character Design/output/godot/coat-cleara
 ## Props (25 October 2026)
 `props/` holds Character Design's `Raphael_Props_v01`: three GLBs, their scene wrappers and helper scripts, unchanged. `props.gd` shows each prop only while it's used, popping it in and out over 0.2 s:
 - **Headset:** follows her Head bone.
-  - **On with the mic** during a conversation: the agent's listening mood (the frame's `listening`), the Think and Talk clips, or her mouth moving.
-  - **On without the mic** for slow music (DanceVibe, Mixamo "Listening To Music"). Not for DanceExcited.
+  - **On with the mic** during a spoken conversation: from push-to-talk until her reply has been spoken (the frame's `headset` = "talk", `stage.py` `headset`).
+  - **On without the mic** while any media plays (`headset` = "music").
+  - **Off** for everything else, even when she speaks: voice reactions, wheel poses (Think included), briefings and typed chat (Saber, 2026-10-26). It comes off 5 s after the conversation or the music ends.
   - DanceVibe is listening, not dancing: the overlay's dance sway (`ParamBodyAngleX`, `ParamAngleZ`) isn't layered over a Mixamo dance take (`raphael.gd`), only over the keyed fallback dances.
   - Both dances wear `smile` (`raphael.gd` `_add_smile`): the Joy brows and mouth with her eyes open. VRoid's `happy` (Fcl_ALL_Joy) shuts her eyes.
   - **Off** 5 s after either ends.
 - **Slime beanbag:** under her while she sits (Sit). It squashes over 0.4 s as she settles. Sit plays the chair take "Sitting Idle", with her hips held at the squashed seat (`keep_height`, `lift=-0.415`).
-- **Futon: switched off for now** (`SHOW_FUTON` in `props.gd`); she sleeps on the floor. When on, it lies under her while she sleeps (Sleep), laid feet-to-head along her body, with the pillow under her head.
-  - **One take per sleep** (`vary=false`): Female Laying Pose (on her front), Female Laying Pose - 2 (propped up) or Sleeping Idle (on her side).
-  - **Per-take fit:** each has its own lift (`per_file` in `clip_sources.cfg`), now fitted to the floor; the comment there keeps the mattress values for when the futon returns.
-  - **Futon v02:** what a better-fitting futon needs (blanket shapes per pose, a longer head end) is in `D:\Character Design\output\3d\props\requests\futon-v02-requirements.md`.
+- **Futon (v02, 26 October 2026):** under her while she sleeps (Sleep, from the pose wheel or idle sleep), laid feet-to-head along her body with her head on the pillow. It pops out when she wakes (a poke, a drag, or the agent needing her), since the clip leaves Sleep.
+  - **Source:** Character Design's `futon-v02` (`D:\Character Design\output\3d\props\futon-v02`). The GLB goes in `props/models/` (gitignored). Its `futon.tscn` and `soft_prop.gd` replace v01's. `soft_prop.gd` keeps `set_occupied` for the beanbag and adds `set_cover` and `set_shape`.
+  - **One take per sleep** (`vary=false`), each with its own lift onto the mattress and its own blanket shape key (`per_file` in `clip_sources.cfg`, `cover`):
+
+    | Take | Pose | Lift | Cover |
+    |---|---|---|---|
+    | Female Laying Pose | on her front | 0.12 | `Cover_Front` |
+    | Female Laying Pose - 2 | propped up on one arm | 0.14 | `Cover_SitUp` (over her legs and lap) |
+    | Sleeping Idle | curled on her side | 0.25 | `Cover_Side` |
+
+  - **How the cover is set:** `props.gd` calls `set_cover` only when the take's cover changes, because it clears the other keys. A take without `cover` gets `Occupied`, v01's generic hump. `Pillow_Dent` is on under every cover.
+  - **Fit:** checked with `--pose-report`. Her hips land on v02's `Hips_Front`, `Hips_SitUp` and `Hips_Side` markers within 3 cm, and her head is at z −0.64 on the pillow (`PILLOW_FROM_CENTRE` 0.635). The covers are taller than the brief asked for (peaks 43, 60 and 68 cm), because the designer fitted them around her coat. The side cover is the bulkiest.
+  - **Turning it off:** set `SHOW_FUTON = false` and the Sleep lifts back to about 0 for floor sleep.
 - **Clicks:** they pass through the props; the click hull is her bones only.
 - **Prop colours:** the props were made under Blender's soft multi-light studio and its AgX view, which lifts and greys colours. Under her single key light the same PBR colours came out vivid cyan with near-black undersides. So `props.gd` gives the beanbag (and the futon) a front fill and a low bounce light on render layer 2, which only props are on, and desaturates and softens their materials (`DESATURATE`, `VALUE`, `SPECULAR`, `FILL_ENERGY`, `BOUNCE_ENERGY`).
   - **Match:** measured against the delivery's preview: mid tone #A8CBDA against Blender's #AFCDDD, shade #86A2AE against #95BAD0.
   - **Her look is untouched:** a test with both lights at strength 10 blew the beanbag to white and left her unchanged. The headset keeps its original look.
 
-Preview checks: `--take=<file>` plays one take of the slot, `--listen=S` pretends she's listening for S seconds, and `--pose-report` prints her extent in the futon's own space.
+Preview checks: `--take=<file>` plays one take of the slot, `--listen=S` pretends she's listening for S seconds, and `--pose-report` prints her extent in the futon's own space. Example: `--clip=Sleep --take="Sleeping Idle" --pose-report --offscreen --seconds=4 --screenshot=side.png`.
 
 ## Render quality
 `[overlay] render_scale` (supersampling, 1.0–2.0) and `msaa` (0/2/4/8) in `config.toml` go to the renderer (`--render-scale`, `--msaa`).

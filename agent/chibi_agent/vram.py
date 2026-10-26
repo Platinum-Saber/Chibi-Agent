@@ -4,7 +4,7 @@ A fullscreen app in front (or the tray toggle) puts her in gaming mode: the
 overlay hides itself, the LLM is unloaded (keep_alive 0) and the voice process
 drops F5 and Whisper (STT falls back to CPU). Push-to-talk still works: the
 moment PTT goes down the manager checks free VRAM with NVML and, if a turn
-fits, starts reloading the LLM and TTS while Kryo is still speaking (the cold
+fits, starts reloading the LLM and TTS while Saber is still speaking (the cold
 reload was most of a ~16 s gaming-mode turn). It unloads everything again once
 she has finished speaking.
 """
@@ -69,7 +69,7 @@ class VramManager:
         return free is None or free >= TURN_NEEDS_MB
 
     async def on_ptt(self) -> None:
-        """PTT went down: in gaming mode, reload the models while Kryo speaks."""
+        """PTT went down: in gaming mode, reload the models while Saber speaks."""
         if not self.gaming or self.preloaded or not self._fits():
             return  # a turn that doesn't fit is refused in before_turn
         self.preloaded = True

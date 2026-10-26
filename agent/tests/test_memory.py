@@ -50,33 +50,33 @@ def memory():
 
 
 async def test_remember_then_recall(memory):
-    await memory.remember("Kryo's cat is called Miso")
-    await memory.remember("Kryo drinks iced latte")
+    await memory.remember("Saber's cat is called Miso")
+    await memory.remember("Saber drinks iced latte")
     block = await memory.recall("what is my cat called")
     assert "Miso" in block and "latte" not in block
 
 
 async def test_near_duplicate_replaces(memory, monkeypatch):
     monkeypatch.setattr(mem, "DUPLICATE_SIM", 0.8)
-    assert await memory.remember("Kryo's cat is called Miso") == "added"
-    assert await memory.remember("Kryo's cat is called Miso now") == "updated"
+    assert await memory.remember("Saber's cat is called Miso") == "added"
+    assert await memory.remember("Saber's cat is called Miso now") == "updated"
     assert len(memory.store.all_facts()) == 1
 
 
 async def test_nothing_relevant_gives_empty_block(memory):
-    await memory.remember("Kryo's cat is called Miso")
+    await memory.remember("Saber's cat is called Miso")
     assert await memory.recall("quantum chromodynamics lecture") == ""
 
 
 async def test_forget(memory):
-    await memory.remember("Kryo's cat is called Miso")
+    await memory.remember("Saber's cat is called Miso")
     hits = await memory.find("cat called", min_sim=0.3)
     memory.forget([h.id for h in hits])
     assert memory.store.all_facts() == []
 
 
 async def test_conversation_ends_after_idle_and_is_extracted(monkeypatch):
-    llm = FakeLLM(["Kryo plays Valorant on weekends"])
+    llm = FakeLLM(["Saber plays Valorant on weekends"])
     m = Memory({}, Store(":memory:"), BagEmbedder(), llm)
     m.log_turn("I'll play Valorant this weekend", "Answer. Have fun.")
     first = m.conv_id
@@ -86,7 +86,7 @@ async def test_conversation_ends_after_idle_and_is_extracted(monkeypatch):
     m.log_turn("new topic", "Answer. Sure.")
     assert m.conv_id != first  # a new conversation after 5 quiet minutes
     assert await m.extract_due() >= 1
-    assert "Valorant" in llm.prompts[0] and "Kryo: I'll play Valorant" in llm.prompts[0]
+    assert "Valorant" in llm.prompts[0] and "Saber: I'll play Valorant" in llm.prompts[0]
     assert "Valorant" in await m.recall("do I play Valorant on weekends")
 
 

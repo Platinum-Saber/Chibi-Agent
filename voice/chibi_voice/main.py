@@ -17,9 +17,9 @@ import numpy as np
 from chibi_shared import paths
 from chibi_shared.protocol import Lip, Load, Msg, Ptt, Speak, SpeakState, Stop, Transcript, VoiceTune
 
-from .clips import ClipCache
+from .clips import ALL_LINES, LINES, ClipCache
 from .player import Player
-from .speech import Item, SpeechQueue
+from .speech import Item, Skip, SpeechQueue
 from .stt import Recorder, Stt
 from .tts import Tts
 
@@ -60,7 +60,7 @@ class VoiceApp:
         if (saved := saved_voice(last_voice)) is not None:
             self.tts.tune(saved.engine, saved.voice, saved.speed, saved.nfe)
         self.stt = Stt(vcfg.get("stt_model", "small.en"))
-        self.clips = ClipCache(paths.CLIPS, self.tts.voice_key())
+        self.clips = ClipCache(paths.CLIPS, self.tts.voice_key(), ALL_LINES)
         self.recorder = Recorder()
         self.player = Player(on_lip=lambda rms: self._send(Lip(rms=round(rms, 3))))
         self.queue = SpeechQueue(self._render, self.player.play, self._emit)
@@ -69,6 +69,7 @@ class VoiceApp:
         self._bg: set[asyncio.Task] = set()
         self.loading: asyncio.Future | None = None
         self._tts_failed_at: float | None = None  # monotonic time of the last failed load
+        self._tts_lazy = False  # F5 dropped for memory relief: reload it when speech needs it
 
     # --- plumbing ---------------------------------------------------------------
     async def _on(self, pool: ThreadPoolExecutor, fn, *args):
@@ -94,6 +95,7 @@ class VoiceApp:
         try:
             await self._on(self._tts_pool, self.tts.load)
             self._tts_failed_at = None
+            self._tts_lazy = False
             made = await self._on(self._tts_pool, self._ensure_clips)
             if made:
                 log.info("rendered %d clips", len(made))
@@ -101,12 +103,29 @@ class VoiceApp:
             if not self.tts.loaded:
                 self._tts_failed_at = time.monotonic()
             log.exception("tts load failed")
+            return
+        self._spawn(self._render_reactions())
 
-    def _ensure_clips(self) -> list[str]:
+    def _ensure_clips(self, lines: list[str] = LINES) -> list[str]:
         """Render missing clips (on the tts thread). The cache key is read here, beside the
         synth: a voice switch queued behind a load once had the old voice's cache filled with
         the new voice's audio, then rendered all ten clips again under the right key."""
-        return ClipCache(paths.CLIPS, self.tts.voice_key()).ensure(self.tts.synth)
+        return ClipCache(paths.CLIPS, self.tts.voice_key(), lines).ensure(self.tts.synth)
+
+    async def _render_reactions(self) -> None:
+        """Her voice reactions, in the background after the openers: one tts job per line, so
+        a live sentence waits behind at most one of them. Stops if the model goes (gaming mode)."""
+        made = []
+        for line in ALL_LINES[len(LINES):]:
+            if not self.tts.loaded:
+                break
+            try:
+                made += await self._on(self._tts_pool, self._ensure_clips, [line])
+            except Exception as e:
+                log.warning("reaction clip %r not rendered: %s", line, e)
+                break
+        if made:
+            log.info("rendered %d reaction clips", len(made))
 
     async def _retry_tts(self) -> None:
         """A failed load (once: a CUDA error reading the checkpoint) left F5 unloaded and
@@ -135,14 +154,18 @@ class VoiceApp:
             log.exception("voice switch failed")
             self._tts_failed_at = time.monotonic()
             return
-        self.clips = ClipCache(paths.CLIPS, self.tts.voice_key())
-        save_voice(msg, self._last_voice)
+        self.clips = ClipCache(paths.CLIPS, self.tts.voice_key(), ALL_LINES)
+        # What she really uses (an F5 choice becomes Kokoro while F5 is off): memrelief reads this.
+        kokoro = self.tts.engine == "kokoro"
+        save_voice(msg.model_copy(update={"engine": self.tts.engine, "speed": self.tts.speed,
+                                          "voice": self.tts.kvoice if kokoro else msg.voice}), self._last_voice)
         log.info("voice -> %s %s (speed %.2f)", self.tts.engine,
                  self.tts.kvoice if self.tts.engine == "kokoro" else Path(self.tts.ref).name, self.tts.speed)
         if loaded:
             made = await self._on(self._tts_pool, self._ensure_clips)
             if made:
                 log.info("rendered %d clips", len(made))
+            self._spawn(self._render_reactions())
 
     def start(self) -> None:
         try:
@@ -160,8 +183,13 @@ class VoiceApp:
                 import soundfile as sf
                 data, sr = await asyncio.to_thread(sf.read, str(path), dtype="float32")
                 return data, sr
+            if item.only_cached:
+                raise Skip(f"no clip for {item.clip!r} yet")
             log.info("no clip for %r; synthesising it", item.clip)
         await self._retry_tts()
+        if self._tts_lazy and not self.tts.loaded:
+            log.info("tts was unloaded for memory relief; loading it for live speech")
+            await self.load_tts()
         return await self._on(self._tts_pool, self.tts.synth, item.text or item.clip)
 
     # --- listening ------------------------------------------------------------------
@@ -193,7 +221,7 @@ class VoiceApp:
             elif self.recorder.recording:
                 self._spawn(self._ptt_up())
         elif isinstance(msg, Speak):
-            self.queue.submit(Item(msg.utt_id, msg.text, msg.clip))
+            self.queue.submit(Item(msg.utt_id, msg.text, msg.clip, msg.only_cached))
         elif isinstance(msg, Stop):
             await self.queue.stop()
         elif isinstance(msg, VoiceTune):
@@ -208,11 +236,24 @@ class VoiceApp:
             else:
                 if stt:
                     self._spawn(self._on(self._stt_pool, self.stt.unload))
-                if tts:
+                if tts and msg.reason == "memory":
+                    self._spawn(self._relieve())
+                elif tts:
                     self._tts_failed_at = None
+                    self._tts_lazy = False
                     self._spawn(self._on(self._tts_pool, self.tts.unload))
         else:
             log.debug("ignoring %s", msg.t)
+
+    async def _relieve(self) -> None:
+        """Memory relief: drop F5 (~1 GB of VRAM, plus host memory) unless it is the voice in
+        use right now; Kokoro is small and stays. A later sentence reloads F5 if needed."""
+        if self.tts.model is None:
+            log.info("memory relief: F5 is not loaded (%s voice); nothing to unload", self.tts.engine)
+            return
+        if self.tts.engine == "f5":
+            self._tts_lazy = True
+        await self._on(self._tts_pool, self.tts.unload_f5)
 
     async def close(self) -> None:
         await self.queue.close()

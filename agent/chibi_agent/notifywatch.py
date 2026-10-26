@@ -1,6 +1,6 @@
 """Windows notifications for the briefing and the thought cloud (docs/scope.md).
 
-Read through WinRT's UserNotificationListener once Kryo allows it (tray). Spike 4
+Read through WinRT's UserNotificationListener once Saber allows it (tray). Spike 4
 (docs/spikes.md) settled the shape:
 - The NotificationChanged event needs package identity, so she polls (every 60 s)
   and compares toast keys.

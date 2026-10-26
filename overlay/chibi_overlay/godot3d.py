@@ -379,7 +379,7 @@ class GodotModel:
                 "walking": self.motion == "Walk", "facing_left": self.facing_left,
                 "params": {k: round(v, 3) for k, v in self.params.items()},
                 "gaze": [round(self.gaze[0], 1), round(self.gaze[1], 1)] if self.gaze else None,
-                "listening": bool(getattr(getattr(self.widget, "stage", None), "listening", False)),  # headset
+                "headset": str(getattr(getattr(self.widget, "stage", None), "headset", "")),  # "talk"/"music"/""
                 "yaw": round(float(getattr(getattr(self.widget, "stage", None), "yaw", 0.0)), 1),  # middle-drag turn
                 "visible": True}
 

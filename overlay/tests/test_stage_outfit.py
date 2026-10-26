@@ -193,3 +193,43 @@ def test_excited_music_picks_the_excited_dance(st):
     assert st.clip("chibi").motion == "DanceExcited"
     st.brain.mood = Mood.IDLE
     assert st.clip("chibi").motion != "DanceExcited"
+
+
+def test_a_long_press_giggles_once_and_a_poke_reacts(st):
+    import time
+    from chibi_shared.protocol import React
+    st.press = (500.0, 500.0, time.monotonic() - stage_mod.LONG_PRESS_S - 0.1)
+    st.tick((500, 500), pressed=True)
+    st.tick((500, 500), pressed=True)
+    assert [m.event for m in st.link.sent if isinstance(m, React)] == ["giggle"]  # HAPPY itself stays quiet
+    st.press = None
+    st.brain.poke(int(time.monotonic() * 1000) + 5000)
+    st.tick((500, 500))
+    assert [m.event for m in st.link.sent if isinstance(m, React)] == ["giggle", "poke"]
+
+
+def test_alt_drag_moves_her_home_and_it_is_saved(st, monkeypatch, tmp_path):
+    from chibi_overlay import character
+    monkeypatch.setattr(stage_mod.paths, "DATA", tmp_path)
+    default = st.home
+    st.press_at(st.physics.x, st.physics.y - 50, alt=True)
+    st.move_to(700, 400)
+    st.release_at(700, 400)
+    assert st.home[1] == 1040 and abs(st.home[0] - st.physics.x) < 1 and st.home != default  # on the taskbar line
+    saved = character.load(tmp_path / character.FILE_NAME).behaviour
+    assert (saved.home_x, saved.home_y) == st.home
+    st.apply_character(character.load(tmp_path / character.FILE_NAME))
+    assert st.home == (saved.home_x, saved.home_y)  # kept across a restart
+
+
+def test_a_plain_drag_keeps_her_home_and_a_stale_spot_is_ignored(st):
+    from chibi_overlay import character
+    default = st.home
+    st.press_at(st.physics.x, st.physics.y - 50)
+    st.move_to(700, 400)
+    st.release_at(700, 400)
+    assert st.home == default
+    ch = character.Character()
+    ch.behaviour.home_x, ch.behaviour.home_y = 5000.0, 1040.0  # a monitor that's gone
+    st.apply_character(ch)
+    assert st.home == default

@@ -20,7 +20,7 @@ extends Node3D
 ##   --gaze=X,Y                   look at this window point
 ##   --turn=DEG                   turn her about the vertical axis (180 = back view)
 ##   --take=NAME                  play this Mixamo take of the clip slot (file name without .fbx)
-##   --listen=S                   pretend the agent is listening for the first S seconds (headset)
+##   --listen=S                   pretend she's in a spoken conversation for the first S seconds (headset)
 ##   --offscreen                  keep the window off-screen (measuring)
 ##   --height=PX                  her height in the preview (default 850; in the overlay she's 520 at 100 %)
 ##   --seconds=S                  run S seconds, print the average fps, then quit
@@ -42,7 +42,7 @@ const STATS_S := 10.0  # how often the link's timing goes to the log
 
 var body: Body
 var props: Props
-var _listening := false  # the agent's listening mood (from the overlay's frames)
+var _headset := ""  # "talk" (a spoken conversation), "music" (media playing) or "": from the overlay's frames
 var model: Node3D
 var args := {}
 var height_m := 1.0  # her mesh height at rest
@@ -140,8 +140,9 @@ func _process(delta: float) -> void:
 		_pump(delta)
 	else:
 		_preview()
-		_listening = args.has("listen") and _elapsed < float(args["listen"])
-	props.update(delta, body.clip_name(), _listening, body.mouth)
+		_headset = "talk" if args.has("listen") and _elapsed < float(args["listen"]) \
+				else "music" if body.clip_name() == "DanceVibe" else ""
+	props.update(delta, body.clip_name(), _headset)
 	_update_hull()
 	if args.has("seconds"):
 		_elapsed += delta
@@ -253,7 +254,7 @@ func _apply(f: Dictionary, delta: float) -> void:
 	var params: Dictionary = f.get("params", {})
 	body.params = params
 	body.mouth = params.get("ParamMouthOpenY", 0.0)
-	_listening = f.get("listening", false)
+	_headset = f.get("headset", "")
 	body.eyes_closed = params.get("ParamEyeLOpen", 1.0) < 0.5
 	var gaze = f.get("gaze")
 	var head := camera.unproject_position(body.head_position())

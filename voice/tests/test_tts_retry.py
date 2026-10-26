@@ -26,6 +26,9 @@ class FakeTts:
     def unload(self):
         self.model = None
 
+    unload_f5 = unload
+    engine = "f5"
+
     def synth(self, text):
         if self.model is None:
             raise TtsUnloaded("tts is unloaded")
@@ -46,6 +49,7 @@ def app(tts) -> main.VoiceApp:
     a._ensure_clips = lambda: []
     a._tts_pool = ThreadPoolExecutor(1)
     a._tts_failed_at = None
+    a._tts_lazy = False
     return a
 
 
@@ -72,3 +76,20 @@ async def test_asked_for_unload_is_not_retried(monkeypatch):
     await a.handle(Load(t="unload", what="tts"))
     await a._retry_tts()
     assert a.tts.loads == 1
+
+
+async def test_memory_unload_reloads_for_live_speech():
+    a = app(FakeTts())
+    await a.load_tts()
+    await a._relieve()  # memory relief: F5 goes...
+    assert not a.tts.loaded and a._tts_lazy
+    audio, sr = await a._render(Item("u1", "Notice.", None))  # ...and comes back when she speaks
+    assert a.tts.loads == 2 and a.tts.loaded and not a._tts_lazy
+
+
+async def test_memory_unload_leaves_kokoro_alone():
+    tts = FakeTts()
+    tts.engine = "kokoro"  # Kokoro speaking; F5 not loaded: nothing to drop
+    a = app(tts)
+    await a._relieve()
+    assert not a._tts_lazy and tts.loads == 0

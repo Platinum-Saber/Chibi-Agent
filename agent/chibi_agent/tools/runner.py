@@ -84,7 +84,7 @@ class Runner:
             confirmed = await self.gate.ask(tool, args)
             if not confirmed:
                 self._audit(tool=name, args=args, confirmed=False, status="declined")
-                return Result("Kryo declined. Do not retry unless asked again.")
+                return Result("Saber declined. Do not retry unless asked again.")
         t0 = time.perf_counter()
         try:
             if inspect.iscoroutinefunction(tool.fn):

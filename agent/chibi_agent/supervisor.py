@@ -38,7 +38,14 @@ class KillOnExitJob:
     in the job too, so when the agent dies (even by TerminateProcess) Windows
     kills them all; in M3 an overlay outlived its agent. Adding children one by
     one doesn't work: the venv python.exe is a launcher that has already spawned
-    the real interpreter by then."""
+    the real interpreter by then.
+
+    The handle is kept for the whole process (`_HELD`), not just the Supervisor's life:
+    closing it kills the agent itself too. When run() returned and the Supervisor was freed,
+    the agent died right there, before the tray's Restart could start a fresh one (2026-10-26).
+    Windows closes it when the process exits, which is when the children should go anyway."""
+
+    _HELD: list = []
 
     def __init__(self):
         import win32api
@@ -49,6 +56,7 @@ class KillOnExitJob:
                                                         | win32job.JOB_OBJECT_LIMIT_BREAKAWAY_OK)
         win32job.SetInformationJobObject(self._job, win32job.JobObjectExtendedLimitInformation, info)
         win32job.AssignProcessToJobObject(self._job, win32api.GetCurrentProcess())
+        KillOnExitJob._HELD.append(self._job)
 
 
 def venv_python(package_dir: Path) -> Path:

@@ -56,6 +56,7 @@ Overlay → agent:
 |---|---|
 | `confirm_result` | `{call_id, ok: bool}` |
 | `poke` / `hold` / `drop` | `{x, y, speed}`: so she can comment ("Kryo, please refrain.") |
+| `react` | `{event, picked}`: a body event (poke, held, drop, dizzy, sleep, stretch, a wheel pose...). The agent (`reactions.py`) may answer with `speak {clip, only_cached}`; the voice plays the cached clip or skips it. `react-` utterances never send her `idle`. |
 | `text_input` | `{text}`: typed in the bubble |
 | `file_drop` | `{paths[]}`: files dropped on her ("what is this?") |
 | `fullscreen` | `{active: bool, exe}`: the overlay watches the foreground window |
@@ -171,6 +172,18 @@ sequenceDiagram
 - `mailwatch.py` (M5): `MailWatch` polls every account's inbox every 5 min (paused in gaming mode), labels each new mail with `mail_labels.py` (sender rules, then the model on ONE mail, else fallback rules) and stores sender name, subject and label only (`mail` table, pruned after 7 days). A new urgent mail is announced once ("Warning. Urgent mail from …") between 07:00 and 23:00, not while gaming or mid-turn, and only while under 2 h old. `Briefer` gathers 72 h of calendar, labelled mail and today's reminders for `briefing.py` (pure composer, a port of Saber's `BriefingComposer`: urgency order, 72 h deadline window, no module codes or addresses, 4 facts / 50 words, "End of report."). `MorningBriefing` speaks it once a day: first start after 06:00, or 07:30 if already running (`[briefing]` in config.toml). Saying "status report" (or "report", "briefing", "what needs my attention") runs it without the model; the HUD calls it a status report.
 - `notifywatch.py`: `NotifyWatch` reads Windows toasts with WinRT `UserNotificationListener` once Kryo allows it (tray → Allow notification access; denied opens `ms-settings:privacy-notifications`). The change event needs package identity, so it polls every 60 s on a worker thread: a listing takes 6–9 s (Spike 4). It skips `ignore_apps`, toasts from before start − 2 h, and gaming/mid-turn. It labels like mail (`mail_labels`, kind "notification", ≤5 by the model per poll, then rules) and stores app, first line and label only (`notif` table, 2 days). It never speaks unasked; urgent/reply toasts go to the `cloud` message and the briefing (`[notifications]` in config.toml).
 - `vram.py`: the VRAM manager (below).
+- `memrelief.py`: memory relief (`[memory_relief]` in config.toml). RAM is sampled every 20 s. It goes "high" after 2 samples ≥ 90 % and stays high until it drops under 85 %, with at most one intervention per 10 min. Each intervention:
+  - is skipped mid-turn and in gaming mode;
+  - stops early once RAM is under threshold − 5 %;
+  - logs every decision (`memrelief: ...`);
+  - reports on the HUD ("Memory relief"), in the bubble and in her voice. If F5 was just dropped, only the "Notice." clip is spoken.
+
+  The stages, cheapest first:
+  1. Her own stack: F5 goes after 180 s of quiet, but only when F5 is the voice in use. The voice process gets `load{unload, tts, reason: "memory"}` and reloads F5 by itself for the next sentence; PTT reloads it too. Kokoro stays. Her Ollama models (chat, and the embed model's ~1.2 GB runner, kept alive 30 min) are unloaded with `keep_alive: 0` after 60 s without a turn.
+  2. `EmptyWorkingSet` on Kryo's idle apps with a working set ≥ 300 MB, and on her quiet voice process (its working set is mostly cuBLAS/CUDA DLL pages). This is low value: the pages fault back in.
+  3. The largest idle app (≥ 700 MB, with a window) is named and offered through the confirmation gate. A yes posts WM_CLOSE (never a kill); a no keeps it quiet for an hour.
+
+  It never touches system processes, other users' processes, the Claude app (and its WebView2), the foreground app or her own processes, and it never purges the standby list. Debug: `python -m chibi_agent.memrelief --once` (a dry run; `--act` acts but only logs its messages).
 - `hotkey.py`:
   - global push-to-talk through a low-level keyboard hook (pynput / `SetWindowsHookEx`), default `Alt+1` hold, configurable;
   - screen-look hotkey `Ctrl+Alt+S`.
@@ -202,6 +215,7 @@ sequenceDiagram
 ## Voice internals (`voice/`)
 - **STT:**
   - faster-whisper `small.en` int8_float16 on CUDA (0.19 s, 0.37 GB in spike 2; CPU takes 1.8 s, so gaming mode accepts slower replies).
+  - Its cuBLAS/cuDNN DLLs are loaded from torch's wheel without importing torch (`env.load_cuda_dlls`). Importing torch maps all of torch's CUDA libraries: measured 2.6 → 2.0 GB private and 1.0 → 0.7 GB working set for Whisper alone. Torch comes in only with F5.
   - Silero VAD trims silence.
   - 16 kHz mono capture via `sounddevice` while PTT is held.
 - **TTS:**

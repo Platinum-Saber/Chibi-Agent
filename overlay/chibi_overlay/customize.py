@@ -726,6 +726,9 @@ class CustomizeDialog(QDialog):
         self.v_engine = QComboBox()
         self.v_engine.addItem("Her voice (F5 clone of the reference clip)", "f5")
         self.v_engine.addItem("Kokoro preset voices (CPU, fast)", "kokoro")
+        if not self._f5_on():
+            self.v_engine.setItemText(0, "Her voice (F5 clone): off in config.toml [voice] f5")
+            self.v_engine.model().item(0).setEnabled(False)
         self.v_engine.currentIndexChanged.connect(self._engine_picked)
         self.v_voice = QComboBox()
         self.v_voice.currentIndexChanged.connect(self._voice_set)
@@ -757,6 +760,15 @@ class CustomizeDialog(QDialog):
         f.addRow(default)
         f.addRow(self.v_note)
         return w
+
+    def _f5_on(self) -> bool:
+        return bool(self.vcfg.get("f5", True))
+
+    def _config_voice(self) -> character.VoiceSettings:
+        """config.toml's voice: her F5 clone, or Kokoro's bf_emma while F5 is off."""
+        if not self._f5_on():
+            return character.VoiceSettings("kokoro", "bf_emma", 1.0, int(self.vcfg.get("nfe", 8)))
+        return character.VoiceSettings(speed=float(self.vcfg.get("speed", 0.9)), nfe=int(self.vcfg.get("nfe", 8)))
 
     def _f5_refs(self) -> list[Path]:
         ref = self.vcfg.get("reference")
@@ -791,8 +803,9 @@ class CustomizeDialog(QDialog):
 
     def _fill_voice(self) -> None:
         self._filling = True
-        v = self.ch.voice or character.VoiceSettings(speed=float(self.vcfg.get("speed", 0.9)),
-                                                     nfe=int(self.vcfg.get("nfe", 8)))
+        v = self.ch.voice or self._config_voice()
+        if v.engine == "f5" and not self._f5_on():
+            v = self._config_voice()
         self.v_engine.setCurrentIndex(max(0, self.v_engine.findData(v.engine)))
         self._fill_voice_list(v.engine, v.voice)
         self.v_speed.setValue(v.speed)
@@ -827,8 +840,7 @@ class CustomizeDialog(QDialog):
             self.send(voice_msg(v))
             self._voice_sent = True
         elif self._voice_sent:  # back to the config's voice
-            self.send(voice_msg(character.VoiceSettings(speed=float(self.vcfg.get("speed", 0.9)),
-                                                        nfe=int(self.vcfg.get("nfe", 8)))))
+            self.send(voice_msg(self._config_voice()))
             self._voice_sent = False
 
     def _say(self) -> None:
@@ -840,6 +852,8 @@ class CustomizeDialog(QDialog):
     def apply(self) -> None:
         ch = copy.deepcopy(self.ch)
         ch.outfit = self.outfit
+        live = self.stage.character.behaviour  # set outside this window (tray, Alt+drag): not its copy
+        ch.behaviour.sounds, ch.behaviour.home_x, ch.behaviour.home_y = live.sounds, live.home_x, live.home_y
         self.stage.apply_character(ch)
         if self.outfit != self.stage.outfit:
             self.stage.request_outfit(self.outfit)

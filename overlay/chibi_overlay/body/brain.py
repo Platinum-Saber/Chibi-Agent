@@ -67,12 +67,10 @@ CRY_MS = 3_000
 HAPPY_MS = 2_000
 SOFT_LANDING_MS = 600
 HARD_LANDING_MS = 2_700  # 3D body: flat impact and a moment lying (1.6 s), then getting up (1.1 s)
+HIGH_LANDING_MS = 2_100  # 3D body: Mixamo "Hard Landing" from touchdown (0.6 s in) back to standing
 DIZZY_MS = 2_500
 
-# Impact speeds in px/s at 96 dpi (physics divides out its scale). On the phone
-# a plain drop from the top reached ~1500; crying needs a hard throw down.
-DIZZY_IMPACT = 700.0
-CRY_IMPACT = 1_700.0
+# How she lands is decided by the stage (stage.py: drop height, throw speed, wall hits).
 
 SLEEP_AFTER_MS = 60_000
 WAKE_TOUCH_MS = 1_000
@@ -257,16 +255,17 @@ class Brain:
         if self.mood == Mood.HELD:
             self._set(Mood.FALLING, now, None)
 
-    def land(self, impact: float, now: int, flat: bool = False) -> None:
-        """She hit the floor (first contact of a fall) at peak speed ``impact`` px/s at 96 dpi.
-        ``flat``: she fell lying flat (dropped while carried); the hard landing gets her up
-        whatever the speed, so no dizziness or tears on top."""
-        if flat:
-            self._set(Mood.HARD_LANDING, now, HARD_LANDING_MS)
-        elif impact >= CRY_IMPACT:
+    def land(self, now: int, flat: bool = False, high: bool = False, hurt: bool = False) -> None:
+        """She hit the floor (first contact of a fall). Saber's rules (2026-10-26):
+        ``hurt`` (she was thrown, or slammed into a screen edge) -> tears; ``flat`` (dropped while
+        carried lying flat) or ``high`` (dropped more than half the screen's height) -> the hard
+        landing; anything lower -> the soft one. No dizziness after falls any more."""
+        if hurt:
             self._set(Mood.CRYING, now, CRY_MS)
-        elif impact >= DIZZY_IMPACT:
-            self._set(Mood.DIZZY, now, DIZZY_MS)
+        elif flat:
+            self._set(Mood.HARD_LANDING, now, HARD_LANDING_MS)
+        elif high:
+            self._set(Mood.HARD_LANDING, now, HIGH_LANDING_MS)
         else:
             self._set(Mood.SOFT_LANDING, now, SOFT_LANDING_MS)
 

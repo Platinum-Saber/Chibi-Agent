@@ -121,7 +121,7 @@ class SpyMemory:
 async def test_turn_sends_only_the_pick_and_shares_the_vector(tmp_path):
     q = axis(("mail", 0.9))
     picker = ToolPicker(FakeEmbed({"any new mail?": q}), {"families": 1, "margin": 0.0})
-    llm = ScriptLLM([[Chunk(text="Answer. Nothing new, Kryo.")]])
+    llm = ScriptLLM([[Chunk(text="Answer. Nothing new, Saber.")]])
     mem = SpyMemory()
     o = Orchestrator(FakeHub(), llm, Runner(AutoGate(True), audit_file=tmp_path / "a.jsonl"), mem, picker=picker)
     o.start_turn("any new mail?")
@@ -136,7 +136,7 @@ async def test_turn_sends_only_the_pick_and_shares_the_vector(tmp_path):
 async def test_cant_with_a_subset_retries_once_with_every_tool(tmp_path):
     picker = ToolPicker(FakeEmbed({"empty the recycle bin list": axis(("files", 0.9))}),
                         {"families": 1, "margin": 0.0})
-    llm = ScriptLLM([[Chunk(text="Answer. I cannot see the Recycle Bin, Kryo.")],
+    llm = ScriptLLM([[Chunk(text="Answer. I cannot see the Recycle Bin, Saber.")],
                      [Chunk(tool_calls=[{"function": {"name": "get_time", "arguments": {}}}])],
                      [Chunk(text="Confirmed.")]])
     o = Orchestrator(FakeHub(), llm, Runner(AutoGate(True), audit_file=tmp_path / "a.jsonl"), picker=picker)
@@ -150,7 +150,7 @@ async def test_cant_with_a_subset_retries_once_with_every_tool(tmp_path):
 
 async def test_ordinary_cant_does_not_retry(tmp_path):
     picker = ToolPicker(FakeEmbed({"do you have feelings?": axis(("memory", 0.9))}), {"families": 1})
-    llm = ScriptLLM([[Chunk(text="Answer. I can't feel emotions the way you do, Kryo.")]])
+    llm = ScriptLLM([[Chunk(text="Answer. I can't feel emotions the way you do, Saber.")]])
     o = Orchestrator(FakeHub(), llm, Runner(AutoGate(True), audit_file=tmp_path / "a.jsonl"), picker=picker)
     o.start_turn("do you have feelings?")
     await o.turn

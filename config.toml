@@ -17,10 +17,11 @@ keep_alive = "120s"
 
 [voice]
 hf_home = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\hf'
-reference = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\voice\ref_06_clean.wav'   # variant B: noise-reduced + EQ (spikes/voice/tune_voice.py)
-reference_text = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\voice\ref_06.txt'
+reference = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\voice\voice_f.wav'   # a clean dub line (Sebas0914/Great-Sage candidates), 2026-10-26
+reference_text = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\voice\voice_f.txt'
 speed = 0.90
 nfe = 8
+f5 = true                # false: F5 never loads and Kokoro speaks
 stt_model = "small.en"
 # Kokoro preset voices (tray -> Customize Raphael -> Voice): kokoro-v1.0.onnx + voices-v1.0.bin
 # from github.com/thewh1teagle/kokoro-onnx releases (model-files-v1.0). Runs on the CPU.
@@ -38,6 +39,10 @@ outfit = "casual_coat"  # her own robe rig is "robe"; was "aniya"
 chibi_only = true
 # Extra fonts for her text panel (Electroharmonix), outside git; every .otf/.ttf here is loaded.
 fonts_dir = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\fonts'
+# UI sounds (Kryo's files, outside git): startup, appear, hover, click, close .wav.
+# Tray -> "Sound effects" turns them off; her voice reactions follow "Mute voice".
+sounds_dir = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\sounds'
+sfx_volume = 0.6
 # Her bodies, one at a time (tray / Customize -> "Switch to 3D model" / "Switch to 2D art"):
 # the outfit each one wears. The choice is remembered in her Customize settings.
 bodies = { 2d = "casual_coat", 3d = "teen_3d" }
@@ -96,6 +101,23 @@ chibi_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.
 chibi_map = 'rigs/mao.toml'
 serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\chibi\Haru.model3.json'
 serious_map = 'rigs/haru.toml'
+
+[memory_relief]
+# When physical RAM stays at or above `threshold` % (two samples in a row), she gives memory
+# back, cheapest first: F5 if it is loaded and she has been quiet, her Ollama model, working-set
+# trims of idle apps (and her own quiet voice process), then she names the largest idle app and
+# asks before closing it. Never system processes, the Claude app or the app in front.
+enabled = true
+threshold = 90        # Kryo, 2026-10-26 (was 75; 70 is this laptop's floor with Claude + Raphael open)
+hysteresis = 5          # "high" until RAM drops below threshold - hysteresis
+interval_s = 20
+cooldown_s = 600        # at most one intervention per 10 min while RAM stays high
+voice_idle_s = 180      # quiet this long before F5 goes / her voice process is trimmed
+llm_idle_s = 60         # no turn this long before her Ollama model is unloaded
+trim_working_sets = true
+trim_min_mb = 300
+offer_close = true
+close_min_mb = 700
 
 [tools]
 # Folders file tools may read and change (no deleting in v1).

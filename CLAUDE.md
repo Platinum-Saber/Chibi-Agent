@@ -2,7 +2,7 @@
 
 Raphael, an agentic desktop companion (look and voice inspired by Tensura's
 Raphael, not the Great Sage lore), lives on the Windows desktop as a local agent
-for Kryo (the user's nickname; "Sir" when serious): voice in and out, memory, desktop tools with confirmation,
+for Saber (the user's nickname, formerly Kryo; "Sir" when serious): voice in and out, memory, desktop tools with confirmation,
 calendar/mail briefings and on-demand screen reading. She has two Live2D forms:
 chibi (idle/chat) and serious (work, alerts, on command). Python, all local.
 Budget: keep this file under ~500 tokens.

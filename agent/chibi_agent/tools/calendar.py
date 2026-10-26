@@ -1,4 +1,4 @@
-"""Google Calendar, read-only (M5). Code turns Kryo's words into a time range and
+"""Google Calendar, read-only (M5). Code turns Saber's words into a time range and
 formats the events; the model only reads the lines. Event text comes from other
 people's invites, so it is marked untrusted."""
 from __future__ import annotations
@@ -114,7 +114,7 @@ async def fetch_events(c: httpx.AsyncClient, auth: dict, start: dt.datetime,
     return [x for lst in lists for x in lst], len(cals)
 
 
-@tool("calendar_events", "List Kryo's calendar events.",
+@tool("calendar_events", "List Saber's calendar events.",
       {"when": ("'today', 'tomorrow', 'this week', 'next week', 'the weekend', 'next 3 days' or a date", False)},
       summary=lambda a: f"Calendar: {a.get('when') or 'today'}")
 async def calendar_events(when: str = "today") -> Result:
@@ -123,7 +123,7 @@ async def calendar_events(when: str = "today") -> Result:
         return Result(_google.not_connected("Calendar"))
     rng = day_range(when, dt.datetime.now())
     if rng is None:
-        return Result(f"I could not understand '{when}' as a day. Ask Kryo which day.")
+        return Result(f"I could not understand '{when}' as a day. Ask Saber which day.")
     start, end, label = rng
     # All accounts at once over one pooled client: one by one took ~10 s for three accounts.
     done, problems = await _google.each_account(

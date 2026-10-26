@@ -86,8 +86,18 @@ class Ollama:
         have |= {n.removesuffix(":latest") for n in have}
         return [w for w in wanted if w not in have and w.removesuffix(":latest") not in have]
 
+    async def loaded(self) -> list[dict]:
+        """What Ollama has in memory now (/api/ps: name, size, size_vram, expires_at)."""
+        r = await self._client.get(f"{self.url}/api/ps", timeout=5)
+        r.raise_for_status()
+        return r.json().get("models", [])
+
     async def unload(self) -> None:
         await self._client.post(f"{self.url}/api/generate", json={"model": self.model, "keep_alive": 0})
+
+    async def unload_embed(self, model: str) -> None:
+        """An embedding model can't go through /api/generate; an empty /api/embed can."""
+        await self._client.post(f"{self.url}/api/embed", json={"model": model, "input": [], "keep_alive": 0})
 
     async def close(self) -> None:
         await self._client.aclose()

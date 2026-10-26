@@ -172,13 +172,13 @@ waits until she lands.
 | done / 10 s without work | → chibi | transform back, then happy for a moment |
 | poke ×1 / ×3 / ×5 | chibi | surprised / pout / upset |
 | long-press | chibi | happy |
-| drag, throw, landing | chibi | held → fall → land (soft) / dizzy (hard) / upset (very hard) |
+| drag, throw, landing | chibi | held → fall → land (a drop under half the screen's height) / hard landing (higher: Mixamo "Hard Landing", feet first) / upset (only when thrown, or slammed into a screen edge). No dizziness after falls (Saber, 2026-10-26; `stage.py` HIGH_DROP, THROW_SPEED, WALL_HURT) |
 | media playing | chibi | idle with a sway on the beat-agnostic bob (~110 bpm) |
 | "serious mode" / "chibi mode" | as asked | stays until asked again (work no longer switches her back) |
 
 ## Personality and wording
 - **Voice of the text:** precise, calm, composed, quietly proud of her accuracy; dry humour now and then. She speaks to Kryo directly.
-- **Address:** "Kryo" by default; "Sir" when it's serious or urgent (warnings, safety, confirmations). At most once per reply, often not at all.
+- **Address:** "Saber" by default (was "Kryo" until 2026-10-26; `persona.USER_NAME`); "Sir" when it's serious or urgent (warnings, safety, confirmations). At most once per reply, often not at all.
 - **Openers:**
   - "Notice." for news;
   - "Answer." for replies to questions;
@@ -203,9 +203,30 @@ fit her.
    - The clips, the cloned outputs and any tuned model **never go into git and are never shared or published**.
 2. **Clone and tune:** render the audition lines with each reference and pick by ear. Optionally fine-tune F5 on a few minutes of her lines if zero-shot isn't close enough.
 3. **Never** use her voice to impersonate the actress or to say things presented as hers. It's Raphael's voice inside this desktop app only.
+   - **Current (2026-10-26):** reference `voice_f.wav` + `voice_f.txt` (Whisper transcript), a clean dub line from the Sebas0914/Great-Sage repo's voice candidates; F5 NFE 8, speed 0.90, no FX. Kryo picked it by ear over Pocket TTS and Kokoro (`spikes/voice/audition_cpu.py`; renders in `ChibiAgent\voice\audition_cpu`). Numbers are rewritten before synthesis (`tts.speakable`: 3.5 → "3 point 5", $4.99, 10:30), since both engines read the "." as a full stop. The ref_06 notes below are history.
    - **Chosen (2026-10-17):** reference `ref_06`, the "Answer, the use of the magic sense…" line from the compilation, with game music removed by Demucs htdemucs. It's used **raw, without the FX chain**: the source already has her processed timbre. F5 NFE 8, **speed 0.90**. **Cleaned (2026-10-17):** the reference is noise-reduced and EQ'd before cloning (`ref_06_clean.wav`, variant B of `spikes/voice/tune_voice.py`), which removed most of the echo and 6–9 kHz hiss while keeping her processed timbre; exclamation marks become full stops before synthesis, since F5 pitched them up and smeared the endings (picked over 0.95 and 0.85; at 1.0 line 2 sounded rushed). ref_04 was close but too fast.
    - **How the clip was made:** `spikes/voice/segment.py` (Whisper word timestamps), then `pick_refs.py` (speaker filter + 6–10 s merge), then Demucs.
 4. **Fallback:** the stock-voice candidates from the spike-2 audition (`kokoro_*`, `f5_*`).
 5. **Raphael timbre (FX chain, real time):** light EQ (cut below 120 Hz, a slight lift around 3–5 kHz), a short plate reverb (~8 % wet), a subtle chorus or doubled voice (~10 ms, low mix) for the "inner voice" feel, and a limiter.
    - Each stage has its own on/off switch in settings.
 6. **Licensing:** F5-TTS code is MIT. Check the base checkpoint's weights licence (it may be non-commercial) before any use beyond personal use.
+
+## Sounds
+- **UI sounds** (Kryo's files, outside git, in `config [overlay] sounds_dir`): `startup` when she
+  first appears, `appear` when she comes back from hiding, and on the pose wheel `hover` (each new
+  segment), `click` (a pose picked, or a confirm button) and `close` (never mind, or the timeout).
+  Opening the wheel is silent (Kryo, 2026-10-26). The overlay plays them itself (`overlay/chibi_overlay/sounds.py`). Tray →
+  "Sound effects" turns them off; volume is `sfx_volume`.
+- **Giggle:** a long press on her (she turns happy) gets a spoken giggle ("Hee hee." or "He he,
+  that tickles."); F5 can't laugh, so it reads them as words. Write the
+  syllables apart: F5 squeezed "Hehe" into a single "he". Saber asked for it (2026-10-26).
+- **Voice reactions** (2026-10-26): short in-character words in her current voice, not gasps (F5
+  says words reliably). Lines live in `shared/chibi_shared/reactions.py`; the voice process
+  pre-renders them into the clip cache after the openers, one at a time in the background.
+  - The overlay reports the event (`React`); the agent (`agent/chibi_agent/reactions.py`) stays
+    quiet when muted, in gaming mode, or while she's listening or answering; it waits 1.5 s between
+    reactions and 4 s before repeating one; idle moments she starts by herself speak 25 % of the
+    time, at most every 30 s; poses picked on the wheel always speak.
+  - A reaction plays only from the cache (never synthesises), and moves her mouth without
+    switching her to talking, so a stretch or sleep isn't interrupted. The geometric core above
+    her stays hidden for reactions: it shows only when the agent thinks or answers.

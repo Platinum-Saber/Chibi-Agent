@@ -1,6 +1,6 @@
 """Gmail, read-only (M5). Code builds the query and the lines; senders are named,
 never shown by address. Everything from a mail is untrusted data. The list is
-numbered so Kryo can say "read the second one" (read_mail resolves the number
+numbered so Saber can say "read the second one" (read_mail resolves the number
 against the last list). Mail stays unread: the scope is read-only."""
 from __future__ import annotations
 
@@ -201,7 +201,7 @@ async def read_mail(number: str) -> Result:
     if n == -1:
         n = len(_LAST)
     if n is None or not 1 <= n <= len(_LAST):
-        return Result(f"The last list has mails 1 to {len(_LAST)}. Ask Kryo which one.")
+        return Result(f"The last list has mails 1 to {len(_LAST)}. Ask Saber which one.")
     email, mid = _LAST[n - 1]
     done, problems = await _google.each_account(
         API, TRANSPORT, lambda c, auth, _e: _get_full(c, auth, mid), [email])

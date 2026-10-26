@@ -63,11 +63,15 @@ def main() -> None:
     link = QtLink()
     stage = Stage(wardrobe, PKG, primary.devicePixelRatio(), link, own_windows=set())
     stage.apply_character(custom)
+    stage.physics.place(*stage.home)  # start on her home spot (Alt+dragged, or the default)
     stage.bodies = dict(cfg.get("bodies") or {})  # her 2D art / 3D model (tray -> Switch to ...)
     stage.chibi_only = bool(cfg.get("chibi_only", False))
     if stage.chibi_only:
         log.info("chibi_only: the serious form is off")
     link.connected.connect(stage.send_outfit_state)
+    from .sounds import Sfx
+    stage.sfx = Sfx(cfg.get("sounds_dir"), float(cfg.get("sfx_volume", 0.6)),
+                    enabled=lambda: stage.character.behaviour.sounds)
 
     def send_voice() -> None:  # her chosen voice (Customize window); the agent passes it on
         if stage.character.voice is not None:
@@ -88,6 +92,7 @@ def main() -> None:
         elif not hidden and not win.isVisible():
             win.show()
             win.update()
+            stage.sfx.play("appear")  # back from hiding (the first show plays "startup")
 
     def watch_fullscreen() -> None:
         exe = env.fullscreen_app(stage.ground.own)
@@ -104,6 +109,7 @@ def main() -> None:
     link.start()
     for w in windows:
         w.show()
+    stage.sfx.play("startup")
     fs_timer = QTimer()
     fs_timer.timeout.connect(watch_fullscreen)
     fs_timer.start(500)

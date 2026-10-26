@@ -53,6 +53,9 @@ class Behaviour:
     moment_max_s: float = 20.0
     sleep_after_s: float = 60.0  # untouched this long: she falls asleep
     effects: bool = True        # zzz, sparkles, notes, hearts, "!"
+    sounds: bool = True         # UI sounds (tray -> Sound effects); her voice reactions follow Mute voice
+    home_x: float = -1.0        # her home spot on the taskbar (Alt+drag her there), desktop px; -1: the default
+    home_y: float = -1.0
     dance_words: str = ""       # extra words/artists (comma-separated) that make a track "excited" (body/music.py)
     panel_font: str = ""        # her text panel's font family; "" = the default (hud.PANEL_FONTS)
     panel_font_size: float = 11.5

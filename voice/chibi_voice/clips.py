@@ -3,6 +3,7 @@
 A clip is `<slug>-<hash>.wav` in %LOCALAPPDATA%\\ChibiAgent\\clips. The hash covers the
 voice (reference audio + transcript + F5 settings) and the text, so changing her
 voice re-renders every clip. The agent asks for a clip by its text: `clip="Answer."`.
+Her voice reactions ("Hm?", "Ow.") are clips too, played only if already rendered.
 """
 from __future__ import annotations
 
@@ -14,12 +15,16 @@ from pathlib import Path
 
 import numpy as np
 
+from chibi_shared.reactions import all_lines as all_reaction_lines
+
 log = logging.getLogger(__name__)
 
 LINES = [
     "Answer.", "Notice.", "Understood.", "Confirmed.", "Warning.", "Report.",
-    "End of report.", "Understood, Sir.", "Good morning, Kryo.", "Yes, Sir.",
+    "End of report.", "Understood, Sir.", "Good morning, Saber.", "Yes, Sir.",
 ]
+ALL_LINES = LINES + [t for t in all_reaction_lines() if t not in LINES]
+"""The openers, then her short voice reactions (chibi_shared.reactions), rendered after them."""
 
 
 def slug(text: str) -> str:

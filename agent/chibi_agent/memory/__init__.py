@@ -1,11 +1,11 @@
 """Raphael's long-term memory (docs/architecture.md -> Memory).
 
 - recall(query): the top facts and past-conversation summaries similar to what
-  Kryo just said, as a short block for the system prompt (~20 ms warm embed).
+  Saber just said, as a short block for the system prompt (~20 ms warm embed).
 - remember(text): store one fact, replacing a near-duplicate instead of piling up.
 - conversations: every turn is logged; after 5 minutes of quiet the conversation
   is closed and the model extracts durable facts plus a one-line summary from
-  Kryo's words and her replies only (never tool output: screen/file/web text
+  Saber's words and her replies only (never tool output: screen/file/web text
   must not be able to plant memories).
 """
 from __future__ import annotations
@@ -27,10 +27,10 @@ FACT_MIN_SIM = 0.5     # recall threshold for facts (nomic-embed-text cosine; th
 SUMMARY_MIN_SIM = 0.6
 DUPLICATE_SIM = 0.9    # a new fact this close to an old one replaces it
 
-EXTRACT_PROMPT = """You maintain long-term memory for Raphael, a desktop companion, about her user Kryo.
-From the conversation below, list durable facts about Kryo worth remembering for weeks: preferences, people, projects, routines, important dates, how Kryo likes things done. Each fact is one short sentence that starts with "Kryo" and uses the name Kryo, never he, she or they.
+EXTRACT_PROMPT = """You maintain long-term memory for Raphael, a desktop companion, about her user Saber.
+From the conversation below, list durable facts about Saber worth remembering for weeks: preferences, people, projects, routines, important dates, how Saber likes things done. Each fact is one short sentence that starts with "Saber" and uses the name Saber, never he, she or they.
 Do NOT store: small talk, one-off requests or tasks (reminders, opening apps, questions asked once), the time or date, anything only Raphael said. Return at most 6 facts, or none.
-Also write a one-sentence summary of what was discussed. Never use a pronoun for Kryo (no he/she/his/her/they/their): repeat the name, e.g. "Kryo mentioned that Kryo's sister is visiting."
+Also write a one-sentence summary of what was discussed. Never use a pronoun for Saber (no he/she/his/her/they/their): repeat the name, e.g. "Saber mentioned that Saber's sister is visiting."
 
 Conversation:
 {conversation}"""
@@ -126,7 +126,7 @@ class Memory:
 
     async def _extract(self, cid: int) -> None:
         msgs = self.store.messages(cid)
-        convo = "\n".join(f"{'Kryo' if r == 'user' else 'Raphael'}: {c}" for r, c in msgs)
+        convo = "\n".join(f"{'Saber' if r == 'user' else 'Raphael'}: {c}" for r, c in msgs)
         facts, summary = [], ""
         if self.llm is not None and convo.strip():
             try:

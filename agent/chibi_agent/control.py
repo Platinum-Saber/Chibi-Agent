@@ -1,5 +1,5 @@
 """Tray commands and app state: mute, gaming mode, memory viewer, settings, autostart,
-Google sign-in, notification access, quit.
+Google sign-in, notification access, restart, quit.
 
 The agent owns this state and sends `State` to the overlay whenever it changes
 (and when the overlay connects) so the tray's check marks stay true.
@@ -28,8 +28,10 @@ USER_CONFIG_HEADER = """# Your Chibi-Agent settings. Anything here overrides the
 
 
 class Controller:
-    def __init__(self, hub, orch, vram, memory, quit_cb: Callable[[], None], google=None, notify=None):
+    def __init__(self, hub, orch, vram, memory, quit_cb: Callable[[], None], google=None, notify=None,
+                 restart_cb: Callable[[], None] | None = None):
         self.hub, self.orch, self.vram, self.memory, self.quit_cb = hub, orch, vram, memory, quit_cb
+        self.restart_cb = restart_cb  # quit, then main() starts a fresh agent
         self.google = google  # chibi_agent.google_auth.GoogleAuth
         self.notify = notify  # chibi_agent.notifywatch.NotifyWatch
         if notify:
@@ -104,13 +106,16 @@ class Controller:
         elif name == "quit":
             self.quit_cb()
             return
+        elif name == "restart" and self.restart_cb:
+            self.restart_cb()
+            return
         await self.push_state()
 
     async def _sign_in(self) -> None:
-        """Kryo finishes the sign-in in the browser; she says how it went."""
+        """Saber finishes the sign-in in the browser; she says how it went."""
         try:
             email = await self.google.sign_in()
-            await self._tell("Confirmed.", f"{short(email)} is connected, Kryo.")
+            await self._tell("Confirmed.", f"{short(email)} is connected, Saber.")
         except Exception as e:
             log.warning("google sign-in failed: %s", e)
             await self._tell("Warning.", f"The Google sign-in did not work. {e}")
@@ -131,7 +136,7 @@ def open_user_config() -> None:
 
 
 def set_autostart(on: bool) -> None:
-    """A shortcut in the Startup folder, made only when Kryo ticks the tray option."""
+    """A shortcut in the Startup folder, made only when Saber ticks the tray option."""
     if not on:
         SHORTCUT.unlink(missing_ok=True)
         return

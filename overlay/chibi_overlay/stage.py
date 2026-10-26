@@ -15,16 +15,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from chibi_shared.protocol import (Bubble, Confirm, ConfirmResult, FormReq, Hud, Lip, MoodAck,
-                                   MoodReq, OutfitReq, OutfitState, Quit, Touch, Visibility)
+                                   MoodReq, OutfitReq, OutfitState, Quit, React, Touch, Visibility)
 
 from .body import motion, music
 from .body.brain import Brain, Moment, Mood, moment_ms
 from .body.motion import Clip, RigMap
 from .body.physics import Physics, Rect
-from .character import Character, apply_to_map
+from chibi_shared import paths
+
+from .character import FILE_NAME, Character, apply_to_map, save as save_character
 from .core_fx import CoreFX
 from .env import Ground, MediaWatcher
 from .outfits import Wardrobe
+from .sounds import Sfx, reaction_for
 from .wheel import POSES, PoseWheel
 
 log = logging.getLogger(__name__)
@@ -53,7 +56,14 @@ PERFORM = {
 }
 GRAB_LOW = 0.5  # grabbed below this fraction of her height (her waist): the "held_low" clip, if the rig has one
 FLAT_IMPACT_S = 1.6  # after a flat fall: lying on the floor this long ("hard_landing"), then "hard_landing_up"
+# How she lands (Saber, 2026-10-26): dropped more than HIGH_DROP of the screen's height -> the hard
+# landing, less -> the soft one; tears only when thrown (let go faster than THROW_SPEED) or slammed
+# into a screen edge (WALL_HURT). Speeds in px/s at 96 dpi.
+HIGH_DROP = 0.5
+THROW_SPEED = 1_500.0
+WALL_HURT = 900.0
 ANSWER_POINT_S = 2.7  # an answer opens with "answer_point" (Mixamo "Pointing", 2.77 s), then "answer"
+REACT_LIP_S = 4.0  # after a React, her voice moves only her mouth: a reaction doesn't turn a stretch into talking
 
 
 @dataclass
@@ -109,6 +119,7 @@ class Stage:
         self.lip_target = 0.0
         self.core = CoreFX()  # the geometric object above her while she thinks or speaks
         self.listening = False
+        self.conversation = False  # a spoken conversation: from push-to-talk until her reply ends
         self.hidden = False
         self.facing_left = False
         self.cursor = (0, 0)
@@ -121,16 +132,23 @@ class Stage:
         self.geom: dict = {}  # rig -> puppet.Geom, measured once by the primary window
         self.last_touch = time.monotonic()
         self.press: tuple[float, float, float] | None = None  # x, y, t
+        self.press_alt = False  # Alt held at the press: the drag sets her home spot
         self.grab_offset = (0.0, 0.0)
         self.dragging = False
         self.grab_low = False  # this drag picked her up below the waist
         self.fall_flat = False  # dropped while carried flat: falls lying down, lands hard
+        self.landed_flat = False  # her last hard landing was a flat one (FlatImpact, then GetUp)
+        self.thrown = False  # let go fast (THROW_SPEED): she cries when she lands
         self.answer_since: float | None = None  # monotonic s when talking straight after thinking began
         self._prev_mood = Mood.IDLE
         self.yaw = 0.0  # degrees she faces at rest (3D body), set by middle-dragging her; + turns her left
         self._rotate_from: tuple[float, float] | None = None  # cursor x, yaw when the middle drag began
         self.long_pressed = False
         self.wheel = PoseWheel()  # right-click on her: pick a pose
+        self._wheel_hover: int | None = None
+        self.sfx = Sfx(None)  # UI sounds; main.py loads Kryo's files
+        self._react_key = (self.brain.mood, self.brain.since)  # a new mood (or the same one again): maybe a reaction
+        self.reacting_until = 0.0
         self.drag_trail: deque[tuple[float, float, float]] = deque(maxlen=8)
         self._last_ground = 0.0
         self._t = time.monotonic()
@@ -159,6 +177,8 @@ class Stage:
             return rig.moods["held_low"]  # picked up by the legs: carried, not hanging
         if self.brain.mood == Mood.FALLING and self.fall_flat and "falling_flat" in rig.moods:
             return rig.moods["falling_flat"]  # still lying flat in the air, not flung upright
+        if self.brain.mood == Mood.HARD_LANDING and not self.landed_flat and "hard_landing_high" in rig.moods:
+            return rig.moods["hard_landing_high"]  # a high drop upright: Mixamo "Hard Landing", feet first
         if self.brain.mood == Mood.HARD_LANDING and "hard_landing_up" in rig.moods \
                 and time.monotonic() * 1000 - self.brain.since >= FLAT_IMPACT_S * 1000:
             return rig.moods["hard_landing_up"]  # flat on the floor long enough: getting up
@@ -167,6 +187,15 @@ class Stage:
             if key in rig.moods:
                 return rig.moods[key]  # answering a question: point first, then talk
         return rig.clip(self.brain.mood, self.brain.moment)
+
+    @property
+    def headset(self) -> str:
+        """Her headset (3D body, overlay3d/props.gd): "talk" (with the mic) through a spoken
+        conversation, "music" while media plays, else "". Not for voice reactions, poses,
+        briefings or typed chat (Saber, 2026-10-26)."""
+        if self.conversation:
+            return "talk"
+        return "music" if getattr(self.media, "playing", False) else ""
 
     @property
     def music_style(self) -> str:
@@ -238,15 +267,20 @@ class Stage:
             self.long_pressed = True
             b.long_press(now)
             self.last_touch = now_s
+            if b.mood == Mood.HAPPY:  # she giggles; the agent's own "happy" stays quiet (reaction_for)
+                self.reacting_until = now_s + REACT_LIP_S
+                self.link.send(React(event="giggle"))
 
         # body
         h, hw = self.size[self.form]
         ph.half_width, ph.head_height = hw, h
         if not self.dragging:
-            impact = ph.step(dt)
-            if impact is not None:
-                b.land(impact, now, flat=self.fall_flat and "hard_landing" in self.rigs[self.form].moods)
-                self.fall_flat = False
+            if ph.step(dt) is not None:  # first touch of the floor
+                mon = self.ground.monitor_at(ph.x, ph.y - 1)
+                self.landed_flat = self.fall_flat and "hard_landing" in self.rigs[self.form].moods
+                b.land(now, flat=self.landed_flat, high=ph.y - ph.top_y > (mon.bottom - mon.top) * HIGH_DROP,
+                       hurt=self.thrown or ph.wall_hit >= WALL_HURT)
+                self.fall_flat = self.thrown = False
             if not ph.airborne:
                 floor = self.ground(ph.x)
                 if floor > ph.y + 1:
@@ -284,10 +318,20 @@ class Stage:
             self.answer_since = now_s  # an answer: it opens with "answer_point", then "answer"
         elif b.mood != Mood.TALKING:
             self.answer_since = None
+        prev_mood = self._prev_mood
         self._prev_mood = b.mood
-        # the thinking core above her: while she thinks, and while she speaks (it follows her voice)
+        if (b.mood, b.since) != self._react_key:
+            self._react_key = (b.mood, b.since)
+            event = reaction_for(prev_mood, b.mood, b.moment, b.performing)
+            if event:
+                self.reacting_until = now_s + REACT_LIP_S
+                self.link.send(React(event=event, picked=b.performing))
+        # the thinking core above her: while she thinks, and while she speaks (it follows her voice);
+        # not for a voice reaction ("Hm?"), which is her, not the agent answering
+        reacting = now_s < self.reacting_until
         self.core.update(dt, thinking=b.mood == Mood.THINKING,
-                         speaking=b.mood == Mood.TALKING or self.lip > 0.03, level=min(1.0, self.lip * 1.6))
+                         speaking=b.mood == Mood.TALKING or (self.lip > 0.03 and not reacting),
+                         level=min(1.0, self.lip * 1.6))
 
         # form
         if b.mood in motion.SERIOUS_MOODS:
@@ -310,6 +354,10 @@ class Stage:
             self.wheel.track(cursor)
             if not self.wheel.open:  # timed out
                 self.close_wheel()
+            elif self.wheel.hover != self._wheel_hover:
+                self._wheel_hover = self.wheel.hover
+                if self.wheel.hover is not None:
+                    self.sfx.play("hover")
 
     def _start_transform(self, to: str, now_s: float) -> None:
         self.transform_t0 = now_s
@@ -381,6 +429,7 @@ class Stage:
         old_height = self.rigs["chibi"].height_dip
         self.character = ch
         b = ch.behaviour
+        self.home = self._saved_home(b)
         self.brain.sleep_after_ms = int(b.sleep_after_s * 1000)
         lo = int(b.moment_min_s * 1000)
         self.brain.moment_gap_ms = (lo, max(lo + 1, int(b.moment_max_s * 1000)))
@@ -392,6 +441,30 @@ class Stage:
             self.geom = {}
             self.outfit_gen += 1
         self.character_gen += 1
+
+    def _saved_home(self, b) -> tuple[float, float]:
+        """Her Alt+dragged spot while it's still on a monitor's taskbar line, else the default
+        (a monitor unplugged or rescaled since)."""
+        if b.home_x >= 0:
+            for _, work, _ in self.ground.mons:
+                if work.left <= b.home_x < work.right and abs(work.bottom - b.home_y) < 1:
+                    return b.home_x, b.home_y
+        return self.ground.home()
+
+    def set_home(self, x: float) -> None:
+        """Alt+drag: the taskbar spot below `x` is her home now (where she returns to when idle);
+        saved with her Customize settings."""
+        hw = self.size[self.form][1]
+        work = self.ground.work_area_at(x)
+        x = min(max(x, work.left + hw), work.right - hw)
+        self.home = (x, work.bottom)
+        self.character.behaviour.home_x, self.character.behaviour.home_y = self.home
+        self.sfx.play("click")
+        log.info("new home: %.0f, %.0f", *self.home)
+        try:
+            save_character(self.character, paths.DATA / FILE_NAME)
+        except OSError as e:
+            log.warning("can't save her home spot: %s", e)
 
     def _tweaked(self, outfit: str, maps: dict[str, RigMap]) -> dict[str, RigMap]:
         """The chibi map with Kryo's size and clip overrides for this outfit."""
@@ -445,7 +518,8 @@ class Stage:
         now = int(now_s * 1000)
         if isinstance(msg, Lip):
             self.lip_target = max(0.0, min(1.0, msg.rms))
-            self.brain.talk(now, 1500)
+            if now_s >= self.reacting_until:  # a reaction moves her mouth, not her pose
+                self.brain.talk(now, 1500)
             # The voice sends lip levels at 60 Hz while audio plays: keep her words up until
             # she has finished speaking them, not just until the text finished streaming.
             if self.ov.bubble:
@@ -456,6 +530,10 @@ class Stage:
         elif isinstance(msg, MoodReq):
             self.last_touch = now_s
             self.listening = msg.mood == "listening"
+            if msg.mood == "listening":  # Saber is talking to her (push-to-talk)...
+                self.conversation = True
+            elif msg.mood == "idle":  # ...until her reply has been spoken
+                self.conversation = False
             if msg.mood == "thinking":
                 self.ov.bubble = ""  # the thinking core above her shows it; no "…" text cloud
             elif msg.mood == "listening":
@@ -496,9 +574,11 @@ class Stage:
                 return name
         return None
 
-    def press_at(self, x: float, y: float) -> None:
+    def press_at(self, x: float, y: float, alt: bool = False) -> None:
+        """A left press; `alt` held: dragging her sets a new home spot where she's dropped."""
         hit = self.hit_overlay(x, y)
         if hit in ("yes", "no"):
+            self.sfx.play("click")
             self._answer_confirm(hit == "yes")
             return
         if hit == "wheel":
@@ -511,6 +591,7 @@ class Stage:
         if hit:  # bubble/HUD: swallow the click
             return
         self.press = (x, y, time.monotonic())
+        self.press_alt = alt
         self.grab_offset = (self.physics.x - x, self.physics.y - y)
         self.long_pressed = False
         self.drag_trail.clear()
@@ -537,10 +618,13 @@ class Stage:
         now = int(now_s * 1000)
         self.last_touch = now_s
         if self.dragging:
-            vx, vy = self._drag_v()
+            vx, vy = (0.0, 0.0) if self.press_alt else self._drag_v()  # Alt: put down, not thrown
             self.fall_flat = self.grab_low and "held_low" in self.rigs[self.form].moods
             self.brain.release(now)
             self.physics.throw_at(vx, vy)
+            self.thrown = math.hypot(vx, vy) / self.scale >= THROW_SPEED
+            if self.press_alt:
+                self.set_home(self.physics.x)
             self.link.send(Touch(t="drop", x=x, y=y, speed=math.hypot(vx, vy) / self.scale))
         elif not self.long_pressed:
             self.brain.poke(now)
@@ -554,10 +638,14 @@ class Stage:
         h, hw = self.size[self.form]
         self.wheel.show((x, y), h, hw, self.scale, (m.left, m.top, m.right, m.bottom))
         self.ov.rects["wheel"] = self.wheel.rect
+        self._wheel_hover = None  # opening is silent (Kryo); closing and picking make sounds
 
-    def close_wheel(self) -> None:
+    def close_wheel(self, picked: bool = False) -> None:
+        """Close it: with the click sound for a picked pose, the close sound for never mind
+        (the hole, a click elsewhere, right-click again, the timeout)."""
+        if self.ov.rects.pop("wheel", None) is not None:
+            self.sfx.play("click" if picked else "close")
         self.wheel.close()
-        self.ov.rects.pop("wheel", None)
 
     def toggle_wheel(self) -> None:
         if self.wheel.open:
@@ -567,7 +655,7 @@ class Stage:
 
     def perform(self, key: str) -> bool:
         """Play a pose Kryo picked on the wheel; False while she can't (held, falling, dizzy)."""
-        self.close_wheel()
+        self.close_wheel(picked=True)
         mood, moment, ms = PERFORM[key]
         now_s = time.monotonic()
         if not self.brain.perform(mood, int(now_s * 1000), ms, moment):

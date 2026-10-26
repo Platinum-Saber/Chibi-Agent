@@ -76,6 +76,29 @@ async def test_switch_queued_behind_a_load_renders_clips_once_under_the_new_key(
     assert main.saved_voice(a._last_voice).engine == "kokoro"
 
 
+def _tts(tmp_path, **vcfg):
+    from chibi_voice.tts import Tts
+    (tmp_path / "ref.txt").write_text("Reference.", encoding="utf-8")
+    return Tts({"reference": str(tmp_path / "ref.wav"), "reference_text": str(tmp_path / "ref.txt"),
+                "speed": 0.9, **vcfg})
+
+
+def test_f5_off_makes_kokoro_the_voice(tmp_path):
+    t = _tts(tmp_path, f5=False)
+    assert (t.engine, t.kvoice, t.speed) == ("kokoro", "bf_emma", 1.0)
+    t.tune("f5", "", 0.9, 8)  # a saved F5 choice, or one from Customize
+    assert (t.engine, t.kvoice, t.speed) == ("kokoro", "bf_emma", 1.0)
+    t.tune("kokoro", "af_sky", 1.1, 8)
+    assert (t.engine, t.kvoice, t.speed) == ("kokoro", "af_sky", 1.1)
+
+
+def test_f5_on_is_unchanged(tmp_path):
+    t = _tts(tmp_path)
+    assert (t.engine, t.speed) == ("f5", 0.9)
+    t.tune("f5", "", 0.9, 8)
+    assert t.engine == "f5"
+
+
 def test_hub_goes_offline_only_when_every_model_is_cached(tmp_path):
     repos = ["SWivid/F5-TTS", "charactr/vocos-mel-24khz"]
     assert not env.cached(str(tmp_path), repos)

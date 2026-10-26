@@ -1,5 +1,5 @@
-"""Tray icon and menu: show/hide, mute, gaming mode, body (2D art / 3D model), outfit, customize,
-memory, settings, Google accounts, notification access, autostart, quit.
+"""Tray icon and menu: show/hide, mute, sound effects, gaming mode, body (2D art / 3D model), outfit, customize,
+memory, settings, Google accounts, notification access, autostart, restart, quit.
 
 Show/hide, the body, the outfit and Customize Raphael (customize.py: moods, size, behaviour, sequences,
 voice) are handled here (they're about her look); everything else is a
@@ -89,6 +89,10 @@ class Tray:
         self.a_show = self._action(m, "Hide Raphael", self._toggle_visible)
         m.addSeparator()
         self.a_mute = self._action(m, "Mute voice", lambda on: self._cmd("mute" if on else "unmute"), True)
+        self.a_sfx = self._action(m, "Sound effects", self._sounds, True)  # local: the overlay plays them
+        self.a_sfx.blockSignals(True)
+        self.a_sfx.setChecked(stage.character.behaviour.sounds)
+        self.a_sfx.blockSignals(False)
         self.a_gaming = self._action(m, "Gaming mode (free GPU memory)",
                                      lambda on: self._cmd("gaming_on" if on else "gaming_off"), True)
         self.a_body = self._action(m, "", self.switch_body)  # her 2D art <-> her 3D model
@@ -106,6 +110,7 @@ class Tray:
         self.a_auto = self._action(m, "Start with Windows",
                                    lambda on: self._cmd("autostart_on" if on else "autostart_off"), True)
         m.addSeparator()
+        self._action(m, "Restart agent", lambda: self._cmd("restart"))  # the agent restarts overlay and voice too
         self._action(m, "Quit Raphael", lambda: self._cmd("quit"))
         self.menu = m
         self.icon.setContextMenu(m)
@@ -151,6 +156,14 @@ class Tray:
                 character.save(self.stage.character, paths.DATA / character.FILE_NAME)
             except OSError as e:
                 log.warning("can't save the body choice: %s", e)
+
+    def _sounds(self, on: bool) -> None:
+        """UI sounds on or off, remembered with her Customize settings."""
+        self.stage.character.behaviour.sounds = on
+        try:
+            character.save(self.stage.character, paths.DATA / character.FILE_NAME)
+        except OSError as e:
+            log.warning("can't save the sound choice: %s", e)
 
     def _customize(self) -> None:
         if self.customize is None:

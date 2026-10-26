@@ -5,7 +5,7 @@ retrieval, both tested on Qwen3 0.6-14B).
 
 Selection is by family, not by tool, so multi-step flows keep their partners
 (mail_list -> read_mail, search_files -> move_file). Each family has a descriptor
-written for nomic-embed-text: what it does plus how Kryo asks for it. Anything
+written for nomic-embed-text: what it does plus how Saber asks for it. Anything
 unsure falls back to every tool, which is the old behaviour.
 """
 from __future__ import annotations
@@ -35,7 +35,7 @@ FAMILIES: dict[str, tuple[tuple[str, ...], str]] = {
                  "Calendar, schedule and events: meetings, classes, appointments today, tomorrow or this week. "
                  "What's on today? Am I free on Friday? When is my next meeting?"),
     "memory": (("remember", "recall_memory", "forget_memory"),
-               "Long-term memory about Kryo: remember a fact or preference, recall what you know, forget something. "
+               "Long-term memory about Saber: remember a fact or preference, recall what you know, forget something. "
                "Remember that my sister is called Aiko. What do you know about my project? Forget that."),
     "reminders": (("set_reminder", "list_reminders", "cancel_reminder"),
                   "Reminders, timers and alarms: remind me later, set a timer, list or cancel reminders. "
@@ -50,7 +50,7 @@ FAMILIES: dict[str, tuple[tuple[str, ...], str]] = {
                "The PC's state: time and date, battery, CPU, RAM, GPU memory, disk space, which apps are running, "
                "the window in front, internet connection, Wi-Fi, ping. How much battery is left? Is my internet down?"),
     "screen": (("look_at_screen",),
-               "Look at the screen and see what Kryo sees: look at this, what's this error, read what's on screen."),
+               "Look at the screen and see what Saber sees: look at this, what's this error, read what's on screen."),
     "clipboard": (("get_clipboard", "set_clipboard"),
                   "The clipboard: what did I copy, read the clipboard, copy this text, paste."),
     "shell": (("run_shell",),

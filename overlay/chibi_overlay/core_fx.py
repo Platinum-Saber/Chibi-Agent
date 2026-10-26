@@ -15,7 +15,9 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QRadialGradient
 
 CYAN, VIOLET, GREEN, WHITE = QColor(127, 227, 255), QColor(165, 123, 255), QColor(120, 230, 170), QColor(245, 250, 255)
-SIZE_DIP = 70.0      # radius of the cage at rest, at her default height (scaled with her size)
+# base radius r at her default height (scaled linearly with her size); the outer cage is 1.25 r, so
+# at rest it spans ~1.1x her head width (head ~0.19 of her height on the 3D chibi); it grows with her voice
+SIZE_DIP = 27.0
 FADE_S = 0.35        # fade in / out time constant
 SHARDS = 26
 

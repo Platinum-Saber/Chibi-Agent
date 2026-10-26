@@ -48,18 +48,18 @@ def test_grab_release_fall_and_landing_reactions(brain):
     assert brain.mood == Mood.HELD
     brain.release(100)
     assert brain.mood == Mood.FALLING
-    brain.land(500.0, 400)
+    brain.land(400)
     assert brain.mood == Mood.SOFT_LANDING
-    brain.land(b.DIZZY_IMPACT, 500)
-    assert brain.mood == Mood.DIZZY
-    brain.land(b.CRY_IMPACT, 600)
+    brain.land(500, high=True)
+    assert brain.mood == Mood.HARD_LANDING  # a high drop lands hard; no more dizziness
+    brain.land(600, hurt=True)
     assert brain.mood == Mood.CRYING
 
 
 def test_a_flat_fall_lands_hard_whatever_the_speed_and_refuses_requests(brain):
     brain.grab(0)
     brain.release(100)
-    brain.land(b.CRY_IMPACT, 400, flat=True)
+    brain.land(400, flat=True)
     assert brain.mood == Mood.HARD_LANDING
     assert not brain.request_mood(Mood.THINKING, 500)
     brain.tick(400 + b.HARD_LANDING_MS)
@@ -67,7 +67,7 @@ def test_a_flat_fall_lands_hard_whatever_the_speed_and_refuses_requests(brain):
 
 
 def test_walks_home_after_a_reaction_when_moved(brain):
-    brain.land(100.0, 0)
+    brain.land(0)
     brain.away_from_home = True
     brain.tick(b.SOFT_LANDING_MS)
     assert brain.mood == Mood.WALKING
@@ -195,7 +195,7 @@ def test_cursor_is_ignored_while_held_or_crying(brain):
     brain.cursor_near(10)
     assert brain.mood == Mood.HELD
     brain.release(20)
-    brain.land(b.CRY_IMPACT, 30)
+    brain.land(30, hurt=True)
     brain.cursor_far(40)
     assert brain.mood == Mood.CRYING
 
@@ -296,18 +296,18 @@ def test_request_mood_overrides_sulking_and_sleep(brain):
     assert brain.mood == Mood.ALERT
 
 
-@pytest.mark.parametrize("setup", ["held", "falling", "dizzy"])
+@pytest.mark.parametrize("setup", ["held", "falling", "hard_landing"])
 def test_request_mood_is_refused_until_she_lands(brain, setup):
     brain.grab(0)
     if setup != "held":
         brain.release(10)
-    if setup == "dizzy":
-        brain.land(b.DIZZY_IMPACT, 20)
+    if setup == "hard_landing":
+        brain.land(20, high=True)
     before = brain.mood
     assert brain.request_mood(Mood.TALKING, 30) is False
     assert brain.mood == before
     if setup == "falling":
-        brain.land(100.0, 40)
+        brain.land(40)
         assert brain.request_mood(Mood.TALKING, 50) is True
 
 
@@ -329,5 +329,5 @@ def test_busy_is_held_or_falling(brain):
     assert brain.busy
     brain.release(10)
     assert brain.busy
-    brain.land(b.DIZZY_IMPACT, 20)
+    brain.land(20, high=True)
     assert not brain.busy

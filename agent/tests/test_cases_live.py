@@ -38,7 +38,7 @@ pytestmark = pytest.mark.skipif(not ollama_up(), reason="Ollama is not running")
 FOLLOW_UPS = [
     ("Any new mail?", "Notice. Three new mails. 1, Alice: lunch plans. 2, Bob: the invoice. 3, Moodle: quiz.",
      {"mail_list"}, "Read the second one.", "read_mail", {"number": "2"}),
-    ("Where is report.docx?", "Answer. It is C:/Users/Kryo/Downloads/report.docx.",
+    ("Where is report.docx?", "Answer. It is C:/Users/Saber/Downloads/report.docx.",
      {"search_files"}, "Move it to my Documents folder.", "move_file", {"source": "report"}),
     ("Which apps are open?", "Answer. Spotify, Chrome and Discord are open.",
      {"running_apps"}, "Close Discord.", "close_window", {"title": "discord"}),

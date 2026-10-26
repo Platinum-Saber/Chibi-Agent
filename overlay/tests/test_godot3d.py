@@ -371,7 +371,7 @@ def test_dropped_from_the_torso_up_falls_and_lands_as_before(st):
     st.release_at(*st.feet)
     assert st.clip("chibi").motion == "Fall"
     _land_next_tick(st)
-    assert st.brain.mood == Mood.DIZZY
+    assert st.brain.mood == Mood.SOFT_LANDING  # a low drop (under half the screen): no dizziness
 
 
 def test_a_carried_drop_on_the_2d_art_lands_as_before(st):
@@ -379,7 +379,37 @@ def test_a_carried_drop_on_the_2d_art_lands_as_before(st):
     st.release_at(*st.feet)
     assert not st.fall_flat
     _land_next_tick(st)
-    assert st.brain.mood == Mood.DIZZY
+    assert st.brain.mood == Mood.SOFT_LANDING
+
+
+def test_a_high_drop_lands_hard_feet_first_on_the_3d_body(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.75)
+    st.release_at(*st.feet)
+    st.physics.top_y = st.physics.y - 0.6 * 1080  # dropped from over half the screen's height
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.HARD_LANDING and st.clip("chibi").motion == "HardLand"
+    st.brain.since -= int(stage_mod.FLAT_IMPACT_S * 1000)
+    assert st.clip("chibi").motion == "HardLand"  # no FlatImpact/GetUp for an upright drop
+
+
+def test_only_a_throw_or_a_wall_slam_makes_her_cry(st):
+    _grab_at(st, 0.75)
+    st.drag_trail.clear()
+    st.drag_trail.extend([(st.feet[0], st.feet[1], time.monotonic() - 0.05),
+                          (st.feet[0] + 200, st.feet[1], time.monotonic())])  # 4000 px/s: a throw
+    st.release_at(*st.feet)
+    assert st.thrown
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.CRYING
+    st.brain.since -= 10_000
+    st.tick(st.feet)
+    _grab_at(st, 0.75)
+    st.release_at(*st.feet)  # put down gently...
+    st.physics.wall_hit = stage_mod.WALL_HURT  # ...but it slammed into the screen's edge
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.CRYING
 
 
 def test_a_rig_without_held_low_just_hangs(st):
@@ -446,14 +476,30 @@ def test_switching_back_to_3d_wears_the_last_3d_variant(st):
     assert st.switch_body() == "ruby_3d"  # not [overlay.bodies]' teen_3d: the variant she last wore
 
 
-def test_frames_say_when_the_agent_is_listening(fake_bridge):
-    """The headset goes on while she listens (overlay3d/props.gd); the flag comes from the stage."""
+def test_frames_carry_the_headset_choice(fake_bridge):
+    """The headset (overlay3d/props.gd) follows the stage's `headset`: "talk", "music" or ""."""
     class W:
         hwnd = 0
-        stage = type("S", (), {"listening": True})()
+        stage = type("S", (), {"headset": "talk"})()
     m = godot3d.GodotModel("X:/nowhere", widget=W(), bridge=fake_bridge)
-    assert m.frame()["listening"] is True
-    assert _puppet().model.frame()["listening"] is False  # no window/stage: never listening
+    assert m.frame()["headset"] == "talk"
+    assert _puppet().model.frame()["headset"] == ""  # no window/stage: no headset
+
+
+def test_headset_only_for_a_spoken_conversation_or_media(st):
+    from chibi_shared.protocol import Lip, MoodReq
+    st.on_message(Lip(rms=0.5))  # a voice reaction, a briefing line...
+    assert st.headset == ""
+    st.on_message(MoodReq(mood="listening"))  # push-to-talk
+    for mood in ("thinking", "talking"):
+        st.on_message(MoodReq(mood=mood))
+        assert st.headset == "talk"
+    st.on_message(MoodReq(mood="idle"))  # her reply has been spoken
+    assert st.headset == ""
+    st.on_message(MoodReq(mood="thinking"))  # a typed question: no headset
+    assert st.headset == ""
+    st.media.playing = True
+    assert st.headset == "music"
 
 
 def test_middle_drag_turns_her_and_frames_carry_it(st, fake_bridge):

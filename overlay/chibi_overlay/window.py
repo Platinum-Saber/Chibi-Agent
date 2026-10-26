@@ -254,8 +254,8 @@ class MonitorWindow(QOpenGLWidget):
 
     # --- mouse: forwarded to the stage in desktop px -------------------------------------------
     def mousePressEvent(self, e) -> None:
-        if e.button() == Qt.MouseButton.LeftButton:
-            self.stage.press_at(*win32.cursor_pos())
+        if e.button() == Qt.MouseButton.LeftButton:  # with Alt: dragging her moves her home spot
+            self.stage.press_at(*win32.cursor_pos(), alt=bool(e.modifiers() & Qt.KeyboardModifier.AltModifier))
         elif e.button() == Qt.MouseButton.MiddleButton and self.stage.hit_overlay(*win32.cursor_pos()) is None:
             self.stage.rotate_press(win32.cursor_pos()[0])  # middle-drag on her: turn her
         elif e.button() == Qt.MouseButton.RightButton and self.stage.hit_overlay(*win32.cursor_pos()) in (None, "wheel"):

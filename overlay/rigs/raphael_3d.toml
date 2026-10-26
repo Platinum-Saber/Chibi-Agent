@@ -21,6 +21,7 @@ held_low     = { motion = "Carried", expression = "surprised" }   # picked up be
 falling      = { motion = "Fall", expression = "surprised" }
 falling_flat = { motion = "FallFlat", expression = "surprised" }  # dropped while carried: face down in the air
 soft_landing = { motion = "Land", expression = "happy" }
+hard_landing_high = { motion = "HardLand", expression = "sad" }  # a high drop upright: Mixamo "Hard Landing"
 hard_landing = { motion = "FlatImpact", expression = "sad" }      # after a flat fall: flat on the floor...
 hard_landing_up = { motion = "GetUp", expression = "neutral" }   # ...then up (stage.py FLAT_IMPACT_S)
 dizzy        = { motion = "Dizzy", expression = "sad" }

@@ -1,4 +1,4 @@
-"""SQLite memory: facts about Kryo, conversation summaries, messages, reminders.
+"""SQLite memory: facts about Saber, conversation summaries, messages, reminders.
 
 Vectors live in sqlite-vec tables keyed by the row id of their fact or
 conversation (cosine distance; nomic-embed-text's 768 dims). One connection,

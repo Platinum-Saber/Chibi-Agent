@@ -14,7 +14,7 @@ happy        = { motion = "Happy", expression = "happy" }
 held         = { motion = "Held", expression = "surprised" }
 falling      = { motion = "Fall", expression = "surprised" }
 soft_landing = { motion = "Land", expression = "happy" }
-hard_landing = { motion = "Land", expression = "happy" }  # never reached: only the 3D body falls flat
+hard_landing = { motion = "Land", expression = "upset" }  # a high drop (the 3D body lies flat, then gets up)
 dizzy        = { motion = "Dizzy", expression = "upset" }
 walking      = { motion = "Walk", expression = "neutral" }
 wander       = { motion = "Walk", expression = "neutral" }

@@ -1,4 +1,4 @@
-"""The briefing composer: ranks what needs Kryo's attention and words it in her
+"""The briefing composer: ranks what needs Saber's attention and words it in her
 voice ("Notice. … End of report."). A port of Saber-Theme's BriefingComposer.
 
 Pure: no clock, network or model, so every rule is tested. The model only labels
@@ -19,7 +19,7 @@ SPOKEN_FACTS = 4
 DEADLINE_WINDOW = dt.timedelta(hours=72)
 OPENERS = ("Notice.", "Report.")
 CLOSER = "End of report."
-ALL_QUIET = "There are no pending matters, Kryo."
+ALL_QUIET = "There are no pending matters, Saber."
 _NUMBERS = "Two Three Four Five Six Seven Eight Nine Ten".split()
 _CODE = re.compile(r"\b[A-Z]{2,4} ?\d{4}[A-Z]?\b\s*[-:–]?\s*")
 _DEADLINE = re.compile(r"\b(exam|quiz|deadline|due|submission|viva|presentation)\b", re.I)
@@ -223,8 +223,8 @@ def compose(now: dt.datetime, events: list[Event] = (), mails: list[Mail] = (),
         return Briefing([], ["Report.", ALL_QUIET])
     opener = random.Random(seed).choice(OPENERS)
     n = len(items)
-    count = ("One matter requires your attention, Kryo." if n == 1 else
-             f"{_NUMBERS[n - 2] if n - 2 < len(_NUMBERS) else n} matters require your attention, Kryo.")
+    count = ("One matter requires your attention, Saber." if n == 1 else
+             f"{_NUMBERS[n - 2] if n - 2 < len(_NUMBERS) else n} matters require your attention, Saber.")
     sentences, words = [opener, count], _words(opener) + _words(count) + _words(CLOSER)
     for item in items[:SPOKEN_FACTS]:
         fact = _cap(item.speech) + "."

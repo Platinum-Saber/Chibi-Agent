@@ -21,6 +21,11 @@ class Item:
     utt_id: str
     text: str
     clip: str | None = None
+    only_cached: bool = False  # a reaction: its clip or nothing
+
+
+class Skip(Exception):
+    """The renderer drops an item on purpose (a reaction whose clip isn't rendered yet)."""
 
 
 Render = Callable[[Item], Awaitable[tuple[np.ndarray, int]]]
@@ -58,6 +63,10 @@ class SpeechQueue:
                 audio, sr = await self._render(item)
             except asyncio.CancelledError:
                 raise
+            except Skip as e:
+                log.info("skipped %s: %s", item.utt_id, e)
+                await self._finish(item.utt_id, "cancel")
+                continue
             except Exception as e:
                 log.error("could not render %s %r: %s", item.utt_id, item.text, e)
                 await self._finish(item.utt_id, "cancel")

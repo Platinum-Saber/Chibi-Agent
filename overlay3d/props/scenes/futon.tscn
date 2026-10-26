@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="../scripts/soft_prop.gd" id="2"]
 
 [sub_resource type="BoxShape3D" id="Support"]
-size = Vector3(0.88, 0.14, 1.78)
+size = Vector3(0.88, 0.14, 1.90)
 
 [node name="futon" type="Node3D"]
 script = ExtResource("2")
@@ -14,5 +14,5 @@ script = ExtResource("2")
 [node name="Support" type="StaticBody3D" parent="."]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Support"]
-position = Vector3(0, 0.07, 0)
+position = Vector3(0, 0.07, -0.04)
 shape = SubResource("Support")

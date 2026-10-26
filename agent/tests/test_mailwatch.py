@@ -206,7 +206,7 @@ async def test_morning_on_first_start_after_six_once_a_day():
     clock.t += 15
     assert m.due()
     await m.fire()
-    assert orch.reports and orch.reports[0][0][-1] in ("End of report.", "There are no pending matters, Kryo.")
+    assert orch.reports and orch.reports[0][0][-1] in ("End of report.", "There are no pending matters, Saber.")
     assert not m.due()  # once a day
     clock.t = dt.datetime(2026, 10, 20, 6, 30).timestamp()  # still running the next morning
     assert not m.due()
