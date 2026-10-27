@@ -12,10 +12,10 @@ from .core_fx import SIZE_DIP as CORE_SIZE_DIP
 
 GOLD = QColor(216, 180, 90)
 CYAN = QColor(127, 227, 255)
-PANEL = QColor(16, 22, 34, 215)
 CORE_REF_H = 320.0  # her height (logical px) at which the core has its designed size
 TEAL = QColor(20, 200, 190)
 GLASS_TINT = 0.20   # the glass panel's teal wash (Kryo: 20 %)
+MIN_W = 180         # narrowest a HUD card gets when it squeezes into a free side
 # Kryo's pick, loaded from [overlay] fonts_dir at startup (load_fonts); then installed fallbacks
 PANEL_FONTS = ["Electroharmonix", "OCR A Extended", "Consolas"]
 
@@ -72,37 +72,32 @@ class Painter:
             scale = h / CORE_REF_H
             r = CORE_SIZE_DIP * scale
             st.core.paint(p, QPointF(fx, top - r * 1.15), scale)
+        half_w = st.size[st.form][1] / self.dpr
+        speech = None
         if st.ov.bubble and now < st.ov.bubble_until and not st.hidden:
-            half_w = st.size[st.form][1] / self.dpr
-            self._bubble(p, st.ov.bubble, fx, top, half_w, h)
+            speech = self._bubble(p, st.ov.bubble, fx, top, half_w, h)
         else:
             st.ov.rects.pop("bubble", None)
         # chibi_only keeps the panel (task HUD, confirm buttons) on the chibi form
         if (st.form == "serious" or st.chibi_only) and (st.ov.hud or st.ov.confirm) and not st.hidden:
-            self._panel(p, st, fx, fy - h)
+            self._panel(p, st, fx, top, half_w, h, speech)
         else:
             for k in ("hud", "yes", "no"):
                 st.ov.rects.pop(k, None)
         p.end()
 
-    def _bubble(self, p: QPainter, text: str, x: float, head_y: float, half_w: float, height: float) -> None:
-        """Her words in a liquid-glass panel beside her (her right, or her left near the screen
-        edge), level with her face. A layered window can't blur what's behind it, so the glass is
-        frosted translucency: a soft shadow, a white-blue fill, a top sheen and a bright rim."""
+    def _font(self, bold: bool = False) -> QFont:
         b = getattr(getattr(self.stage, "character", None), "behaviour", None)
         font = panel_font(b.panel_font_size, b.panel_font) if b else panel_font()
-        p.setFont(font)
-        text = text if len(text) < 600 else "…" + text[-600:]
-        tr = QFontMetrics(font).boundingRect(0, 0, 320, 2000, Qt.TextFlag.TextWordWrap, text)
-        bw, bh = tr.width() + 32, tr.height() + 24
-        gap = 14
-        bx = x + half_w + gap
-        if bx + bw > self.w.width() - 8:  # no room on her right: her left
-            bx = x - half_w - gap - bw
-        bx = min(max(bx, 8), self.w.width() - bw - 8)
-        by = min(max(head_y + height * 0.12, 8), self.w.height() - bh - 8)
-        r = QRectF(bx, by, bw, bh)
-        radius = 18.0
+        if bold:
+            font.setBold(True)
+            font.setPointSizeF(font.pointSizeF() + 0.5)
+        return font
+
+    def _glass(self, p: QPainter, r: QRectF, radius: float = 18.0) -> None:
+        """The liquid-glass card every text panel uses. A layered window can't blur what's behind
+        it, so the glass is frosted translucency: a soft shadow, a white-blue fill with the teal
+        wash, a top sheen and a bright rim."""
         p.save()
         for k, a in ((10, 18), (6, 26), (3, 34)):  # soft drop shadow
             sh = QPainterPath()
@@ -134,17 +129,42 @@ class Painter:
         inner.addRoundedRect(r.adjusted(1.5, 1.5, -1.5, -1.5), radius - 1.5, radius - 1.5)
         p.setPen(QPen(QColor(10, 14, 30, 60), 1.0))
         p.drawPath(inner)
-        box = r.adjusted(16, 12, -16, -12)
-        p.setPen(QColor(0, 0, 0, 110))
-        p.drawText(box.translated(0, 1), Qt.TextFlag.TextWordWrap, text)
-        p.setPen(QColor(246, 249, 255))
-        p.drawText(box, Qt.TextFlag.TextWordWrap, text)
+        p.restore()
+
+    def _text(self, p: QPainter, box: QRectF, text: str, flags=Qt.TextFlag.TextWordWrap,
+              color: QColor | None = None) -> None:
+        p.setPen(QColor(0, 0, 0, 110))  # a faint drop, so glass text reads on any wallpaper
+        p.drawText(box.translated(0, 1), flags, text)
+        p.setPen(color or QColor(246, 249, 255))
+        p.drawText(box, flags, text)
+
+    def _bubble(self, p: QPainter, text: str, x: float, head_y: float, half_w: float, height: float) -> QRectF:
+        """Her words in a liquid-glass panel beside her (her right, or her left near the screen
+        edge), level with her face."""
+        font = self._font()
+        text = text if len(text) < 600 else "…" + text[-600:]
+        tr = QFontMetrics(font).boundingRect(0, 0, 320, 2000, Qt.TextFlag.TextWordWrap, text)
+        bw, bh = tr.width() + 32, tr.height() + 24
+        gap = 14
+        bx = x + half_w + gap
+        if bx + bw > self.w.width() - 8:  # no room on her right: her left
+            bx = x - half_w - gap - bw
+        bx = min(max(bx, 8), self.w.width() - bw - 8)
+        by = min(max(head_y + height * 0.12, 8), self.w.height() - bh - 8)
+        r = QRectF(bx, by, bw, bh)
+        self._glass(p, r)
+        p.save()
+        p.setFont(font)
+        self._text(p, r.adjusted(16, 12, -16, -12), text)
         p.restore()
         self.record("bubble", r)
+        return r
 
-    def _panel(self, p: QPainter, st, fx: float, head_y: float) -> None:
-        """Translucent HUD left of her: task title, items, progress, confirm buttons."""
-        title_f, body_f = QFont("Segoe UI Semibold", 11), QFont("Segoe UI", 10)
+    def _panel(self, p: QPainter, st, fx: float, head_y: float, half_w: float, height: float,
+               speech: QRectF | None = None) -> None:
+        """Task HUD (title, items, progress) or confirm buttons, in the same glass as her words.
+        It takes the side of her the speech panel doesn't; with no room there, it sits under it."""
+        title_f, body_f = self._font(bold=True), self._font()
         lines: list[str] = []
         title = "Analysis"
         if st.ov.hud:
@@ -154,42 +174,59 @@ class Painter:
             title = "Confirm: " + c.summary
             lines = [c.detail] if c.detail else []
         show_progress = bool(st.ov.hud and st.ov.hud.progress is not None and not c)
-        w = 320
         body = "\n".join(lines)
-        bh = QFontMetrics(body_f).boundingRect(0, 0, w - 28, 2000, Qt.TextFlag.TextWordWrap, body).height() if body else 0
-        h = 44 + bh + (14 if show_progress else 0) + (44 if c else 0)
-        x = max(fx - w - 60, 8)
-        y = max(head_y, 8)
+        wrap = Qt.TextFlag.TextWordWrap
+        gap, W, H = 14, self.w.width(), self.w.height()
+        right = fx + half_w + gap
+        # as wide as its longest line (320 at most), narrower still to fit a free side
+        natural = max(QFontMetrics(title_f).horizontalAdvance(title),
+                      *(QFontMetrics(body_f).horizontalAdvance(ln) for ln in lines or [""]))
+        w = min(max(natural + 34, 232 if c else MIN_W), 320)
+        if speech is not None and not c:
+            free = W - 8 - right if speech.center().x() < fx else fx - half_w - gap - 8
+            if MIN_W <= free < w:
+                w = free
+        th = QFontMetrics(title_f).boundingRect(0, 0, w - 32, 2000, wrap, title).height()
+        bh = QFontMetrics(body_f).boundingRect(0, 0, w - 32, 2000, wrap, body).height() if body else 0
+        h = 12 + th + (8 + bh if body else 0) + (16 if show_progress else 0) + (46 if c else 0) + 14
+        left = fx - half_w - gap - w
+        y = head_y + height * 0.12
+        if speech is None:
+            x = right if right + w <= W - 8 else left
+        else:
+            x = right if speech.center().x() < fx else left  # the side her words don't use
+            if x < 8 or x + w > W - 8:  # no room there: under her words
+                x, y = speech.left(), speech.bottom() + 10
+        x = min(max(x, 8), W - w - 8)
+        y = min(max(y, 8), H - h - 8)
         r = QRectF(x, y, w, h)
-        path = QPainterPath()
-        path.addRoundedRect(r, 10, 10)
-        p.fillPath(path, PANEL)
-        p.setPen(QPen(CYAN, 1.2))
-        p.drawPath(path)
+        self._glass(p, r)
+        p.save()
         p.setFont(title_f)
-        p.setPen(QColor(230, 240, 255))
-        p.drawText(QRectF(x + 14, y + 10, w - 28, 24), Qt.TextFlag.TextSingleLine, title)
-        p.setFont(body_f)
-        p.setPen(QColor(200, 215, 235))
+        self._text(p, QRectF(x + 16, y + 12, w - 32, th), title)
+        cy = y + 12 + th
         if body:
-            p.drawText(QRectF(x + 14, y + 38, w - 28, bh), Qt.TextFlag.TextWordWrap, body)
-        cy = y + 40 + bh
+            p.setFont(body_f)
+            self._text(p, QRectF(x + 16, cy + 8, w - 32, bh), body, color=QColor(220, 240, 245))
+            cy += 8 + bh
         if show_progress:
-            p.fillRect(QRectF(x + 14, cy, w - 28, 4), QColor(255, 255, 255, 40))
-            p.fillRect(QRectF(x + 14, cy, (w - 28) * max(0, min(1, st.ov.hud.progress)), 4), CYAN)
-            cy += 14
+            cy += 8
+            p.fillRect(QRectF(x + 16, cy, w - 32, 4), QColor(255, 255, 255, 50))
+            p.fillRect(QRectF(x + 16, cy, (w - 32) * max(0, min(1, st.ov.hud.progress)), 4), CYAN)
+            cy += 8
         self.record("hud", r)
         if c:
-            for i, (name, label, col) in enumerate((("yes", "Yes", GOLD), ("no", "No", QColor(140, 150, 170)))):
-                br = QRectF(x + 14 + i * 104, cy + 4, 92, 30)
+            p.setFont(body_f)
+            for i, (name, label, col) in enumerate((("yes", "Yes", GOLD), ("no", "No", QColor(170, 185, 200)))):
+                br = QRectF(x + 16 + i * 104, cy + 10, 92, 30)
                 bp = QPainterPath()
-                bp.addRoundedRect(br, 8, 8)
-                p.fillPath(bp, QColor(col.red(), col.green(), col.blue(), 70))
+                bp.addRoundedRect(br, 12, 12)
+                p.fillPath(bp, QColor(col.red(), col.green(), col.blue(), 60))
                 p.setPen(QPen(col, 1.2))
                 p.drawPath(bp)
-                p.setPen(QColor(240, 244, 250))
-                p.drawText(br, Qt.AlignmentFlag.AlignCenter, label)
+                self._text(p, br, label, Qt.AlignmentFlag.AlignCenter)
                 self.record(name, br)
+        p.restore()
 
     def _particles(self, p: QPainter, st) -> None:
         prog = st.transform_progress() or 0.0
