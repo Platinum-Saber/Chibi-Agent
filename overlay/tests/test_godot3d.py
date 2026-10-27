@@ -178,6 +178,23 @@ def test_bridge_handshake_frames_and_quit(qapp, monkeypatch, tmp_path):
     assert '"quit"' in log.read_text()
 
 
+def test_quitting_closes_a_renderer_in_use_without_a_failure(qapp, monkeypatch, tmp_path, caplog):
+    fake, log = tmp_path / "fake.py", tmp_path / "got.txt"
+    fake.write_text(FAKE_RENDERER)
+    real_popen = subprocess.Popen
+    monkeypatch.setattr(godot3d.subprocess, "Popen",
+                        lambda cmd, **kw: real_popen([sys.executable, "-I", str(fake), str(log), *cmd[1:]], **kw))
+    monkeypatch.setattr(godot3d.Bridge, "_own_window", lambda self: None)
+    monkeypatch.setattr(godot3d.Bridge, "_open", {})
+    b = godot3d.Bridge.get(str(tmp_path))  # a body still wears it
+    assert _wait(lambda: b.ready), b.failed
+    godot3d.Bridge.close_all()
+    assert _wait(lambda: b.proc.poll() is not None)
+    qapp.processEvents()
+    assert not b.failed and "renderer link closed" not in caplog.text
+    assert '"quit"' in log.read_text() and not godot3d.Bridge._open
+
+
 def test_bridge_refuses_a_wrong_token(qapp, monkeypatch, tmp_path):
     fake, log = tmp_path / "fake.py", tmp_path / "got.txt"
     fake.write_text(FAKE_RENDERER.replace('args["token"]', '"guess"'))

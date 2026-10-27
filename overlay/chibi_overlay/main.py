@@ -16,7 +16,7 @@ from chibi_shared import config, paths
 
 from chibi_shared.protocol import Fullscreen
 
-from . import character, env, hud, outfits
+from . import character, env, godot3d, hud, outfits
 from .link import QtLink
 from .stage import Stage
 from .tray import Tray
@@ -106,6 +106,7 @@ def main() -> None:
     link.received.connect(tray.on_message)
     link.received.connect(lambda _m: update_visibility())
     stage._quit_cb = app.quit
+    app.aboutToQuit.connect(godot3d.Bridge.close_all)  # the 3D renderer gets its quit line
     link.start()
     for w in windows:
         w.show()

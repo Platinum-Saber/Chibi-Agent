@@ -243,7 +243,15 @@ class Bridge:
         if self.users <= 0:
             self.close()
 
+    @classmethod
+    def close_all(cls) -> None:
+        """The overlay is quitting: tell every renderer to go, instead of leaving it to die with
+        our job (its link then dropped mid-use, logged as a renderer failure on every quit)."""
+        for b in list(cls._open.values()):
+            b.close()
+
     def close(self) -> None:
+        self.users = 0  # a link that closes from here on is expected, not a failure
         if Bridge._open.get(self.spec) is self:
             del Bridge._open[self.spec]
         if self.hwnd:
