@@ -228,6 +228,11 @@ class MemoryRelief:
         self.interval_s = float(cfg.get("interval_s", 20))
         self.cooldown_s = float(cfg.get("cooldown_s", 600))
         self.voice_idle_s = float(cfg.get("voice_idle_s", 180))
+        # F5 goes only when RAM is this full (Saber: her voice stays below 95 %), and never in
+        # the first minutes: a cold F5 load plus her clip renders took over 3 min once, and
+        # unloading straight after left her reaction clips unrendered
+        self.voice_unload_pct = float(cfg.get("voice_unload_pct", 95))
+        self.startup_grace_s = float(cfg.get("startup_grace_s", 600))
         self.llm_idle_s = float(cfg.get("llm_idle_s", 60))
         self.own = bool(cfg.get("own_stack", True))
         self.trim_on = bool(cfg.get("trim_working_sets", True))
@@ -241,6 +246,7 @@ class MemoryRelief:
         self.sample, self.available, self.snap, self.windows = sample, available, snap, windows
         self.foreground, self.trim_fn, self.close_fn, self.ws = foreground, trim_fn, close_fn, ws
         self.sleep, self.clock = sleep, clock
+        self.started_at = clock()
         self._engine = engine or saved_engine
         self.high = False
         self.above = 0
@@ -332,6 +338,11 @@ class MemoryRelief:
                          self.voice_engine(), sum(p.private_mb for p in voice))
             elif self.tts_released:
                 log.info("memrelief: [own] voice model already unloaded")
+            elif pct < self.voice_unload_pct:
+                log.info("memrelief: [own] RAM %.0f%% < %.0f%%: keeping F5", pct, self.voice_unload_pct)
+            elif self.clock() - self.started_at < self.startup_grace_s:
+                log.info("memrelief: [own] started %.0fs ago (< %.0fs): keeping F5 while it loads and renders",
+                         self.clock() - self.started_at, self.startup_grace_s)
             elif idle < self.voice_idle_s:
                 log.info("memrelief: [own] voice active %.0fs ago (< %.0fs): keeping F5", idle, self.voice_idle_s)
             else:

@@ -187,7 +187,7 @@ sequenceDiagram
   - reports on the HUD ("Memory relief"), in the bubble and in her voice. If F5 was just dropped, only the "Notice." clip is spoken.
 
   The stages, cheapest first:
-  1. Her own stack: F5 goes after 180 s of quiet, but only when F5 is the voice in use. The voice process gets `load{unload, tts, reason: "memory"}` and reloads F5 by itself for the next sentence; PTT reloads it too. Kokoro stays. Her Ollama models (chat, and the embed model's ~1.2 GB runner, kept alive 30 min) are unloaded with `keep_alive: 0` after 60 s without a turn.
+  1. Her own stack: F5 goes after 180 s of quiet, but only when F5 is the voice in use, RAM is at least 95 % (`voice_unload_pct`) and she started over 10 min ago (`startup_grace_s`: a cold first load once took 3 min, and unloading straight after left her reaction clips unrendered). The voice process gets `load{unload, tts, reason: "memory"}` and reloads F5 by itself for the next sentence; PTT reloads it too. Kokoro stays. Her Ollama models (chat, and the embed model's ~1.2 GB runner, kept alive 30 min) are unloaded with `keep_alive: 0` after 60 s without a turn.
   2. `EmptyWorkingSet` on Kryo's idle apps with a working set ≥ 300 MB, and on her quiet voice process (its working set is mostly cuBLAS/CUDA DLL pages). This is low value: the pages fault back in.
   3. The largest idle app (≥ 700 MB, with a window) is named and offered through the confirmation gate. A yes posts WM_CLOSE (never a kill); a no keeps it quiet for an hour.
 

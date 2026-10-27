@@ -143,7 +143,7 @@ def test_own_stack_first_and_early_stop():
     llm = FakeLLM()
     r, hub, calls, clock = make(pct=(60,), orch=orch, llm=llm)
     clock.t = 1000
-    rep = asyncio.run(r.relieve(80))
+    rep = asyncio.run(r.relieve(96))
     loads = [(m.t, m.what, m.reason) for _, m in hub.sent if isinstance(m, p.Load)]
     assert loads == [("unload", "tts", "memory")]
     assert llm.calls == ["unload"]
@@ -229,7 +229,7 @@ def test_ptt_reloads_released_voice():
     orch = FakeOrch()
     r, hub, calls, clock = make({"trim_working_sets": False, "offer_close": False}, pct=(60,), orch=orch)
     clock.t = 1000
-    asyncio.run(r.relieve(80))
+    asyncio.run(r.relieve(96))
     assert r.tts_released
     asyncio.run(r.on_ptt())
     assert [(m.t, m.what) for _, m in hub.sent if isinstance(m, p.Load)][-1] == ("load", "tts")
@@ -246,3 +246,18 @@ def test_idle_embedding_model_is_unloaded():
     assert llm.calls == [("unload_embed", "nomic-embed-text")]
     assert rep["done"] == ["unloaded the embedding model"]
     assert orch.said[0] == "Notice." and len(orch.said) == 2  # Kokoro: she says the whole report
+
+
+def test_voice_stays_below_95_percent_and_while_starting():
+    orch = FakeOrch()
+    r, hub, calls, clock = make({"trim_working_sets": False, "offer_close": False}, pct=(60,), orch=orch)
+    clock.t = 1000
+    asyncio.run(r.relieve(92))  # high enough for relief, not for her voice
+    assert not [m for _, m in hub.sent if isinstance(m, p.Load)]
+    r, hub, calls, clock = make({"trim_working_sets": False, "offer_close": False}, pct=(60,), orch=orch)
+    clock.t = 207  # a slow first F5 load: idle "since start", but she has only just started
+    asyncio.run(r.relieve(97))
+    assert not [m for _, m in hub.sent if isinstance(m, p.Load)]
+    clock.t = 700
+    asyncio.run(r.relieve(97))
+    assert [(m.t, m.what) for _, m in hub.sent if isinstance(m, p.Load)] == [("unload", "tts")]
