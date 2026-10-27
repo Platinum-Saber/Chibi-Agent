@@ -15,6 +15,13 @@ Start-Transcript -Path (Join-Path $Logs "setup.log") -Append | Out-Null
 
 function Step($text) { Write-Host ""; Write-Host "== $text" -ForegroundColor Cyan }
 
+function Test-Imports($code) {
+    # Windows PowerShell turns a native program's stderr into errors, fatal under "Stop"
+    $ErrorActionPreference = "Continue"
+    & .\.venv\Scripts\python.exe -c $code *> $null
+    return $LASTEXITCODE -eq 0
+}
+
 try {
     Write-Host "Raphael $Version setup ($Root)" -ForegroundColor Cyan
 
@@ -23,12 +30,23 @@ try {
     $Uv = Join-Path $Root "bin\uv.exe"
     if (-not (Test-Path $Uv)) { $Uv = (Get-Command uv -ErrorAction SilentlyContinue).Source }
     if (-not $Uv) { throw "uv not found (bin\uv.exe is missing from the app folder)" }
+    # what each process imports first: a package that installed incompletely shows up here
+    $checks = @{
+        agent   = "import pynput, dateparser, chibi_agent.main"
+        overlay = "import PySide6.QtWidgets, live2d, chibi_overlay.main"
+        voice   = "import faster_whisper, kokoro_onnx, chibi_voice.main"
+    }
     foreach ($pkg in "agent", "overlay", "voice") {
         Write-Host "-- $pkg"
         Push-Location (Join-Path $Root $pkg)
         try {
             & $Uv sync --frozen --no-dev
             if ($LASTEXITCODE -ne 0) { throw "uv sync failed in $pkg" }
+            if (-not (Test-Imports $checks[$pkg])) {
+                Write-Host "   $pkg didn't import cleanly: reinstalling its packages"
+                & $Uv sync --frozen --no-dev --reinstall
+                if (-not (Test-Imports $checks[$pkg])) { throw "$pkg still doesn't import after a reinstall" }
+            }
         } finally { Pop-Location }
     }
 
