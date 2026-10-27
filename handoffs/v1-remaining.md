@@ -39,7 +39,7 @@
 Finish item 4's by-hand checks (memory recall needs a second day), then the thought cloud (item 2).
 
 ## Status check (2026-10-27, `svg-rig` at 8edff57)
-Docs brought up to date with the commits since 833cdd1 (script tools, Customize window, sprite-pack chibi, panels and core, music detection, restart, reset_memory, voice start-up, protocol rows). Tests: shared 40, agent 198, voice 37 pass; overlay 223 pass, 1 fails (`test_font_picker...`, Saber's uncommitted `hud.py`).
+Docs brought up to date with the commits since 833cdd1 (script tools, Customize window, sprite-pack chibi, panels and core, music detection, restart, reset_memory, voice start-up, protocol rows). Tests: shared 40, agent 198, voice 37 pass; overlay 225 pass (the font-picker failure was the offscreen test platform finding no fonts, fixed in f40b867; not the `hud.py` work).
 
 **Success criteria (scope.md):**
 | Criterion | State |
