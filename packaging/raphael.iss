@@ -64,6 +64,15 @@ Type: filesandordirs; Name: "{app}\overlay\.venv"
 Type: filesandordirs; Name: "{app}\voice\.venv"
 Type: filesandordirs; Name: "{app}\shared\.venv"
 Type: filesandordirs; Name: "{app}\overlay3d\.godot"
+; Python's bytecode caches, written when she runs
+Type: filesandordirs; Name: "{app}\agent\chibi_agent\__pycache__"
+Type: filesandordirs; Name: "{app}\agent\chibi_agent\memory\__pycache__"
+Type: filesandordirs; Name: "{app}\agent\chibi_agent\tools\__pycache__"
+Type: filesandordirs; Name: "{app}\overlay\chibi_overlay\__pycache__"
+Type: filesandordirs; Name: "{app}\overlay\chibi_overlay\body\__pycache__"
+Type: filesandordirs; Name: "{app}\overlay\chibi_overlay\vector\__pycache__"
+Type: filesandordirs; Name: "{app}\shared\chibi_shared\__pycache__"
+Type: filesandordirs; Name: "{app}\voice\chibi_voice\__pycache__"
 
 [Messages]
 FinishedLabel=Raphael is installed. Her memory, settings and any 3D models you added are kept if you uninstall.
