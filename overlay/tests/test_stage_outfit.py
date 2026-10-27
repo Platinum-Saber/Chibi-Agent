@@ -233,3 +233,20 @@ def test_a_plain_drag_keeps_her_home_and_a_stale_spot_is_ignored(st):
     ch.behaviour.home_x, ch.behaviour.home_y = 5000.0, 1040.0  # a monitor that's gone
     st.apply_character(ch)
     assert st.home == default
+
+
+def test_a_reaction_doesnt_bring_back_her_last_words(st):
+    import time
+    from chibi_shared.protocol import Bubble, Lip
+    st.on_message(Bubble(text="Answer. It is 17:09.", stream=False, done=True))
+    now = time.monotonic()
+    st.ov.bubble_until = now - 1  # the reply's panel has expired
+    st.reacting_until = now + 2   # she was just picked up: "Where are we going?"
+    st.on_message(Lip(rms=0.4))
+    assert st.ov.bubble_until < now  # still gone
+    st.reacting_until = 0.0
+    st.on_message(Lip(rms=0.4))
+    assert st.ov.bubble_until < now  # expired words don't come back for later speech either
+    st.on_message(Bubble(text="Answer. Two.", stream=False, done=False))
+    st.on_message(Lip(rms=0.4))
+    assert st.ov.bubble_until > now  # a live reply stays up while she speaks it

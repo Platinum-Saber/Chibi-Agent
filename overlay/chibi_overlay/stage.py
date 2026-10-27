@@ -527,7 +527,9 @@ class Stage:
                 self.brain.talk(now, 1500)
             # The voice sends lip levels at 60 Hz while audio plays: keep her words up until
             # she has finished speaking them, not just until the text finished streaming.
-            if self.ov.bubble:
+            # Only while her words are still up, and not for a reaction clip: a pick-up's "Where
+            # are we going?" used to bring back the last reply's expired panel.
+            if self.ov.bubble and now_s < self.ov.bubble_until and now_s >= self.reacting_until:
                 self.ov.bubble_until = max(self.ov.bubble_until, now_s + BUBBLE_AFTER_SPEECH_S)
         elif isinstance(msg, Bubble):
             self.ov.bubble = msg.text

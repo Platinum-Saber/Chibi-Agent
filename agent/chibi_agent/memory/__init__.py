@@ -42,12 +42,16 @@ EXTRACT_SCHEMA = {"type": "object", "properties": {
 class Embedder:
     def __init__(self, cfg: dict):
         self.url, self.model = cfg["url"], cfg.get("embed_model", "nomic-embed-text")
+        # on the CPU by default: ~35 ms a query instead of ~17 ms, and 435 MB of VRAM back for
+        # F5 and Whisper (a full GPU spilled into RAM and took 61 s to transcribe 1.6 s)
+        self.options = {} if cfg.get("embed_on_gpu", False) else {"num_gpu": 0}
         self._client = httpx.AsyncClient(timeout=httpx.Timeout(60, connect=5))
 
     async def __call__(self, texts: list[str], query: bool = False) -> list[list[float]]:
         prefix = "search_query: " if query else "search_document: "  # nomic's task prefixes
         r = await self._client.post(f"{self.url}/api/embed", json={
-            "model": self.model, "input": [prefix + t for t in texts], "keep_alive": "30m"})
+            "model": self.model, "input": [prefix + t for t in texts], "keep_alive": "30m",
+            "options": self.options})
         r.raise_for_status()
         return r.json()["embeddings"]
 

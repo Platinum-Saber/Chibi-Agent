@@ -169,3 +169,27 @@ async def test_cancel_wakes_and_skips():
     await asyncio.sleep(0.7)
     rem.stop()
     assert fired == []
+
+
+def test_embeddings_run_on_the_cpu_unless_asked():
+    import asyncio
+    import json
+
+    import httpx
+
+    from chibi_agent.memory import Embedder
+    sent = []
+
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json={"embeddings": [[0.1, 0.2]]})
+
+    async def run(cfg):
+        e = Embedder({"url": "http://ollama", **cfg})
+        e._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        await e(["hello"], query=True)
+        await e.close()
+
+    asyncio.run(run({}))
+    asyncio.run(run({"embed_on_gpu": True}))
+    assert sent[0]["options"] == {"num_gpu": 0} and sent[1]["options"] == {}
