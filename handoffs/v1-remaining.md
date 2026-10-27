@@ -37,3 +37,25 @@
 
 ## Next step
 Finish item 4's by-hand checks (memory recall needs a second day), then the thought cloud (item 2).
+
+## Status check (2026-10-27, `svg-rig` at 8edff57)
+Docs brought up to date with the commits since 833cdd1 (script tools, Customize window, sprite-pack chibi, panels and core, music detection, restart, reset_memory, voice start-up, protocol rows). Tests: shared 40, agent 198, voice 37 pass; overlay 223 pass, 1 fails (`test_font_picker...`, Saber's uncommitted `hud.py`).
+
+**Success criteria (scope.md):**
+| Criterion | State |
+|---|---|
+| Voice commands ≥ 9/10 | ✅ 10/10 each by text (2026-10-17); live cases 32/33 with tool selection |
+| Confirmation | ✅ registry and gate tests pass |
+| Latency ≤ 1.5 s in 8/10 warm | ❌ not met in real use. `agent.log` "first audio" lines: 52/170 under 1.5 s overall, 7/17 on 2026-10-26 (several 2–3 s, outliers 14–21 s that look like cold F5 loads, e.g. after memory relief drops it). The log doesn't mark warm turns, so a dedicated 10-warm-turn run is still owed |
+| Memory recalled next day | ❓ not checked; `reset_memory.py` cleared the store on 2026-10-26, so start the two-day check fresh |
+| Overlay 60 fps, click-through, no focus steal | ❓ vsync on AC / 30 fps on battery in `overlay.log`; no measurement with the real app. The 3D body costs ~580 MiB VRAM (Saber allowed 800 MB) against the ~300 MiB budget |
+| Gaming mode VRAM ≈ 0 in 5 s | ⚠️ 0.3 s measured in M6; "freeing VRAM" fires live (also for fullscreen Edge), but no spot check with a real game |
+
+**Scope items still open:**
+- Thought cloud: the agent sends `cloud`, the overlay doesn't draw it (the "…" text cloud is gone too).
+- Her own rigs: chibi done (robe v21 Live2D, casual-coat sprite pack); the **serious form is still the Mao sample** in every 2D outfit.
+- Optional, not started: Moodle deadlines, battery saver (only the 30 fps cap exists).
+
+**Built beyond v1 scope:** the 3D body (scope said after v1), memory relief, voice reactions and UI sounds, the pose wheel, the Recycle Bin and network tools, the Customize window.
+
+**Verdict:** v1 is not complete. Left: latency (fix or re-measure), the memory and overlay checks, the thought cloud, the serious rig.

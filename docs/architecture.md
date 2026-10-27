@@ -49,6 +49,8 @@ Agent → overlay:
 | `confirm` | `{call_id, tool, summary, detail}`: Yes / No buttons on the HUD |
 | `cloud` | `{items[]}`: thought cloud, newest first; for now the ≤3 unbriefed urgent/reply notifications as "App: title" (`notifywatch.py`), `[]` clears it |
 | `visibility` | `{hidden: bool, reason}`: gaming mode / fullscreen |
+| `state` | `{muted, gaming, autostart, google_accounts[], notif_access}`: the tray's check marks; on connect and on every change |
+| `memory_items` | `{items: [(id, text)]}`: the tray's memory list |
 
 Overlay → agent:
 
@@ -61,6 +63,8 @@ Overlay → agent:
 | `file_drop` | `{paths[]}`: files dropped on her ("what is this?") |
 | `fullscreen` | `{active: bool, exe}`: the overlay watches the foreground window |
 | `outfit_state` | `{outfit, outfits[], ok: bool, error}`: what she wears and can wear. Sent on connect, after each change, and as the refusal of a bad `outfit` (`ok: false`, unknown name, missing model file or bad map). The agent keeps it in `Controller.outfit` / `.outfits` |
+| `command` | `{name, arg}`: a tray or Customize action (`CommandName` in `protocol.py`): show/hide, mute, gaming, memory list/delete, autostart, Google sign-in/out, notification access, `restart`, `voice_test` (arg: a line to say), `quit` |
+| `voice_tune` | `{engine: "f5" \| "kokoro", voice, speed, nfe}`: the voice picked in Customize. The agent relays it to the voice process and resends the last one when voice reconnects |
 
 Voice ↔ agent:
 
@@ -68,10 +72,11 @@ Voice ↔ agent:
 |---|---|
 | `ptt` (agent → voice) | `{down: bool}`: start/stop recording |
 | `transcript` (voice → agent) | `{text, ms}` |
-| `speak` (agent → voice) | `{utt_id, text, clip?}`: one sentence, queued |
+| `speak` (agent → voice) | `{utt_id, text, clip?, only_cached}`: one sentence, queued. `only_cached` (reactions): play the clip if it's rendered, else skip |
 | `speak_state` (voice → agent) | `{utt_id, state: "start" \| "end" \| "cancel"}` |
 | `stop` (agent → voice) | barge-in: cancel the queue |
-| `load` / `unload` (agent → voice) | VRAM manager |
+| `load` / `unload` (agent → voice) | `{what: stt \| tts \| all, reason}`: VRAM manager; `reason: "memory"` (memory relief) drops F5 only, and it reloads by itself when speech needs it |
+| `voice_tune` (agent → voice) | relayed from the overlay (above) |
 
 Voice → overlay: `lip` `{rms}` at 60 Hz while audio plays. The overlay
 smooths it and maps it to `ParamMouthOpenY` (form-aware gain).
@@ -134,7 +139,7 @@ sequenceDiagram
     - When unsure, or when the embedding fails, she gets every tool.
     - If she says she can't do something while she only had a subset, the step reruns once with every tool.
     - `[tools] select = false` turns selection off.
-- `persona.py`: system prompt under 3 k characters. It's generated from the tool registry, so the prompt and the tools always match *(GS lesson)*.
+- `persona.py`: system prompt under 3,400 characters (raised from 3,000 for the script tools; `test_tools.py` and `test_gmail.py` check it). It's generated from the tool registry, so the prompt and the tools always match *(GS lesson)*.
 - `llm.py`: Ollama client (`/api/chat`, `stream`, `tools`, `images`).
   - `num_ctx`: 8192, or 16384 when an image is attached. 4096 silently broke vision *(GS)*.
   - Errors surface with Ollama's own message.
@@ -152,8 +157,11 @@ sequenceDiagram
   - **Modules:**
     - `system.py`: time, battery, usage, VRAM, focused window, processes;
     - `apps.py`: open, close, focus, snap;
-    - `files.py`: search, open, move, copy, rename; paths limited to the user profile + chosen drives;
-    - `shell.py`: PowerShell, full command shown, 30 s timeout, output truncated;
+    - `files.py`: search, open, move, copy, rename; `grep_files` (text inside files), `list_folder` (size sort totals subfolders), `read_file`, and confirmed `create_folder` / `create_file` (never overwrite); paths limited to `allowed_roots` (user profile + chosen drives); file contents are untrusted;
+    - `recycle_bin.py`: `recycle_bin` lists it (read-only); `recycle_bin_action` opens it or restores an item (confirmed), through the Shell namespace. There's no empty action (v1 doesn't delete): she opens the bin and Saber empties it;
+    - `network.py`: read-only `network` (connections by process, traffic rates, ping, Wi-Fi via psutil, ping, netsh);
+    - `memory_tools.py`: `remember`, `recall_memory`, `forget_memory`, `set_reminder`, `list_reminders`, `cancel_reminder` (the writes ask first);
+    - `shell.py`: PowerShell, full command shown, 30 s timeout, output truncated; `Clear-RecycleBin` is blocked;
     - `media.py`, `clipboard.py`, `web.py` (open a URL or search);
     - `screen.py`: `mss` capture, sent as an image in memory only;
     - `reminders.py`, `calendar.py`, `gmail.py` (`mail_list` numbered, `read_mail` by number; `_google.py` reads every account in parallel), `briefing.py`. Windows notifications have no tool in v1 (the prompt budget); `notifywatch.py` feeds them to the briefing.
@@ -184,6 +192,9 @@ sequenceDiagram
   3. The largest idle app (≥ 700 MB, with a window) is named and offered through the confirmation gate. A yes posts WM_CLOSE (never a kill); a no keeps it quiet for an hour.
 
   It never touches system processes, other users' processes, the Claude app (and its WebView2), the foreground app or her own processes, and it never purges the standby list. Debug: `python -m chibi_agent.memrelief --once` (a dry run; `--act` acts but only logs its messages).
+- `reactions.py`: answers the overlay's `react` events with cached voice clips (gates and cooldowns: `character.md` → Sounds).
+- **Restart** (tray → Restart agent, `command restart`): the agent quits cleanly, then starts a fresh agent, which restarts the overlay and voice. It leaves its job object with `CREATE_BREAKAWAY_FROM_JOB`; when the job forbids that, it starts the new agent through WMI (`Win32_Process.Create`), since a process WMI creates belongs to no job of ours (`main.py`).
+- **Fresh memory:** `tools/reset_memory.py` (run with Raphael quit and Ollama up) backs up `memory.db` to `memory.db.bak-<date-time>`, clears facts, conversations and messages, and loads starting facts from `ChibiAgent\profile.txt` (outside git). Reminders, mail/notification labels and settings stay.
 - `hotkey.py`:
   - global push-to-talk through a low-level keyboard hook (pynput / `SetWindowsHookEx`), default `Alt+1` hold, configurable;
   - screen-look hotkey `Ctrl+Alt+S`.
@@ -202,14 +213,29 @@ sequenceDiagram
 - **Outfits** (`outfits.py`, docs/character.md → Outfits): one exported model per outfit and form.
   - Config: `[overlay] outfit = "robe"` picks the current one; `[overlay.outfits.<name>]` has `chibi_rig` / `serious_rig` (`.model3.json`) and optional `chibi_map` / `serious_map`, which default to the shared `[overlay] chibi_map` / `serious_map` (relative to `overlay/`). Old configs with only `[overlay] chibi_rig` / `serious_rig` still work as one outfit, `default`; next to an `outfits` table those keys only fill an outfit's missing rig. An unknown `outfit` falls back to the first one; an outfit without a rig or map stops the overlay at start.
   - Switching: an `outfit` message or tray → Outfit. The stage checks the name, the model files and the maps first (refusals go back as `outfit_state ok=false`), then plays the transform particle puff without changing form; at its midpoint it swaps the maps and model paths and bumps `outfit_gen`, and the window reloads both puppets in its GL context and re-measures them. Brain, physics, form and facing are untouched. The choice lasts until restart (the config holds the start outfit).
-  - Until her rigs exist, `robe` is Haru/Mao and `coat` is the same two samples swapped.
+  - Outfits in `config.toml` (2026-10-27): `casual_coat` (the start outfit: the sprite-pack chibi), `robe` (her own Live2D chibi rig v21), `aniya` (a translated free Live2D model), `teen_3d` and `teen_3d_ruby` (the 3D body), `coat` (the Haru/Mao samples swapped). Every 2D outfit's serious form is still the Mao sample: her own serious rig doesn't exist yet.
+- **Rig kinds** (the outfit's rig path picks what `Puppet` drives; every kind answers the same live2d-py calls):
+  - a `.model3.json`: a Live2D model (live2d-py);
+  - `sprites:<pack dir>` (`sprites.py`, `rigs/raphael_sprites.toml`): Saber's drawn image pack (casual coat). Expressions are whole images; lip sync and blink come from registered states (a feathered mouth patch on other expressions); 18 motion groups map to poses and short sequences (the 8-frame walk, the two dance cycles), each pose placed by its own feet on the master's baseline; eye follow uses the 8-direction gaze drawings clipped to the eye rectangles. Sit and Sleep sit on the slime; the sword is worn at her hip (Look toggle) and held when alert. This is the chibi she wears by default (`casual_coat`);
+  - `vector:` (`vector/`): a code-drawn rig, kept behind the same seam but unused;
+  - `godot:<dir>[#file.vrm]`: the 3D body (below).
+- **Customize window** (tray → Customize Raphael, `customize.py`): a live preview and tabs for what each mood and idle moment plays, the look (outfit, height, walking pace, body, panel font and size; "Add font file…" copies it into `[overlay] fonts_dir`), behaviour (eye follow: last click / pointer / straight ahead, blink, idle moments, sleep, effects, extra EDM words), sprite sequences (frames, timing, what she holds and sits on) and voice (F5 with any reference clip, or one of Kokoro's 54 voices; a test line). Apply changes her live; Save writes `%APPDATA%\ChibiAgent\character.toml` (`character.py`), loaded at startup and kept apart from the hand-edited `config.toml`.
+- **Panels** (`hud.py`, `core_fx.py`):
+  - Thinking and speaking show a geodesic wire core above her head: it spins with shards spiralling in while she thinks, and grows and brightens with her voice while she speaks. Voice reactions don't show it.
+  - Her words go in a frosted liquid-glass panel beside her at face height (her right, or her left near the screen edge; 20 % teal wash), in Electroharmonix (then OCR A Extended, Consolas). Fonts in `[overlay] fonts_dir` are loaded for the overlay only; the font files stay outside git.
+  - The old "…" text cloud is gone. The `cloud` message (notifications) isn't drawn yet.
+- **Pose wheel** (`wheel.py`): right-click her for a frosted-glass wheel of 8 poses (Wave, Cheer, Think, Look around, Stretch, Dance, Sit, Sleep); `Brain.perform` plays the pick. Details: `handoffs/pose-wheel-and-3d-polish.md`.
+- **Home spot:** Alt+drag sets where she returns to on the taskbar (saved as `home_x`/`home_y` in `character.toml`).
+- **Gaze:** her eyes look where Saber last clicked (any button, anywhere) for a few seconds, then ahead; a pointer resting near her gets one 2.5 s smile.
+- **Sounds** (`sounds.py`): UI sounds for startup, reappearing and the wheel (`character.md` → Sounds).
 - **Body:**
   - `brain.py`: a port of `MascotBrain` (moods, pokes, sleep, Duel/Point → cursor gaze/point).
   - `physics.py`: a port of `MascotPhysics` (gravity, bounces, floor = taskbar top / focused window's title-bar top, found with `GetWindowRect` + `DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS)`).
   - `motion.py`: mood → Live2D motion/expression, plus procedural parameters (gaze at the cursor, breath, ring glow, lip RMS).
 - **Environment:**
   - **Foreground and fullscreen:** a `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` hook plus a check of the monitor rect.
-  - **Media playing:** Windows GSMTC through `winsdk`.
+  - **Media playing:** Windows GSMTC through `winsdk`, with the track (title, artist, album, genres, app). Players that publish no media session (classic VLC, MPC-HC/BE, mpv, PotPlayer, SMPlayer, KMPlayer, Windows Media Player) are caught by their sound instead: `audio_sessions.py` reads Windows' per-app audio meters (Core Audio through ctypes); a known player making sound counts as playing, held 5 s through quiet passages, and its window title gives the track.
+  - **Dance style:** `body/music.py` calls a track "excited" (whole-word EDM keywords such as house, dubstep, nightcore, remix; known EDM artists/channels; an electronic genre; Saber's extra words from Customize) or "vibe". Excited plays `dancing_excited`, anything else the slow sway. Customize → Behaviour shows a Now playing line.
   - **AC power:** `GetSystemPowerStatus`. On battery: cap at 30 fps.
 
 ## Voice internals (`voice/`)
@@ -224,7 +250,9 @@ sequenceDiagram
   - Clip cache for fixed lines (hash of voice + text → WAV in `%LOCALAPPDATA%\ChibiAgent\clips`).
 - **FX chain:** `pedalboard` (EQ, reverb, chorus, limiter) per `character.md`.
 - **Lip sync:** RMS in 1/60 s windows of the playback buffer, sent to the overlay over WS.
-- **Fallback when F5 isn't loaded:** Kokoro (CPU) with a stock voice, so she never goes silent.
+- **Engines:** F5 (the default, `[voice] f5`) or Kokoro (`kokoro-onnx` on the CPU, 54 preset voices, model files in `ChibiAgent\models\kokoro`), picked in Customize (`voice_tune`). The fixed clips re-render per voice. Kokoro is also the fallback when F5 isn't loaded, so she never goes silent.
+- **Start-up:** the last `voice_tune` is saved to `%LOCALAPPDATA%\ChibiAgent\voice_tune.json`, and the voice tunes to it before the first load (the overlay's tune arrives only ~15 s in, which used to load config.toml's F5 and then swap). `HF_HUB_OFFLINE=1` is set once F5, Vocos and Whisper are all cached (the Hub checks cost ~20 s of a cold start). Clips are keyed and rendered together on the TTS thread.
+- **Text clean-up:** `tts.speakable` rewrites numbers (3.5 → "3 point 5", $4.99, 10:30), since both engines read "." as a full stop; short lines get room for their last sound, trimmed after.
 
 ## VRAM manager
 | State | LLM | voice (STT+TTS) | Trigger |
@@ -254,6 +282,9 @@ Chibi-Agent/
   voice/                  # stt.py, tts_f5.py, tts_kokoro.py, fx.py, player.py
   assets/rigs/{chibi,serious}/   # Live2D exports (git-ignored if private)
   assets/sfx/
+  overlay3d/              # Godot 4.7 renderer for the 3D body (README.md)
+  tools/                  # reset_memory.py, make_rig_template.py, prepare_aniya.py
+  spikes/                 # brain, notifications, overlay, voice, vrm
   tests/                  # brain/physics ports, tool gate, protocol, memory, persona
   docs/                   # scope, character, architecture, spikes
 ```

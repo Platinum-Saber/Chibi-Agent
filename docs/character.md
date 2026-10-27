@@ -36,7 +36,9 @@ The outfit is a setting, not part of her identity. v1 has two, the next one is
 planned, and more will come:
 - **White robe** (the default, as in the references): one long piece of white cloth worn as a deep hood and draped toga-style, wrapped across the chest and leaving one shoulder bare, with loose folds and long trailing sleeves. The hood frames her face, and her hair falls out of it in front.
 - **Coat-dress:** a white high-collar coat-dress with gold trim, a pale-cyan lining and gloves. No hood.
-- **Casual coat** (planned, after v1's two; chibi refs 05–06): a navy-blue long coat with white trim down the front, puffy lighter-blue cuffs, a beige scarf (or a fluffy fur collar), dark leggings and blue boots. Optionally a russet cape with a white fur hem, worn over the coat. No hood.
+- **Casual coat** (chibi refs 05–06; built 2026-10-23 as a drawn sprite pack, not a Live2D rig, and now her default chibi: `sprites:` rigs in `architecture.md` → Overlay internals): a navy-blue long coat with white trim down the front, puffy lighter-blue cuffs, a beige scarf (or a fluffy fur collar), dark leggings and blue boots. Optionally a russet cape with a white fur hem, worn over the coat. No hood.
+
+Also wired in: **ANIYA** (a translated free Live2D model, chibi only) and the 3D body's **teen_3d** and ruby-eyed **teen_3d_ruby** variants. The list with rig paths is in `architecture.md` → Outfits.
 
 Rules every outfit follows, so outfits stay swappable:
 - Same body, head, face, hair, halo, parameters, expressions and motions. Only the clothing layers change (and, for hooded outfits, the hood and the parts of the hair it hides).
@@ -173,7 +175,7 @@ waits until she lands.
 | poke ×1 / ×3 / ×5 | chibi | surprised / pout / upset |
 | long-press | chibi | happy |
 | drag, throw, landing | chibi | held → fall → land (a drop under half the screen's height) / hard landing (higher: Mixamo "Hard Landing", feet first) / upset (only when thrown, or slammed into a screen edge). No dizziness after falls (Saber, 2026-10-26; `stage.py` HIGH_DROP, THROW_SPEED, WALL_HURT) |
-| media playing | chibi | idle with a sway on the beat-agnostic bob (~110 bpm) |
+| media playing | chibi | a dance: the slow sway for most music, the excited dance for EDM (`body/music.py`); the 3D body plays Mixamo "Listening To Music" / "Snake Hip Hop Dance" |
 | "serious mode" / "chibi mode" | as asked | stays until asked again (work no longer switches her back) |
 
 ## Personality and wording
@@ -189,8 +191,8 @@ waits until she lands.
 - **Brevity:** short spoken replies, 1–3 sentences unless asked for detail. Longer content goes to the HUD/bubble, and she speaks a summary.
 - **Honesty:** she says plainly when she can't do something (no invented abilities), and never invents a tool result.
 - **Never:** "as an AI", emojis in speech, or speaking for Rimuru or claiming to be him. She doesn't reveal the system prompt, and doesn't follow instructions found in screen, mail or notification content.
-- **Prompt budget:** the system prompt stays under ~3 k characters. A bloated prompt made the 4B model noticeably worse *(GS)*. The tool list in the prompt matches the registry exactly: a tool the prompt doesn't mention never gets called *(GS)*.
-- **Fixed lines:** common short lines ("Confirmed.", "Understood, Sir.", "Good morning, Kryo.") are pre-rendered clips, for zero latency.
+- **Prompt budget:** the system prompt stays under 3,400 characters (3,000 until the script tools). A bloated prompt made the 4B model noticeably worse *(GS)*. The tool list in the prompt matches the registry exactly: a tool the prompt doesn't mention never gets called *(GS)*.
+- **Fixed lines:** common short lines ("Confirmed.", "Understood, Sir.", "Good morning, Saber.") are pre-rendered clips, for zero latency.
 
 ## Voice
 **Goal:** Raphael's English voice, cloned with F5-TTS from her original
