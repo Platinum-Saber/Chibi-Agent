@@ -79,6 +79,7 @@ async def test_switch_queued_behind_a_load_renders_clips_once_under_the_new_key(
 def _tts(tmp_path, **vcfg):
     from chibi_voice.tts import Tts
     (tmp_path / "ref.txt").write_text("Reference.", encoding="utf-8")
+    (tmp_path / "ref.wav").write_bytes(b"")
     return Tts({"reference": str(tmp_path / "ref.wav"), "reference_text": str(tmp_path / "ref.txt"),
                 "speed": 0.9, **vcfg})
 
@@ -92,7 +93,15 @@ def test_f5_off_makes_kokoro_the_voice(tmp_path):
     assert (t.engine, t.kvoice, t.speed) == ("kokoro", "af_sky", 1.1)
 
 
-def test_f5_on_is_unchanged(tmp_path):
+def _f5_installed(monkeypatch, yes=True):
+    import importlib.util
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec",
+                        lambda name, *a: (object() if yes else None) if name == "f5_tts" else real(name, *a))
+
+
+def test_f5_on_is_unchanged(tmp_path, monkeypatch):
+    _f5_installed(monkeypatch)
     t = _tts(tmp_path)
     assert (t.engine, t.speed) == ("f5", 0.9)
     t.tune("f5", "", 0.9, 8)
@@ -106,3 +115,12 @@ def test_hub_goes_offline_only_when_every_model_is_cached(tmp_path):
         (tmp_path / "hub" / f"models--{r.replace('/', '--')}" / "snapshots" / "abc").mkdir(parents=True)
     assert env.cached(str(tmp_path), repos)
     assert not env.cached(str(tmp_path), repos + ["Systran/faster-whisper-small.en"])
+
+
+def test_f5_without_its_package_or_reference_falls_back_to_kokoro(tmp_path, monkeypatch):
+    _f5_installed(monkeypatch, yes=False)
+    assert _tts(tmp_path).engine == "kokoro"  # the shipped voice package has no f5 extra
+    _f5_installed(monkeypatch)
+    from chibi_voice.tts import Tts
+    t = Tts({"f5": True, "reference": "", "reference_text": ""})
+    assert (t.engine, t.ref) == ("kokoro", "")

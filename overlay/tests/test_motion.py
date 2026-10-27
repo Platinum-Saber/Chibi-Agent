@@ -51,7 +51,10 @@ def test_chibi_map_names_exist_in_its_rig(outfit, map_name):
     import json
     from chibi_shared import config
     from chibi_overlay import outfits
-    rig = outfits.parse(config.load()["overlay"]).outfits[outfit].rigs["chibi"]
+    wardrobe = outfits.parse(config.load()["overlay"]).outfits
+    if outfit not in wardrobe:
+        pytest.skip(f"no {outfit} outfit in this config (not shipped since v0.1.1)")
+    rig = wardrobe[outfit].rigs["chibi"]
     if not Path(rig).exists():
         pytest.skip("rig export not on this machine")
     refs = json.loads(Path(rig).read_text(encoding="utf-8-sig"))["FileReferences"]

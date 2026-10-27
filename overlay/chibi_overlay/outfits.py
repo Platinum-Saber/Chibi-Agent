@@ -9,7 +9,7 @@ Pure Python; the stage loads the maps, the windows load the models.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .body import motion
@@ -28,6 +28,7 @@ class Outfit:
     name: str
     rigs: dict[str, str]  # form -> .model3.json
     maps: dict[str, str]  # form -> rig map TOML, relative to overlay/
+    chibi_only: bool = False  # its serious model is missing: she stays in the chibi form
 
     def load_maps(self, pkg: Path) -> dict[str, RigMap]:
         return {form: motion.load(pkg / self.maps[form]) for form in FORMS}
@@ -55,6 +56,26 @@ class Wardrobe:
     @property
     def names(self) -> list[str]:
         return list(self.outfits)
+
+
+def usable(w: Wardrobe) -> Wardrobe:
+    """The outfits whose models are on disk. One with its chibi model but not its serious one
+    (a 3D serious body whose VRM isn't installed) stays, in the chibi form only."""
+    keep = {}
+    for name, o in w.outfits.items():
+        chibi_gone = [m for m in Outfit(name, {"chibi": o.rigs["chibi"]}, {}).missing_models()]
+        if chibi_gone:
+            log.info("outfit %s skipped: model not found: %s", name, ", ".join(chibi_gone))
+            continue
+        if o.missing_models():
+            log.info("outfit %s: serious model not found, chibi form only", name)
+            o = replace(o, rigs={**o.rigs, "serious": o.rigs["chibi"]},
+                        maps={**o.maps, "serious": o.maps["chibi"]}, chibi_only=True)
+        keep[name] = o
+    if not keep:
+        return w  # nothing on disk: leave it to the stage to report
+    current = w.current if w.current in keep else next(iter(keep))
+    return Wardrobe(current, keep)
 
 
 def parse(cfg: dict) -> Wardrobe:

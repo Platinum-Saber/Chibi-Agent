@@ -86,6 +86,27 @@ def test_repo_config_parses():
     import tomllib
     cfg = tomllib.loads((PKG.parent / "config.toml").read_text(encoding="utf-8"))["overlay"]
     w = outfits.parse(cfg)
-    assert w.current in w.names and set(w.names) >= {"robe", "coat"}
+    assert w.current in w.names and set(w.names) == {"chibi", "rimuru", "raphael"}
     for o in w.outfits.values():
         o.load_maps(PKG)
+
+
+def test_an_outfit_without_its_serious_vrm_stays_chibi_only(tmp_path):
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    proj = tmp_path / "overlay3d"
+    (proj / "models").mkdir(parents=True)
+    (proj / "project.godot").write_text("")
+    w = outfits.parse({"outfit": "raphael", "outfits": {
+        "chibi": {"chibi_rig": f"sprites:{pack}", "chibi_map": "rigs/raphael_sprites.toml",
+                  "serious_rig": f"godot:{proj}#raphael.vrm", "serious_map": "rigs/raphael_3d.toml"},
+        "raphael": {"chibi_rig": f"godot:{proj}#raphael.vrm", "chibi_map": "rigs/raphael_3d.toml",
+                    "serious_rig": f"godot:{proj}#raphael.vrm", "serious_map": "rigs/raphael_3d.toml"}}})
+    u = outfits.usable(w)
+    assert u.names == ["chibi"] and u.current == "chibi"  # no VRM: the 3D outfit is left out
+    o = u.outfits["chibi"]
+    assert o.chibi_only and o.rigs["serious"] == o.rigs["chibi"] and not o.missing_models()
+    (proj / "models" / "raphael.vrm").write_bytes(b"")
+    u = outfits.usable(w)
+    assert u.names == ["chibi", "raphael"] and u.current == "raphael"
+    assert not u.outfits["chibi"].chibi_only

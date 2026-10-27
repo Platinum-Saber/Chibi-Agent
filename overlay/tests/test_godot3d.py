@@ -53,6 +53,15 @@ def fake_bridge(monkeypatch):
     return b
 
 
+REAL_NEEDS_IMPORT = godot3d.needs_import
+
+
+@pytest.fixture(autouse=True)
+def _no_godot_import(monkeypatch):
+    """The fake renderers below need no Godot import pass."""
+    monkeypatch.setattr(godot3d, "needs_import", lambda project: False)
+
+
 # --- hull --------------------------------------------------------------------------------------
 @pytest.mark.parametrize("pts", [[(0, 0), (10, 0), (10, 20), (0, 20)], [(0, 20), (10, 20), (10, 0), (0, 0)]])
 def test_point_in_hull_either_winding(pts):
@@ -240,7 +249,7 @@ def st(monkeypatch, tmp_path):
     })
     s = stage_mod.Stage(w, PKG, 1.0, FakeLink(), own_windows=set())
     s.bodies = {"2d": "casual_coat", "3d": "teen_3d"}
-    s.chibi_only = True
+    s.chibi_only_cfg = True
     s.size = {"chibi": (320.0, 60.0), "serious": (320.0, 60.0)}
     return s
 
@@ -456,9 +465,9 @@ def test_walk_speed_tweak_is_px_per_second_whatever_her_size():
     assert rig.walk_dip_s(90.0) == pytest.approx(260)  # the default: 0.5 heights/s at 520
     tw = character.OutfitTweaks(height_dip=400, walk_px_s=200)
     assert character.apply_to_map(rig, tw).walk_dip_s(90.0) == pytest.approx(200)
-    ch = character.Character(outfits={"teen_3d": tw})
+    ch = character.Character(outfits={"rimuru": tw})
     back = character.parse(__import__("tomllib").loads(character.dumps(ch)))
-    assert back.outfits["teen_3d"].walk_px_s == 200
+    assert back.outfits["rimuru"].walk_px_s == 200
 
 
 def test_frames_carry_her_velocity(fake_bridge, monkeypatch):
@@ -536,3 +545,41 @@ def test_middle_drag_turns_her_and_frames_carry_it(st, fake_bridge):
         stage = st
     m = godot3d.GodotModel("X:/nowhere", widget=W(), bridge=fake_bridge)
     assert m.frame()["yaw"] == pytest.approx(-110)
+
+
+def test_only_the_drawn_forms_3d_body_shows():
+    from types import SimpleNamespace
+    from chibi_overlay.window import MonitorWindow
+
+    class Body:
+        def __init__(self, bridge):
+            self.bridge, self.calls = bridge, []
+
+        def set_visible(self, on):
+            self.calls.append(on)
+
+    sprite = SimpleNamespace(model=object())  # a 2D chibi has no set_visible
+    serious = Body(bridge=object())
+    w = SimpleNamespace(puppets={"chibi": sprite, "serious": SimpleNamespace(model=serious)})
+    MonitorWindow._drawn_body_only(w, "chibi")
+    MonitorWindow._drawn_body_only(w, "chibi")
+    MonitorWindow._drawn_body_only(w, "serious")
+    assert serious.calls == [False, True]  # hidden while chibi, shown on the transform, once each
+
+    shared = object()  # both forms of a 3D outfit: one renderer, shown in either form
+    a, b = Body(shared), Body(shared)
+    w = SimpleNamespace(puppets={"chibi": SimpleNamespace(model=a), "serious": SimpleNamespace(model=b)})
+    MonitorWindow._drawn_body_only(w, "chibi")
+    assert (a.calls + b.calls) == [True]
+
+
+def test_godot_imports_a_fresh_project_and_newly_added_models(tmp_path):
+    real = REAL_NEEDS_IMPORT  # the autouse fixture patches the module's name
+    assert real(tmp_path)  # no import cache at all
+    (tmp_path / ".godot" / "imported").mkdir(parents=True)
+    (tmp_path / "models").mkdir()
+    assert not real(tmp_path)
+    (tmp_path / "models" / "raphael.vrm").write_bytes(b"")
+    assert real(tmp_path)  # dropped in, never imported
+    (tmp_path / "models" / "raphael.vrm.import").write_text("")
+    assert not real(tmp_path)

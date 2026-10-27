@@ -18,3 +18,9 @@ spikes/vrm/node_modules/
 *.vrma
 *.blend
 *.blend1
+
+# Built and staged by packaging/build.ps1, not in git
+/dist/
+/assets/chibi/
+/godot/
+/bin/

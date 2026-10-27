@@ -48,10 +48,12 @@ def main() -> None:
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     live2d.init()
     app = QApplication(sys.argv)
+    from .tray import app_icon
+    app.setWindowIcon(app_icon())  # Customize and the tray dialogs
     fonts = hud.load_fonts(cfg.get("fonts_dir"))  # Kryo's fonts for her text panel (outside git)
     if fonts:
         log.info("fonts: %s", ", ".join(fonts))
-    wardrobe = outfits.parse(cfg)
+    wardrobe = outfits.usable(outfits.parse(cfg))  # outfits whose models aren't installed are left out
     custom = character.load(paths.DATA / character.FILE_NAME)  # tray -> Customize Raphael
     if custom.outfit in wardrobe.outfits and not wardrobe.outfits[custom.outfit].missing_models():
         wardrobe = replace(wardrobe, current=custom.outfit)
@@ -65,7 +67,7 @@ def main() -> None:
     stage.apply_character(custom)
     stage.physics.place(*stage.home)  # start on her home spot (Alt+dragged, or the default)
     stage.bodies = dict(cfg.get("bodies") or {})  # her 2D art / 3D model (tray -> Switch to ...)
-    stage.chibi_only = bool(cfg.get("chibi_only", False))
+    stage.chibi_only_cfg = bool(cfg.get("chibi_only", False))
     if stage.chibi_only:
         log.info("chibi_only: the serious form is off")
     link.connected.connect(stage.send_outfit_state)

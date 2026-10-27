@@ -1,20 +1,25 @@
 [project]
 name = "chibi-voice"
-version = "0.1.0"
-description = "Chibi-Agent voice process: push-to-talk STT, F5-TTS sentence queue, clip cache, lip RMS"
+version = "0.1.1"
+description = "Chibi-Agent voice process: push-to-talk STT, Kokoro / F5-TTS sentence queue, clip cache, lip RMS"
 requires-python = "==3.12.*"
 dependencies = [
     "chibi-shared",
-    "torch",
-    "torchaudio",
-    "f5-tts==1.1.22",
     "faster-whisper",
+    # Whisper's CUDA 12 libraries without torch (env.load_cuda_dlls)
+    "nvidia-cuda-runtime-cu12",
+    "nvidia-cublas-cu12",
+    "nvidia-cudnn-cu12>=9,<10",
     "sounddevice",
     "soundfile",
     "numpy",
     "nvidia-ml-py",
     "kokoro-onnx>=0.6.1",
 ]
+
+[project.optional-dependencies]
+# A voice of your own (docs/custom-voice.md): `uv sync --extra f5`; not shipped.
+f5 = ["torch", "torchaudio", "f5-tts==1.1.22"]
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-asyncio>=0.24"]

@@ -213,7 +213,9 @@ sequenceDiagram
 - **Outfits** (`outfits.py`, docs/character.md → Outfits): one exported model per outfit and form.
   - Config: `[overlay] outfit = "robe"` picks the current one; `[overlay.outfits.<name>]` has `chibi_rig` / `serious_rig` (`.model3.json`) and optional `chibi_map` / `serious_map`, which default to the shared `[overlay] chibi_map` / `serious_map` (relative to `overlay/`). Old configs with only `[overlay] chibi_rig` / `serious_rig` still work as one outfit, `default`; next to an `outfits` table those keys only fill an outfit's missing rig. An unknown `outfit` falls back to the first one; an outfit without a rig or map stops the overlay at start.
   - Switching: an `outfit` message or tray → Outfit. The stage checks the name, the model files and the maps first (refusals go back as `outfit_state ok=false`), then plays the transform particle puff without changing form; at its midpoint it swaps the maps and model paths and bumps `outfit_gen`, and the window reloads both puppets in its GL context and re-measures them. Brain, physics, form and facing are untouched. The choice lasts until restart (the config holds the start outfit).
-  - Outfits in `config.toml` (2026-10-27): `casual_coat` (the start outfit: the sprite-pack chibi), `robe` (her own Live2D chibi rig v21), `aniya` (a translated free Live2D model), `teen_3d` and `teen_3d_ruby` (the 3D body), `coat` (the Haru/Mao samples swapped). Every 2D outfit's serious form is still the Mao sample: her own serious rig doesn't exist yet.
+  - Shipped outfits (v0.1.1): `chibi` (the start outfit: the sprite-pack chibi, with the 3D Raphael as its serious form), `rimuru` and `raphael` (the 3D body in both forms, `overlay3d/models/{rimuru,raphael}.vrm`). No VRM ships: `outfits.usable` leaves out outfits whose chibi model is missing and keeps one whose serious model is missing in the chibi form only (`Outfit.chibi_only`, `Stage.chibi_only`). Saved Customize settings under the old names (casual_coat, teen_3d, teen_3d_ruby) carry over (`character.RENAMED`). The robe, ANIYA and sample outfits are gone from the defaults; Saber's machine still has the files.
+  - **Mixed bodies:** in the `chibi` outfit the chibi puppet is the sprite pack and the serious puppet the Godot body; `window._drawn_body_only` shows the Godot window only while she's drawn in its form.
+  - **Godot import:** a fresh install has no `.godot/` cache and a dropped-in VRM has no `.import`; `godot3d.needs_import` spots either and runs `godot --headless --import` once before the renderer starts.
 - **Rig kinds** (the outfit's rig path picks what `Puppet` drives; every kind answers the same live2d-py calls):
   - a `.model3.json`: a Live2D model (live2d-py);
   - `sprites:<pack dir>` (`sprites.py`, `rigs/raphael_sprites.toml`): Saber's drawn image pack (casual coat). Expressions are whole images; lip sync and blink come from registered states (a feathered mouth patch on other expressions); 18 motion groups map to poses and short sequences (the 8-frame walk, the two dance cycles), each pose placed by its own feet on the master's baseline; eye follow uses the 8-direction gaze drawings clipped to the eye rectangles. Sit and Sleep sit on the slime; the sword is worn at her hip (Look toggle) and held when alert. This is the chibi she wears by default (`casual_coat`);
@@ -241,7 +243,7 @@ sequenceDiagram
 ## Voice internals (`voice/`)
 - **STT:**
   - faster-whisper `small.en` int8_float16 on CUDA (0.19 s, 0.37 GB in spike 2; CPU takes 1.8 s, so gaming mode accepts slower replies).
-  - Its cuBLAS/cuDNN DLLs are loaded from torch's wheel without importing torch (`env.load_cuda_dlls`). Importing torch maps all of torch's CUDA libraries: measured 2.6 → 2.0 GB private and 1.0 → 0.7 GB working set for Whisper alone. Torch comes in only with F5.
+  - Its cuBLAS/cuDNN DLLs are loaded without importing torch (`env.load_cuda_dlls`): from NVIDIA's wheels (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`, `nvidia-cuda-runtime-cu12`, the shipped voice has no torch), else from torch's wheel. Importing torch maps all of torch's CUDA libraries: measured 2.6 → 2.0 GB private and 1.0 → 0.7 GB working set for Whisper alone. Torch comes in only with F5.
   - Silero VAD trims silence.
   - 16 kHz mono capture via `sounddevice` while PTT is held.
 - **TTS:**
@@ -250,7 +252,7 @@ sequenceDiagram
   - Clip cache for fixed lines (hash of voice + text → WAV in `%LOCALAPPDATA%\ChibiAgent\clips`).
 - **FX chain:** `pedalboard` (EQ, reverb, chorus, limiter) per `character.md`.
 - **Lip sync:** RMS in 1/60 s windows of the playback buffer, sent to the overlay over WS.
-- **Engines:** F5 (the default, `[voice] f5`) or Kokoro (`kokoro-onnx` on the CPU, 54 preset voices, model files in `ChibiAgent\models\kokoro`), picked in Customize (`voice_tune`). The fixed clips re-render per voice. Kokoro is also the fallback when F5 isn't loaded, so she never goes silent.
+- **Engines:** Kokoro (the shipped default: `kokoro-onnx` on the CPU, 54 preset voices, model files in `%LOCALAPPDATA%\ChibiAgent\kokoro`) or F5 (`[voice] f5 = true`, the voice package's optional `f5` extra with torch and f5-tts, and a reference clip; `docs/custom-voice.md`; without them `Tts` falls back to Kokoro), picked in Customize (`voice_tune`). The fixed clips re-render per voice. Kokoro is also the fallback when F5 isn't loaded, so she never goes silent.
 - **Start-up:** the last `voice_tune` is saved to `%LOCALAPPDATA%\ChibiAgent\voice_tune.json`, and the voice tunes to it before the first load (the overlay's tune arrives only ~15 s in, which used to load config.toml's F5 and then swap). `HF_HUB_OFFLINE=1` is set once F5, Vocos and Whisper are all cached (the Hub checks cost ~20 s of a cold start). Clips are keyed and rendered together on the TTS thread.
 - **Text clean-up:** `tts.speakable` rewrites numbers (3.5 → "3 point 5", $4.99, 10:30), since both engines read "." as a full stop; short lines get room for their last sound, trimmed after.
 
@@ -271,6 +273,13 @@ sequenceDiagram
 - **Shell:** shown in full, never chained silently, no admin elevation (a UAC prompt is refused).
 - **Files:** no delete in v1. Move/rename stays inside allowed roots. The audit log keeps the original paths, so a change can be undone by hand.
 - **Logs:** they contain no audio, screenshots or mail bodies. Untrusted tool results (mail, calendar, screen, files, web) are logged as a character count only. Transcripts stay in the chat store only.
+
+## Packaging (v0.1.1)
+- `config.toml` is the shipped default: no machine paths. `config.load` expands `%VARS%`, `~` and app-relative paths (`config.path`, `config.rig_path`); Saber's machine settings live in `%APPDATA%\ChibiAgent\config.toml` (a copy is `ChibiAgent\config-saber.toml`).
+- `launcher/raphael.py` → `Raphael.exe` (PyInstaller): runs `packaging/setup.ps1` until `%LOCALAPPDATA%\ChibiAgent\setup-<VERSION>.done` exists, then starts the agent with `pythonw`.
+- `packaging/setup.ps1`: `uv sync --frozen --no-dev` per package, Ollama (winget) + model pulls, Kokoro files, Whisper `small.en`.
+- `packaging/build.ps1`: stages tracked files plus the sprite pack, `bin/uv.exe` and Godot 4.7.2, refuses private files (VRM, Blender, fonts, voice references, Mixamo takes), builds `Raphael.exe`, then `packaging/raphael.iss` (Inno Setup, per-user install to `%LOCALAPPDATA%\Programs\Raphael`) → `dist/Raphael-<version>-setup.exe`.
+- User guides: `README.md`, `docs/custom-voice.md`, `docs/add-3d-model.md`; release notes in `CHANGELOG.md`.
 
 ## Repo layout
 ```

@@ -87,9 +87,10 @@ class Supervisor:
         oc = self.cfg.get("ollama", {})
         if oc.get("start_if_down", True):
             exe = os.path.expandvars(oc.get("exe", "ollama"))
-            out.append(Child("ollama", [exe, "serve"],
-                             env={"OLLAMA_MODELS": oc.get("models_dir", ""),
-                                  "OLLAMA_FLASH_ATTENTION": "1"}))
+            env = {"OLLAMA_FLASH_ATTENTION": "1"}
+            if oc.get("models_dir"):  # unset: Ollama's own default folder
+                env["OLLAMA_MODELS"] = oc["models_dir"]
+            out.append(Child("ollama", [exe, "serve"], env=env))
         for name in ("overlay", "voice"):
             if not self.cfg.get("processes", {}).get(name, True):
                 continue

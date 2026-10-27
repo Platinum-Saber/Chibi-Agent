@@ -109,7 +109,7 @@ class Stage:
         self.media = MediaWatcher()
         self.form = "chibi"
         self.form_target = "chibi"
-        self.chibi_only = False  # [overlay] chibi_only: never switch to the serious form
+        self.chibi_only_cfg = False  # [overlay] chibi_only: never switch to the serious form
         self.sticky = False
         self.serious_until = 0.0
         self.transform_t0: float | None = None
@@ -388,6 +388,11 @@ class Stage:
             self.particles = []
 
     # --- outfits -----------------------------------------------------------------------------
+    @property
+    def chibi_only(self) -> bool:
+        """Never the serious form: config says so, or the outfit has no serious model on disk."""
+        return self.chibi_only_cfg or self.wardrobe.outfits[self.outfit].chibi_only
+
     def request_outfit(self, name: str) -> None:
         """Queue a change of outfit; `tick` plays it behind the puff. Bad names and missing
         files are refused here, so the windows never try to load a broken model."""

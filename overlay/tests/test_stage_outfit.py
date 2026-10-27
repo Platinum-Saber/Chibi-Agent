@@ -147,7 +147,7 @@ def test_switch_keeps_the_serious_form(st):
 
 
 def test_chibi_only_never_turns_serious(st):
-    st.chibi_only = True
+    st.chibi_only_cfg = True
     st.brain.mood = Mood.WORKING
     st.serious_until = 1e12
     st.on_message(FormReq(form="serious", sticky=True))

@@ -23,7 +23,18 @@ from . import character
 log = logging.getLogger(__name__)
 
 
-def _icon() -> QIcon:
+ICON_DIR = paths.REPO / "assets" / "icon"
+
+
+def app_icon() -> QIcon:
+    """Her emblem (assets/icon, every size) for the tray and her windows; a drawn "R" without it."""
+    icon = QIcon()
+    for f in sorted(ICON_DIR.glob("raphael-emblem-*.png")):
+        icon.addFile(str(f))
+    return icon if not icon.isNull() else _drawn_icon()
+
+
+def _drawn_icon() -> QIcon:
     pm = QPixmap(64, 64)
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
@@ -83,7 +94,7 @@ class Tray:
         self.user_hidden = False
         self.memory = MemoryDialog(link.send)
         self.customize = None  # CustomizeDialog, built on first use
-        self.icon = QSystemTrayIcon(_icon())
+        self.icon = QSystemTrayIcon(app_icon())
         self.icon.setToolTip("Raphael")
         m = QMenu()
         self.a_show = self._action(m, "Hide Raphael", self._toggle_visible)

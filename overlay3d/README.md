@@ -16,8 +16,8 @@ agent ──WS (unchanged)── overlay (Python, Qt)                     Godot 
                           Stage.tick → GodotModel.Update  ──TCP──▶  clip, expression, params, gaze
                           hit test (point in her hull)    ◀──TCP──  hull of her bones, window handle
 ```
-- **The 3D body is a body kind:** an outfit whose rig path is `godot:<this folder>` (`[overlay.outfits.teen_3d]` in `config.toml`; `[overlay] bodies` names the 2D and 3D outfits).
-- **Variants:** `godot:<this folder>#<file>.vrm` picks another model in `models/`. `teen_3d_ruby` is her ruby-eyed variant (`raphael_teen_ruby.vrm`), worn from tray → Outfit. Switching between 3D variants restarts the renderer (about 3 s), and switching back from 2D returns to the 3D variant she last wore.
+- **The 3D body is a body kind:** an outfit whose rig path is `godot:<this folder>` (`[overlay.outfits.rimuru]` in `config.toml`; `[overlay] bodies` names the 2D and 3D outfits).
+- **Variants:** `godot:<this folder>#<file>.vrm` picks another model in `models/`. `raphael` is her ruby-eyed variant (`raphael.vrm`, was `raphael_teen_ruby.vrm`; `rimuru.vrm` was `raphael_teen.vrm`), worn from tray → Outfit. Switching between 3D variants restarts the renderer (about 3 s), and switching back from 2D returns to the 3D variant she last wore.
 - **`overlay/chibi_overlay/godot3d.py`:**
   - **Starting the renderer:** it starts Godot (`[overlay] godot_exe`) with `--renderer=PORT --token=T`.
   - **Taking the calls:** `GodotModel` accepts the same calls `Puppet` makes on a Live2D model.
@@ -94,7 +94,7 @@ Godot_v4.7.2-stable_win64.exe --path overlay3d -- --clip=Wave --seconds=2 --scre
   - `--seconds=S`: prints the average fps
   - `--screenshot=PATH`: saves a transparent PNG, and reports drawn pixels outside the hull
 - **Overlay test flags:**
-  - `python -m chibi_overlay --outfit teen_3d` starts the overlay straight in the 3D body;
+  - `python -m chibi_overlay --outfit rimuru` starts the overlay straight in the 3D body;
   - `--debug-throw=VX,VY` throws her;
   - `--debug-switch=S` switches body after S s and again after 2S s.
   - To keep a test overlay away from a running agent, give it its own empty `APPDATA` and `LOCALAPPDATA`. The agent keeps one overlay, and two would knock each other off.

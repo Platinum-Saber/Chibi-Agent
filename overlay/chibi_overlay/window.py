@@ -73,9 +73,25 @@ class MonitorWindow(QOpenGLWidget):
         super().hideEvent(e)
 
     def _models_visible(self, on: bool) -> None:
+        self._body_shown = {}  # the next frame shows only the drawn form's 3D body again
         for p in self.puppets.values():
             if hasattr(p.model, "set_visible"):
                 p.model.set_visible(on)
+
+    def _drawn_body_only(self, form: str | None) -> None:
+        """A 3D body shows only while she's drawn in its form: with a 2D chibi and a 3D serious
+        form, the Godot window hides until she transforms (forms of one 3D outfit share it)."""
+        want: dict[int, tuple[object, bool]] = {}
+        for f, p in self.puppets.items():
+            if hasattr(p.model, "set_visible"):
+                key = id(getattr(p.model, "bridge", p.model))
+                want[key] = (p.model, want.get(key, (None, False))[1] or f == form)
+        shown = getattr(self, "_body_shown", {})
+        for key, (model, on) in want.items():
+            if shown.get(key) != on:
+                model.set_visible(on)
+                shown[key] = on
+        self._body_shown = shown
 
     def _poll_cursor(self) -> None:
         st = self.stage
@@ -185,6 +201,8 @@ class MonitorWindow(QOpenGLWidget):
         form = st.draw_form()
         drew = False
         hit = None  # the 3D body answers hit tests itself (Godot draws her, not this window)
+        if self._near_me() and self.isVisible():
+            self._drawn_body_only(form)
         if form and self._near_me():
             pup = self.puppets[form]
             x, y = st.feet

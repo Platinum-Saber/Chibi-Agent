@@ -1,4 +1,5 @@
-# Chibi-Agent defaults. Override any key in %APPDATA%\ChibiAgent\config.toml.
+# Raphael defaults (shipped with the app). Override any key in %APPDATA%\ChibiAgent\config.toml.
+# Paths may use %VARS% and ~; relative paths are relative to the app folder.
 
 [processes]
 overlay = true
@@ -7,7 +8,7 @@ voice = true
 [ollama]
 url = "http://127.0.0.1:11434"
 exe = '%LOCALAPPDATA%\Programs\Ollama\ollama.exe'
-models_dir = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\ollama'   # set for the child process only
+models_dir = ''          # set for the Ollama she starts only; '' = Ollama's own folder
 start_if_down = true
 model = "qwen3.5:4b"
 embed_model = "nomic-embed-text"
@@ -16,91 +17,67 @@ temperature = 0.4        # qwen3.5 defaults to 1.0, which made tool choice errat
 keep_alive = "120s"
 
 [voice]
-hf_home = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\hf'
-reference = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\voice\voice_f.wav'   # a clean dub line (Sebas0914/Great-Sage candidates), 2026-10-26
-reference_text = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\voice\voice_f.txt'
-speed = 0.90
+hf_home = '%LOCALAPPDATA%\ChibiAgent\hf'
+# Kokoro (CPU, preset voices; tray -> Customize Raphael -> Voice) is the shipped voice:
+# kokoro-v1.0.onnx + voices-v1.0.bin from github.com/thewh1teagle/kokoro-onnx (setup downloads them).
+kokoro_dir = '%LOCALAPPDATA%\ChibiAgent\kokoro'
+# F5-TTS speaks with a voice of your own (docs/custom-voice.md): install the voice package's
+# `f5` extra, set f5 = true and point reference / reference_text at your clip and its transcript.
+f5 = false
+reference = ''
+reference_text = ''
+speed = 0.90             # F5's speed (Kokoro speaks at 1.0)
 nfe = 8
-f5 = true                # false: F5 never loads and Kokoro speaks
 stt_model = "small.en"
-# Kokoro preset voices (tray -> Customize Raphael -> Voice): kokoro-v1.0.onnx + voices-v1.0.bin
-# from github.com/thewh1teagle/kokoro-onnx releases (model-files-v1.0). Runs on the CPU.
-kokoro_dir = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\models\kokoro'
 
 [hotkeys]
 push_to_talk = "alt+1"
 look_at_screen = "ctrl+alt+s"
 
 [overlay]
-# The outfit she wears (one of [overlay.outfits.*]); the agent can change it while she runs.
-outfit = "casual_coat"  # her own robe rig is "robe"; was "aniya"
-# Stay in the chibi form (no switch to serious while working/alerting); the HUD and
-# confirm buttons then show beside the chibi. Off by default; on for now (Kryo, 2026-10-19).
-chibi_only = true
-# Extra fonts for her text panel (Electroharmonix), outside git; every .otf/.ttf here is loaded.
-fonts_dir = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\fonts'
-# UI sounds (Kryo's files, outside git): startup, appear, hover, click, close .wav.
-# Tray -> "Sound effects" turns them off; her voice reactions follow "Mute voice".
-sounds_dir = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\sounds'
+# The outfit she wears (one of [overlay.outfits.*]); outfits whose models are missing are skipped.
+outfit = "chibi"
+# Stay in the chibi form (no switch to serious while working/alerting); the HUD and confirm
+# buttons then show beside the chibi. Forced on while the outfit's serious model is missing.
+chibi_only = false
+# Extra fonts for her text panel; every .otf/.ttf here is loaded (Customize -> Add font file).
+fonts_dir = '%APPDATA%\ChibiAgent\fonts'
+# UI sounds: startup, appear, hover, click, close .wav. Tray -> "Sound effects" turns them off;
+# her voice reactions follow "Mute voice".
+sounds_dir = 'assets/sounds'
 sfx_volume = 0.6
 # Her bodies, one at a time (tray / Customize -> "Switch to 3D model" / "Switch to 2D art"):
 # the outfit each one wears. The choice is remembered in her Customize settings.
-bodies = { 2d = "casual_coat", 3d = "teen_3d" }
+bodies = { 2d = "chibi", 3d = "raphael" }
 # Godot 4.7 for the 3D body (overlay3d/); it draws her under this overlay's window.
 # Its render quality: supersampling (1.0-2.0) and MSAA (0/2/4/8). 2.0 + 2 keeps her face clear at
-# her normal size for ~580 MiB of GPU memory (Kryo's limit for her render: 800 MB; 2.0 + 4 = 800).
+# her normal size for ~580 MiB of GPU memory (2.0 + 4 = 800).
 render_scale = 2.0
 msaa = 2
-godot_exe = 'X:\Godot\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe'
-# Shared mood maps (relative to overlay/); an outfit may set its own chibi_map / serious_map.
-chibi_map = 'rigs/haru.toml'
-serious_map = 'rigs/mao.toml'
+godot_exe = 'godot\Godot_v4.7.2-stable_win64.exe'
 
-# One exported model per outfit and form (docs/character.md -> Outfits).
-# Placeholders (Live2D samples) until her real rigs exist.
-[overlay.outfits.robe]
-# Testing her own chibi rig (runtime v21: physics, 9 expressions, 18 motions, readable face; 2026-10-19); Haru was:
-# chibi_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\chibi\Haru.model3.json'
-chibi_rig = 'D:\Character Design\output\runtime\chibi\robe\Raphael_chibi_robe_v21.model3.json'
-chibi_map = 'rigs/raphael_chibi.toml'
-serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
-
-[overlay.outfits.casual_coat]
-# svg-rig branch: her chibi as Kryo's casual-coat image pack (chibi_overlay/sprites.py), not Live2D.
-# Wear it with outfit = "casual_coat" above, or ask her to change outfit.
-chibi_rig = 'sprites:D:\Character Design\output\assets\chibi\casual-coat\v01'
+# One model per outfit and form (docs/character.md -> Outfits).
+[overlay.outfits.chibi]
+# Her chibi: the casual-coat image pack (chibi_overlay/sprites.py). Serious: the 3D Raphael,
+# when overlay3d\models\raphael.vrm exists (docs/add-3d-model.md); else she stays chibi.
+chibi_rig = 'sprites:assets\chibi\casual-coat\v01'
 chibi_map = 'rigs/raphael_sprites.toml'
-serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
-
-[overlay.outfits.teen_3d]
-# Her full-size 3D model (Godot renderer, overlay3d/README.md). Personal use only: the VRM in
-# overlay3d/models/ stays out of git. One form: both names point at the same body.
-chibi_rig = 'godot:D:\Projects\Chibi-Agent-Project\Chibi-Agent\overlay3d'
-chibi_map = 'rigs/raphael_3d.toml'
-serious_rig = 'godot:D:\Projects\Chibi-Agent-Project\Chibi-Agent\overlay3d'
+serious_rig = 'godot:overlay3d#raphael.vrm'
 serious_map = 'rigs/raphael_3d.toml'
 
-[overlay.outfits.teen_3d_ruby]
-# The same 3D body with ruby-red eyes and 5 % darker skin (D:\Character Design ... ruby-red-v01,
-# history 061; exported as raphael_teen_ruby_v01.vrm). Wear it from tray -> Outfit.
-chibi_rig = 'godot:D:\Projects\Chibi-Agent-Project\Chibi-Agent\overlay3d#raphael_teen_ruby.vrm'
+[overlay.outfits.rimuru]
+# The 3D body in both forms (overlay3d\models\rimuru.vrm; not shipped).
+chibi_rig = 'godot:overlay3d#rimuru.vrm'
 chibi_map = 'rigs/raphael_3d.toml'
-serious_rig = 'godot:D:\Projects\Chibi-Agent-Project\Chibi-Agent\overlay3d#raphael_teen_ruby.vrm'
+serious_rig = 'godot:overlay3d#rimuru.vrm'
 serious_map = 'rigs/raphael_3d.toml'
 
-[overlay.outfits.aniya]
-# Free ANIYA model by DG_studio: personal use only, no for-profit streaming, no
-# redistribution. Working copy made by tools/prepare_aniya.py (outside git).
-chibi_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\chibi\aniya\aniya.model3.json'
-chibi_map = 'rigs/aniya_chibi.toml'
-serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
-
-[overlay.outfits.coat]
-# Stand-in: the two samples swapped, so a switch is easy to see.
-chibi_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\serious\Mao.model3.json'
-chibi_map = 'rigs/mao.toml'
-serious_rig = 'D:\Projects\Chibi-Agent-Project\ChibiAgent\rigs\chibi\Haru.model3.json'
-serious_map = 'rigs/haru.toml'
+[overlay.outfits.raphael]
+# The ruby-eyed 3D body in both forms (overlay3d\models\raphael.vrm; not shipped).
+chibi_rig = 'godot:overlay3d#raphael.vrm'
+chibi_map = 'rigs/raphael_3d.toml'
+serious_rig = 'godot:overlay3d#raphael.vrm'
+serious_map = 'rigs/raphael_3d.toml'
 
 [memory_relief]
 # When physical RAM stays at or above `threshold` % (two samples in a row), she gives memory

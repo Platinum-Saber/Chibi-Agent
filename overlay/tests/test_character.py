@@ -6,10 +6,10 @@ from chibi_overlay.body.motion import Clip, RigMap
 
 
 def _full() -> character.Character:
-    ch = character.Character(outfit="casual_coat")
+    ch = character.Character(outfit="chibi")
     ch.behaviour.gaze = False
     ch.behaviour.sleep_after_s = 5.0
-    tw = ch.tweaks("casual_coat")
+    tw = ch.tweaks("chibi")
     tw.height_dip = 400
     tw.moods["walking"] = {"motion": "Dance", "expression": "happy"}
     tw.moments["wave"] = {"motion": "Wave", "expression": "neutral"}
@@ -57,7 +57,7 @@ def test_bad_values_are_skipped():
 def test_apply_to_map_overrides_size_and_clips():
     rig = RigMap(320, {"idle": Clip("Idle", None, "neutral"), "walking": Clip("Walk", None, "neutral")},
                  {"wave": Clip("Wave", None, "happy")})
-    out = character.apply_to_map(rig, _full().outfits["casual_coat"])
+    out = character.apply_to_map(rig, _full().outfits["chibi"])
     assert out.height_dip == 400
     assert out.moods["walking"] == Clip("Dance", None, "happy")
     assert out.moods["idle"] == rig.moods["idle"]
@@ -93,7 +93,7 @@ def test_new_fields_round_trip(tmp_path):
     ch = character.Character()
     ch.behaviour.look_at, ch.behaviour.look_hold_s = "cursor", 2.5
     ch.behaviour.dance_words = "LiSA, anime openings"
-    tw = ch.tweaks("casual_coat")
+    tw = ch.tweaks("chibi")
     tw.mask, tw.sword = False, True
     ch.sequences["Sit"] = {"frames": [["poses/sit", 0.9]], "loop": True, "effect": "", "prop": "", "seat": "extras/slime"}
     path = tmp_path / "c.toml"
@@ -109,3 +109,13 @@ def test_panel_font_round_trip(tmp_path):
     character.save(ch, path)
     back = character.load(path)
     assert back.behaviour.panel_font == "Electroharmonix" and back.behaviour.panel_font_size == 13.0
+
+
+def test_settings_saved_under_old_outfit_names_carry_over():
+    ch = character.parse({"outfit": "teen_3d_ruby",
+                          "outfits": {"casual_coat": {"height_dip": 300}, "teen_3d": {"walk_px_s": 200},
+                                      "teen_3d_ruby": {"height_dip": 500}, "raphael": {"height_dip": 520}}})
+    assert ch.outfit == "raphael"
+    assert ch.outfits["chibi"].height_dip == 300 and ch.outfits["rimuru"].walk_px_s == 200
+    assert ch.outfits["raphael"].height_dip == 520  # the new name wins
+    assert "casual_coat" not in ch.outfits

@@ -38,7 +38,7 @@ planned, and more will come:
 - **Coat-dress:** a white high-collar coat-dress with gold trim, a pale-cyan lining and gloves. No hood.
 - **Casual coat** (chibi refs 05–06; built 2026-10-23 as a drawn sprite pack, not a Live2D rig, and now her default chibi: `sprites:` rigs in `architecture.md` → Overlay internals): a navy-blue long coat with white trim down the front, puffy lighter-blue cuffs, a beige scarf (or a fluffy fur collar), dark leggings and blue boots. Optionally a russet cape with a white fur hem, worn over the coat. No hood.
 
-Also wired in: **ANIYA** (a translated free Live2D model, chibi only) and the 3D body's **teen_3d** and ruby-eyed **teen_3d_ruby** variants. The list with rig paths is in `architecture.md` → Outfits.
+Shipped defaults (v0.1.1): the casual-coat sprite chibi, whose serious form is the 3D body; the 3D outfits **Rimuru** (was teen_3d) and ruby-eyed **Raphael** (was teen_3d_ruby) need their VRMs, which don't ship (rurune's licence). ANIYA and the white robe are no longer in the default config. The list with rig paths is in `architecture.md` → Outfits.
 
 Rules every outfit follows, so outfits stay swappable:
 - Same body, head, face, hair, halo, parameters, expressions and motions. Only the clothing layers change (and, for hooded outfits, the hood and the parts of the hair it hides).

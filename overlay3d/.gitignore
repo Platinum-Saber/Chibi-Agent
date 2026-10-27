@@ -1,4 +1,4 @@
 .godot/
-models/
-anims/
+/models/
+/anims/
 *.tmp

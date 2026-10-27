@@ -13,7 +13,7 @@ wheels = [
 
 [[package]]
 name = "chibi-overlay"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "chibi-shared" },
@@ -50,7 +50,7 @@ dev = [{ name = "pytest", specifier = ">=8" }]
 
 [[package]]
 name = "chibi-shared"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "../shared" }
 dependencies = [
     { name = "pydantic" },

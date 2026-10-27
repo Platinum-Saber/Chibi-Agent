@@ -36,7 +36,7 @@ log = logging.getLogger(__name__)
 
 PREFIX = "godot:"
 MODEL = "raphael_teen.vrm"  # in the project's models/; exported by overlay3d/tools/export_vrm.py
-DEFAULT_EXE = r"X:\Godot\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe"
+DEFAULT_EXE = str(paths.REPO / "godot" / "Godot_v4.7.2-stable_win64.exe")  # shipped beside the app
 START_TIMEOUT_MS = 30_000  # first import of the VRM can take a while
 QUIT_GRACE_MS = 500
 RENDER_SCALE = 2.0  # [overlay] render_scale: supersampling for a clearer face (overlay3d/README.md: budgets)
@@ -99,6 +99,31 @@ def missing(spec: str) -> list[str]:
     return [str(f) for f in (p / "project.godot", p / "models" / model) if not f.exists()]
 
 
+IMPORT_TIMEOUT_S = 300
+ASSETS = (".vrm", ".glb", ".fbx", ".png", ".jpg")
+
+
+def needs_import(project: str | Path) -> bool:
+    """Godot only loads imported files: a fresh install has no import cache, and a VRM or Mixamo
+    take dropped in later has no `.import` beside it until the editor has seen it."""
+    p = Path(project)
+    if not (p / ".godot" / "imported").is_dir():
+        return True
+    return any(f.suffix.lower() in ASSETS and not f.with_name(f.name + ".import").exists()
+               for d in ("models", "anims", "props") if (p / d).is_dir() for f in (p / d).rglob("*"))
+
+
+def run_import(exe: str, project: str) -> str:
+    """`godot --headless --import` once (it imports and quits). "" on success, else why not."""
+    log.info("3D renderer: importing new models (first start can take a minute)")
+    try:
+        r = subprocess.run([exe, "--headless", "--path", project, "--import"], capture_output=True,
+                           text=True, timeout=IMPORT_TIMEOUT_S, creationflags=subprocess.CREATE_NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return f"import failed: {e}"
+    return "" if r.returncode == 0 else f"import failed (exit {r.returncode}): {r.stderr[-300:]}"
+
+
 def in_hull(pts: list[tuple[float, float]], x: float, y: float) -> bool:
     """Point in a convex polygon (any winding)."""
     if len(pts) < 3:
@@ -144,6 +169,10 @@ class Bridge:
             return
         ocfg = config.load()["overlay"]
         exe = exe or ocfg.get("godot_exe") or DEFAULT_EXE
+        if needs_import(project):
+            if why := run_import(exe, project):
+                self._fail(why)
+                return
         self._focus = user32.GetForegroundWindow()  # Godot activates its window: handed back on hello
         cmd = [exe, "--path", project, "--", f"--model=res://models/{model}",
                f"--render-scale={float(ocfg.get('render_scale', RENDER_SCALE))}",

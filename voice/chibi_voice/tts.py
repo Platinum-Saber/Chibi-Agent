@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextlib
 import gc
+import importlib.util
 import io
 import logging
 import re
@@ -105,13 +106,22 @@ def reference_text(wav: Path) -> str:
 
 class Tts:
     def __init__(self, vcfg: dict):
-        self.default_ref = str(Path(vcfg["reference"]))
-        self.default_ref_text = Path(vcfg["reference_text"]).read_text(encoding="utf-8").strip()
+        # config [voice] f5 = false: Kokoro speaks, F5 never loads. F5 also needs the voice
+        # package's `f5` extra (torch, f5-tts; not shipped) and a reference clip with its transcript.
+        self.f5_on = bool(vcfg.get("f5", True))
+        ref, ref_txt = vcfg.get("reference") or "", vcfg.get("reference_text") or ""
+        if self.f5_on and importlib.util.find_spec("f5_tts") is None:
+            log.warning("[voice] f5 is on but F5-TTS isn't installed (uv sync --extra f5): Kokoro speaks")
+            self.f5_on = False
+        if self.f5_on and not (ref and ref_txt and Path(ref).exists() and Path(ref_txt).exists()):
+            log.warning("[voice] f5 is on but reference / reference_text aren't set or found: Kokoro speaks")
+            self.f5_on = False
+        self.default_ref = str(Path(ref)) if ref else ""
+        self.default_ref_text = Path(ref_txt).read_text(encoding="utf-8").strip() if self.f5_on else ""
         self.ref, self.ref_text = self.default_ref, self.default_ref_text
         self.speed = float(vcfg.get("speed", 0.90))
         self.nfe = int(vcfg.get("nfe", 8))
         self.kokoro_dir = Path(vcfg.get("kokoro_dir", "")) if vcfg.get("kokoro_dir") else None
-        self.f5_on = bool(vcfg.get("f5", True))  # config [voice] f5 = false: Kokoro speaks, F5 never loads
         self.engine = "f5" if self.f5_on else "kokoro"
         self.kvoice = "bf_emma"
         if not self.f5_on:

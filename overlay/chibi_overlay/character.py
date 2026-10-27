@@ -141,9 +141,17 @@ def _positive_int(v) -> int | None:
     return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
 
 
+# Outfits renamed for v0.1.1: saved settings under the old names carry over
+RENAMED = {"casual_coat": "chibi", "teen_3d": "rimuru", "teen_3d_ruby": "raphael"}
+
+
 def parse(d: dict) -> Character:
     outfits = {}
-    for name, t in (d.get("outfits") or {}).items():
+    saved = d.get("outfits") or {}
+    for name, t in saved.items():
+        if name in RENAMED and RENAMED[name] in saved:  # already saved under the new name
+            continue
+        name = RENAMED.get(name, name)
         if isinstance(t, dict):
             h = t.get("height_dip")
             outfits[name] = OutfitTweaks(int(h) if isinstance(h, (int, float)) and h > 0 else None,
@@ -160,7 +168,7 @@ def parse(d: dict) -> Character:
             for k in ("prop", "seat"):  # absent: the built-in choice; "": none
                 if isinstance(t.get(k), str):
                     seqs[name][k] = t[k]
-    outfit = d.get("outfit")
+    outfit = RENAMED.get(d.get("outfit"), d.get("outfit"))
     return Character(outfit if isinstance(outfit, str) and outfit else None,
                      _behaviour(d.get("behaviour") or {}), outfits, seqs, _voice(d.get("voice")))
 

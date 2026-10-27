@@ -99,7 +99,7 @@ wheels = [
 
 [[package]]
 name = "chibi-agent"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "chibi-shared" },
@@ -168,7 +168,7 @@ dev = [
 
 [[package]]
 name = "chibi-shared"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "../shared" }
 dependencies = [
     { name = "pydantic" },
