@@ -144,9 +144,13 @@ def set_autostart(on: bool) -> None:
     agent_dir = Path(__file__).resolve().parents[1]
     pythonw = Path(sys.executable).with_name("pythonw.exe")
     venv_pythonw = agent_dir / ".venv" / "Scripts" / "pythonw.exe"
+    launcher = agent_dir.parent / "Raphael.exe"  # an installed app: its launcher runs setup when needed
     link = win32com.client.Dispatch("WScript.Shell").CreateShortcut(str(SHORTCUT))
-    link.TargetPath = str(venv_pythonw if venv_pythonw.exists() else pythonw)
-    link.Arguments = "-m chibi_agent"
-    link.WorkingDirectory = str(agent_dir)
+    if launcher.exists():
+        link.TargetPath, link.Arguments, link.WorkingDirectory = str(launcher), "", str(launcher.parent)
+    else:
+        link.TargetPath = str(venv_pythonw if venv_pythonw.exists() else pythonw)
+        link.Arguments = "-m chibi_agent"
+        link.WorkingDirectory = str(agent_dir)
     link.Description = "Raphael, the Chibi-Agent desktop companion"
     link.Save()

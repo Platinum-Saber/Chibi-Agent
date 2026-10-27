@@ -6,7 +6,9 @@ param(
     [string]$SpritePack = "D:\Character Design\output\assets\chibi\casual-coat\v01",
     # Godot 4.7.2 (MIT) runs the 3D body when a VRM is added
     [string]$Godot = "X:\Godot\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe",
-    [string]$Iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+    [string]$Iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    # stage and Raphael.exe only (deploy.ps1 uses the staged app)
+    [switch]$NoInstaller
 )
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -21,7 +23,7 @@ New-Item -ItemType Directory -Force $Stage, $Work | Out-Null
 
 # 1. The app: tracked files only (git ls-files), minus what a user doesn't run
 $skip = '^(spikes|handoffs|tools/(make_rig_template|prepare_aniya)|launcher|\.claude)(/|\.py$)|' +
-        '(^|/)tests/|^(CLAUDE|DEVIATION)\.md$|^chibi\.py$|^packaging/build\.ps1$|(^|/)\.git'
+        '(^|/)tests/|^(CLAUDE|DEVIATION)\.md$|^chibi\.py$|^packaging/(build|deploy)\.ps1$|(^|/)\.git'
 Push-Location $Root
 try {
     $files = git ls-files | Where-Object { $_ -notmatch $skip }
@@ -79,6 +81,7 @@ uvx --from pyinstaller pyinstaller --noconfirm --onefile --noconsole --name Raph
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
 # 6. The installer
+if ($NoInstaller) { Write-Host "Staged $Stage" -ForegroundColor Green; exit 0 }
 & $Iscc /Q "/DVersion=$Version" "/DStage=$Stage" "/DOut=$Dist" "$Root\packaging\raphael.iss"
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
 $setup = Join-Path $Dist "Raphael-$Version-setup.exe"

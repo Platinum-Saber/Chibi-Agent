@@ -36,15 +36,22 @@ try {
         overlay = "import PySide6.QtWidgets, live2d, chibi_overlay.main"
         voice   = "import faster_whisper, kokoro_onnx, chibi_voice.main"
     }
+    # Optional extras a package keeps in extras.txt, one per line (voice: "f5" for a custom
+    # F5-TTS voice, docs/custom-voice.md), so running setup again doesn't remove them
     foreach ($pkg in "agent", "overlay", "voice") {
         Write-Host "-- $pkg"
         Push-Location (Join-Path $Root $pkg)
         try {
-            & $Uv sync --frozen --no-dev
+            $extras = @()
+            if (Test-Path "extras.txt") {
+                foreach ($e in Get-Content "extras.txt") { if ($e.Trim()) { $extras += "--extra", $e.Trim() } }
+                if ($extras -contains "f5") { $checks[$pkg] += ", f5_tts" }
+            }
+            & $Uv sync --frozen --no-dev @extras
             if ($LASTEXITCODE -ne 0) { throw "uv sync failed in $pkg" }
             if (-not (Test-Imports $checks[$pkg])) {
                 Write-Host "   $pkg didn't import cleanly: reinstalling its packages"
-                & $Uv sync --frozen --no-dev --reinstall
+                & $Uv sync --frozen --no-dev --reinstall @extras
                 if (-not (Test-Imports $checks[$pkg])) { throw "$pkg still doesn't import after a reinstall" }
             }
         } finally { Pop-Location }
@@ -76,9 +83,14 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "ollama pull $m failed" }
     }
 
+    # Where her voice models live: config.toml, with %APPDATA%\ChibiAgent\config.toml's overrides
+    $py = Join-Path $Root "agent\.venv\Scripts\python.exe"
+    $dirs = & $py -c "from chibi_shared import config; v = config.load()['voice']; print(v['kokoro_dir']); print(v['hf_home'])"
+    if ($LASTEXITCODE -ne 0 -or $dirs.Count -lt 2) { $dirs = @((Join-Path $Data "kokoro"), (Join-Path $Data "hf")) }
+
     # 3. Kokoro, her shipped voice (kokoro-onnx model files, Apache 2.0)
     Step "Kokoro voice"
-    $Kokoro = Join-Path $Data "kokoro"
+    $Kokoro = $dirs[0]
     New-Item -ItemType Directory -Force $Kokoro | Out-Null
     $base = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
     foreach ($f in "kokoro-v1.0.onnx", "voices-v1.0.bin") {
@@ -91,7 +103,7 @@ try {
 
     # 4. Whisper small.en for push-to-talk (into her Hugging Face cache)
     Step "Speech recognition (Whisper small.en)"
-    $env:HF_HOME = Join-Path $Data "hf"
+    $env:HF_HOME = $dirs[1]
     $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
     & (Join-Path $Root "voice\.venv\Scripts\python.exe") -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-small.en')"
     if ($LASTEXITCODE -ne 0) { throw "Whisper download failed" }
