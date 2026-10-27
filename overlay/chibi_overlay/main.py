@@ -68,6 +68,7 @@ def main() -> None:
     stage.physics.place(*stage.home)  # start on her home spot (Alt+dragged, or the default)
     stage.bodies = dict(cfg.get("bodies") or {})  # her 2D art / 3D model (tray -> Switch to ...)
     stage.chibi_only_cfg = bool(cfg.get("chibi_only", False))
+    stage.auto_serious = bool(cfg.get("auto_serious", False))
     if stage.chibi_only:
         log.info("chibi_only: the serious form is off")
     link.connected.connect(stage.send_outfit_state)

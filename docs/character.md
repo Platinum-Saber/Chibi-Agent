@@ -157,6 +157,8 @@ WebEngine view, and needs its own iGPU fps spike. The mood → form → motion
 table below stays the same; only the motion names map to VRM animations.
 
 ## Mood → form → motion
+**Since v0.1.1 (Saber, 2026-10-27):** she doesn't change form by herself. Work, briefings, confirms and alerts play their motions in her current form, with the task panel and confirm buttons beside her; she changes form only on "serious mode" / "chibi mode", and an outfit whose two forms are one model (the 3D Rimuru and Raphael) never transforms. `[overlay] auto_serious = true` brings back the **serious** column below.
+
 The agent requests moods. The body controller (`brain`) owns the form and the
 motion, and can refuse: while she's held, falling or dizzy, a request
 waits until she lands.

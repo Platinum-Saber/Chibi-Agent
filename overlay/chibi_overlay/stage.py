@@ -110,6 +110,9 @@ class Stage:
         self.form = "chibi"
         self.form_target = "chibi"
         self.chibi_only_cfg = False  # [overlay] chibi_only: never switch to the serious form
+        # [overlay] auto_serious: switch to the serious form by herself for work, alerts and
+        # confirms. Off (Saber): she changes form only on "serious mode" / "chibi mode".
+        self.auto_serious = False
         self.sticky = False
         self.serious_until = 0.0
         self.transform_t0: float | None = None
@@ -337,7 +340,7 @@ class Stage:
         if b.mood in motion.SERIOUS_MOODS:
             self.serious_until = now_s + SERIOUS_HOLD_S
         want = "chibi" if self.chibi_only else self.form_target if self.sticky else (
-            "serious" if now_s < self.serious_until or self.ov.confirm else "chibi")
+            "serious" if self.auto_serious and (now_s < self.serious_until or self.ov.confirm) else "chibi")
         if (want != self.form or self._outfit_next) and self.transform_t0 is None and not self.dragging:
             self._outfit_to, self._outfit_next = self._outfit_next, None  # a pending outfit rides along
             self._start_transform(want, now_s)
@@ -391,7 +394,15 @@ class Stage:
     @property
     def chibi_only(self) -> bool:
         """Never the serious form: config says so, or the outfit has no serious model on disk."""
-        return self.chibi_only_cfg or self.wardrobe.outfits[self.outfit].chibi_only
+        o = self.wardrobe.outfits[self.outfit]
+        # one model in both forms (the 3D Rimuru / Raphael): a "transform" would only resize her
+        return self.chibi_only_cfg or o.chibi_only or o.rigs["chibi"] == o.rigs["serious"]
+
+    @property
+    def panels_on_chibi(self) -> bool:
+        """Her task panel and confirm buttons show beside the chibi too, unless the serious
+        form comes by itself for them (auto_serious)."""
+        return self.chibi_only or not self.auto_serious
 
     def request_outfit(self, name: str) -> None:
         """Queue a change of outfit; `tick` plays it behind the puff. Bad names and missing

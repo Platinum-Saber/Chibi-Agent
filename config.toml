@@ -41,6 +41,9 @@ outfit = "chibi"
 # Stay in the chibi form (no switch to serious while working/alerting); the HUD and confirm
 # buttons then show beside the chibi. Forced on while the outfit's serious model is missing.
 chibi_only = false
+# Switch to the serious form by herself while working, for alerts and confirms. Off: she changes
+# form only when asked ("serious mode" / "chibi mode"); outfits with one model never change.
+auto_serious = false
 # Extra fonts for her text panel; every .otf/.ttf here is loaded (Customize -> Add font file).
 fonts_dir = '%APPDATA%\ChibiAgent\fonts'
 # UI sounds: startup, appear, hover, click, close .wav. Tray -> "Sound effects" turns them off;

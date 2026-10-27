@@ -155,11 +155,30 @@ def test_chibi_only_never_turns_serious(st):
     assert st.transform_t0 is None and st.form == "chibi"
 
 
-def test_serious_moods_still_switch_without_chibi_only(st):
+def test_work_doesnt_transform_her_unless_auto_serious(st):
     st.brain.mood = Mood.WORKING
     st.serious_until = 1e12
     st.tick((0, 0))
-    assert st.transform_t0 is not None
+    assert st.transform_t0 is None and st.form == "chibi"  # Saber: no transform while conversing
+    assert st.panels_on_chibi  # so her task panel and confirm buttons show beside the chibi
+    st.auto_serious = True
+    st.tick((0, 0))
+    assert st.transform_t0 is not None and not st.panels_on_chibi
+
+
+def test_asked_for_she_still_changes_form(st):
+    st.on_message(FormReq(form="serious", sticky=True))  # "serious mode"
+    _run_puff(st)
+    assert st.form == "serious"
+
+
+def test_one_model_in_both_forms_never_transforms(st, tmp_path):
+    from dataclasses import replace
+    o = st.wardrobe.outfits[st.outfit]
+    st.wardrobe.outfits[st.outfit] = replace(o, rigs={"chibi": o.rigs["chibi"], "serious": o.rigs["chibi"]})
+    st.on_message(FormReq(form="serious", sticky=True))
+    st.tick((0, 0))
+    assert st.chibi_only and st.transform_t0 is None and st.form == "chibi"
 
 
 
