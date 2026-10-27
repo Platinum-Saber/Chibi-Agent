@@ -1,0 +1,37 @@
+; Engine configuration file.
+; Godot 4.7, Compatibility renderer: per-pixel transparency is the safest there on Windows.
+
+config_version=5
+
+[application]
+
+config/name="Raphael 3D"
+config/description="Raphael's full-size 3D body: a renderer driven by the Python overlay (overlay/chibi_overlay/godot3d.py)."
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+run/max_fps=60
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0, 0, 0, 0)
+
+[display]
+
+window/size/viewport_width=520
+window/size/viewport_height=1000
+window/size/borderless=true
+window/size/always_on_top=true
+window/size/transparent=true
+window/size/no_focus=true
+; off-screen until placed: the overlay moves the renderer; the preview places itself
+window/size/initial_position_type=0
+window/size/initial_position=Vector2i(-6000, -6000)
+window/per_pixel_transparency/allowed=true
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/vrm/plugin.cfg", "res://addons/Godot-MToon-Shader/plugin.cfg")
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+viewport/transparent_background=true

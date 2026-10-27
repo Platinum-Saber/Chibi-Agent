@@ -1,0 +1,585 @@
+"""Her 3D body: frames for the Godot renderer, hull hit tests, the renderer link, the body switch."""
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import pytest
+from PySide6.QtCore import QCoreApplication
+
+from chibi_overlay import godot3d, outfits, stage as stage_mod
+from chibi_overlay.body import motion
+from chibi_overlay.body.brain import Mood, Moment
+from chibi_overlay.body.motion import Clip
+from chibi_overlay.puppet import Puppet
+from chibi_shared.protocol import OutfitState
+
+from test_stage_outfit import FakeGround, FakeLink, FakeMedia, _run_puff
+
+PKG = Path(__file__).resolve().parents[1]
+CLIPS_GD = PKG.parent / "overlay3d" / "clips.gd"
+
+
+class FakeBridge:
+    def __init__(self, ready=True):
+        self.failed = ""
+        self.ready = ready
+        self.height_m, self.half_width_m = 1.47, 0.294
+        self.hull = []
+        self.own = []
+        self.hwnd = 0
+        self.sent = []
+        self.released = 0
+        self.shown = []
+
+    def send(self, msg):
+        self.sent.append(msg)
+
+    def place(self, above, rect):
+        pass
+
+    def show(self, on):
+        self.shown.append(on)
+
+    def release(self):
+        self.released += 1
+
+
+@pytest.fixture
+def fake_bridge(monkeypatch):
+    b = FakeBridge()
+    monkeypatch.setattr(godot3d.Bridge, "get", classmethod(lambda cls, project: b))
+    return b
+
+
+REAL_NEEDS_IMPORT = godot3d.needs_import
+
+
+@pytest.fixture(autouse=True)
+def _no_godot_import(monkeypatch):
+    """The fake renderers below need no Godot import pass."""
+    monkeypatch.setattr(godot3d, "needs_import", lambda project: False)
+
+
+# --- hull --------------------------------------------------------------------------------------
+@pytest.mark.parametrize("pts", [[(0, 0), (10, 0), (10, 20), (0, 20)], [(0, 20), (10, 20), (10, 0), (0, 0)]])
+def test_point_in_hull_either_winding(pts):
+    assert godot3d.in_hull(pts, 5, 10)
+    assert not godot3d.in_hull(pts, 11, 10)
+    assert not godot3d.in_hull(pts, 5, -1)
+
+
+def test_empty_hull_never_hits():
+    assert not godot3d.in_hull([], 0, 0)
+    assert not godot3d.in_hull([(0, 0), (1, 1)], 0.5, 0.5)
+
+
+# --- the puppet model -----------------------------------------------------------------------
+def _puppet(fb=(2560, 1392), dpr=1.25):
+    rig = motion.load(PKG / "rigs" / "raphael_3d.toml")
+    return Puppet("godot:X:/nowhere", rig, dpr, fb)
+
+
+def test_geometry_waits_for_the_renderer(fake_bridge):
+    fake_bridge.ready = False
+    assert _puppet().model.geom() is None
+    fake_bridge.ready = True
+    g = _puppet().model.geom()
+    assert g.height == 1.0 and g.half_width == pytest.approx(0.2)
+
+
+def test_frame_carries_feet_height_clip_params_gaze(fake_bridge):
+    fb = (2560, 1392)
+    pup = _puppet(fb, dpr=1.25)
+    pup.configure(pup.model.geom(), fb)
+    assert pup.height == pytest.approx(520 * 1.25)  # height_dip at 125 %
+    assert pup.half_width == pytest.approx(pup.height * 0.2)
+    pup.place(2200, 1392)
+    pup.face(True)
+    pup.play(Clip("Walk", None, "happy"))
+    pup.set_param("ParamMouthOpenY", 0.42)
+    pup.model.Drag(100, 200)
+    pup.model.Update()
+    (f,) = fake_bridge.sent
+    assert f["t"] == "frame"
+    assert f["feet"] == [pytest.approx(2200, abs=0.1), pytest.approx(1392, abs=0.1)]
+    assert f["h"] == pytest.approx(650, abs=0.1)
+    assert (f["motion"], f["expression"], f["walking"], f["facing_left"]) == ("Walk", "happy", True, True)
+    assert f["params"] == {"ParamMouthOpenY": 0.42}
+    assert f["gaze"] == [100, 200]
+
+
+def test_hit_uses_the_renderers_hull(fake_bridge):
+    m = _puppet().model
+    fake_bridge.hull = [(100, 100), (200, 100), (200, 400), (100, 400)]
+    assert m.hit(150, 300) and not m.hit(250, 300)
+
+
+def test_close_releases_the_renderer_once(fake_bridge):
+    m = _puppet().model
+    m.close()
+    m.close()
+    assert fake_bridge.released == 1
+
+
+# --- the renderer link (a fake renderer process instead of Godot) ---------------------------------
+FAKE_RENDERER = r'''
+import json, socket, sys
+args = dict(a.lstrip("-").split("=", 1) for a in sys.argv if a.startswith("--") and "=" in a)
+out = open(sys.argv[1], "w")
+s = socket.create_connection(("127.0.0.1", int(args["renderer"])))
+s.sendall((json.dumps({"t": "hello", "token": args["token"], "hwnd": 4242,
+                       "height_m": 1.5, "half_width_m": 0.3}) + "\n").encode())
+s.sendall(b'{"t":"hull","pts":[0,0,10,0,10,10,0,10]}\n')
+buf = b""
+while True:
+    data = s.recv(65536)
+    if not data:
+        break
+    buf += data
+    while b"\n" in buf:
+        line, buf = buf.split(b"\n", 1)
+        out.write(line.decode() + "\n"); out.flush()
+        if json.loads(line).get("t") == "quit":
+            sys.exit(0)
+'''
+
+
+@pytest.fixture
+def qapp(monkeypatch, tmp_path):
+    monkeypatch.setattr(godot3d.paths, "LOGS", tmp_path / "logs")  # the renderer's log, not Kryo's
+    return QCoreApplication.instance() or QCoreApplication([])
+
+
+def _wait(cond, timeout=10.0):
+    end = time.monotonic() + timeout
+    while not cond() and time.monotonic() < end:
+        QCoreApplication.processEvents()
+        time.sleep(0.01)
+    return cond()
+
+
+def test_bridge_handshake_frames_and_quit(qapp, monkeypatch, tmp_path):
+    fake, log = tmp_path / "fake.py", tmp_path / "got.txt"
+    fake.write_text(FAKE_RENDERER)
+    real_popen = subprocess.Popen
+    started = []
+
+    def popen(cmd, **kw):  # run the fake renderer with Godot's arguments
+        started.append(cmd)
+        return real_popen([sys.executable, "-I", str(fake), str(log), *cmd[1:]], **kw)
+    monkeypatch.setattr(godot3d.subprocess, "Popen", popen)
+    monkeypatch.setattr(godot3d.Bridge, "_own_window", lambda self: None)  # 4242 isn't a window
+
+    b = godot3d.Bridge(str(tmp_path), exe="godot.exe")
+    b.users = 1
+    assert started[0][:3] == ["godot.exe", "--path", str(tmp_path)]
+    assert "--model=res://models/raphael_teen.vrm" in started[0]
+    assert any(a.startswith("--render-scale=") for a in started[0]) and any(a.startswith("--msaa=") for a in started[0])
+    assert _wait(lambda: b.ready and b.hull), b.failed
+    assert (b.hwnd, b.height_m, b.half_width_m) == (4242, 1.5, 0.3)
+    assert godot3d.in_hull(b.hull, 5, 5)
+    b.send({"t": "frame", "motion": "Idle"})
+    assert _wait(lambda: log.exists() and "Idle" in log.read_text())
+    b.release()
+    assert _wait(lambda: b.proc.poll() is not None)
+    assert '"quit"' in log.read_text()
+
+
+def test_quitting_closes_a_renderer_in_use_without_a_failure(qapp, monkeypatch, tmp_path, caplog):
+    fake, log = tmp_path / "fake.py", tmp_path / "got.txt"
+    fake.write_text(FAKE_RENDERER)
+    real_popen = subprocess.Popen
+    monkeypatch.setattr(godot3d.subprocess, "Popen",
+                        lambda cmd, **kw: real_popen([sys.executable, "-I", str(fake), str(log), *cmd[1:]], **kw))
+    monkeypatch.setattr(godot3d.Bridge, "_own_window", lambda self: None)
+    monkeypatch.setattr(godot3d.Bridge, "_open", {})
+    b = godot3d.Bridge.get(str(tmp_path))  # a body still wears it
+    assert _wait(lambda: b.ready), b.failed
+    godot3d.Bridge.close_all()
+    assert _wait(lambda: b.proc.poll() is not None)
+    qapp.processEvents()
+    assert not b.failed and "renderer link closed" not in caplog.text
+    assert '"quit"' in log.read_text() and not godot3d.Bridge._open
+
+
+def test_bridge_refuses_a_wrong_token(qapp, monkeypatch, tmp_path):
+    fake, log = tmp_path / "fake.py", tmp_path / "got.txt"
+    fake.write_text(FAKE_RENDERER.replace('args["token"]', '"guess"'))
+    real_popen = subprocess.Popen
+    monkeypatch.setattr(godot3d.subprocess, "Popen",
+                        lambda cmd, **kw: real_popen([sys.executable, "-I", str(fake), str(log), *cmd[1:]], **kw))
+    b = godot3d.Bridge(str(tmp_path), exe="godot.exe")
+    assert _wait(lambda: bool(b.failed))
+    assert not b.ready and "hello" in b.failed
+    b.close()
+
+
+def test_missing_executable_fails_cleanly(qapp, tmp_path):
+    b = godot3d.Bridge(str(tmp_path), exe=str(tmp_path / "no-godot.exe"))
+    assert "can't start" in b.failed and not b.ready
+    b.close()
+
+
+# --- one body at a time ----------------------------------------------------------------------
+@pytest.fixture
+def st(monkeypatch, tmp_path):
+    monkeypatch.setattr(stage_mod, "Ground", FakeGround)
+    monkeypatch.setattr(stage_mod, "MediaWatcher", FakeMedia)
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    proj = tmp_path / "overlay3d"
+    (proj / "models").mkdir(parents=True)
+    (proj / "project.godot").write_text("")
+    (proj / "models" / "raphael_teen.vrm").write_bytes(b"")
+    (proj / "models" / "ruby.vrm").write_bytes(b"")
+    w = outfits.parse({
+        "outfit": "casual_coat",
+        "outfits": {
+            "casual_coat": {"chibi_rig": f"sprites:{pack}", "chibi_map": "rigs/raphael_sprites.toml",
+                            "serious_rig": f"sprites:{pack}", "serious_map": "rigs/raphael_sprites.toml"},
+            "teen_3d": {"chibi_rig": f"godot:{proj}", "chibi_map": "rigs/raphael_3d.toml",
+                        "serious_rig": f"godot:{proj}", "serious_map": "rigs/raphael_3d.toml"},
+            "ruby_3d": {"chibi_rig": f"godot:{proj}#ruby.vrm", "chibi_map": "rigs/raphael_3d.toml",
+                        "serious_rig": f"godot:{proj}#ruby.vrm", "serious_map": "rigs/raphael_3d.toml"},
+            "lost_3d": {"chibi_rig": f"godot:{tmp_path / 'gone'}", "chibi_map": "rigs/raphael_3d.toml",
+                        "serious_rig": f"godot:{tmp_path / 'gone'}", "serious_map": "rigs/raphael_3d.toml"},
+        },
+    })
+    s = stage_mod.Stage(w, PKG, 1.0, FakeLink(), own_windows=set())
+    s.bodies = {"2d": "casual_coat", "3d": "teen_3d"}
+    s.chibi_only_cfg = True
+    s.size = {"chibi": (320.0, 60.0), "serious": (320.0, 60.0)}
+    return s
+
+
+def test_outfits_know_their_body(st):
+    assert st.body == "2d"
+    assert st.wardrobe.outfits["teen_3d"].body == "3d"
+    assert st.wardrobe.outfits["lost_3d"].missing_models()  # no project, no model
+
+
+def test_switch_to_3d_and_back_keeps_one_form(st):
+    assert st.switch_body() == "teen_3d"
+    assert st.character.outfit == "teen_3d"
+    _run_puff(st)
+    assert st.outfit == "teen_3d" and st.body == "3d" and st.form == "chibi"
+    assert st.rig_paths["chibi"] == st.rig_paths["serious"]
+    assert st.link.states()[-1].ok and st.link.states()[-1].outfit == "teen_3d"
+    st.brain.request_mood(Mood.WORKING, 0)  # work doesn't transform her: chibi_only
+    st.tick((0, 0))
+    assert st.transform_t0 is None and st.form == "chibi"
+    assert st.switch_body() == "casual_coat"
+    _run_puff(st)
+    assert st.body == "2d"
+
+
+def test_switch_falls_back_to_the_first_outfit_of_the_other_body(st):
+    st.bodies = {}
+    assert st.other_body_outfit() == "teen_3d"
+
+
+def test_a_3d_body_that_cant_start_goes_back_to_2d(st):
+    st.switch_body()
+    _run_puff(st)
+    gen = st.outfit_gen
+    st.body_failed("no hello from Godot in time")
+    assert st.body == "2d" and st.outfit_gen == gen + 1
+    last = st.link.states()[-1]
+    assert not last.ok and "3D body unavailable" in last.error
+
+
+# --- the mood map against the clip library ---------------------------------------------------
+def test_3d_map_covers_every_mood_and_moment_with_real_clips():
+    rig = motion.load(PKG / "rigs" / "raphael_3d.toml")
+    clips = set(re.findall(r'"(\w+)": (?:true|false)', CLIPS_GD.read_text(encoding="utf-8")))
+    assert {"Idle", "Walk", "Talk", "Think"} <= clips
+    for m in Mood:
+        assert m.value in rig.moods, m
+        assert rig.moods[m.value].motion in clips, m
+    for mo in Moment:
+        assert rig.moments[mo.value].motion in clips, mo
+    assert rig.moods["dancing_excited"].motion in clips
+    vrm = {"neutral", "happy", "angry", "sad", "relaxed", "surprised", "smile"}  # smile: raphael.gd builds it
+    assert {c.expression for c in [*rig.moods.values(), *rig.moments.values()]} <= vrm
+
+
+def test_params_last_one_frame(fake_bridge):
+    """Eyes shut while asleep must not stick once she wakes (Stage.params stops sending them)."""
+    m = _puppet().model
+    m.SetSaveParamById("ParamEyeLOpen", 0.0)
+    m.Update()
+    m.Update()
+    assert fake_bridge.sent[0]["params"] == {"ParamEyeLOpen": 0.0}
+    assert fake_bridge.sent[1]["params"] == {}
+
+
+def _grab_at(st, frac):
+    """Press at `frac` of her height above her feet, then drag."""
+    x, y = st.feet
+    h = st.size[st.form][0]
+    st.press_at(x, y - frac * h)
+    st.move_to(x + 20, y - frac * h - 20)
+
+
+def test_held_from_the_torso_up_hangs(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.75)
+    assert st.brain.mood == Mood.HELD and not st.grab_low
+    assert st.clip("chibi").motion == "Held"
+
+
+def test_held_below_the_waist_is_carried(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.3)
+    assert st.brain.mood == Mood.HELD and st.grab_low
+    assert st.clip("chibi").motion == "Carried"
+
+
+def _land_next_tick(st, impact=900.0):
+    """The next tick's physics step reports first contact with the floor."""
+    st.physics.step = lambda dt: impact
+    st.tick(st.feet)
+
+
+def test_dropped_while_carried_falls_flat_then_lands_hard(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.3)
+    st.release_at(*st.feet)
+    assert st.brain.mood == Mood.FALLING
+    assert st.clip("chibi").motion == "FallFlat"  # face down in the air, no upright Fall
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.HARD_LANDING and not st.fall_flat
+    assert st.clip("chibi").motion == "FlatImpact"
+    st.brain.since -= int(stage_mod.FLAT_IMPACT_S * 1000)
+    assert st.clip("chibi").motion == "GetUp"
+
+
+def _mood(st, mood):
+    st.brain.request_mood(mood, int(time.monotonic() * 1000))
+    st.tick(st.feet)
+
+
+def test_an_answer_points_then_talks(st):
+    st.switch_body()
+    _run_puff(st)
+    _mood(st, Mood.THINKING)
+    _mood(st, Mood.TALKING)
+    assert st.clip("chibi").motion == "AnswerPoint"
+    st.answer_since -= stage_mod.ANSWER_POINT_S + 0.01  # margin: a large monotonic() rounds
+    assert st.clip("chibi").motion == "Answer"
+    _mood(st, Mood.IDLE)
+    assert st.answer_since is None
+
+
+def test_talking_without_thinking_first_keeps_the_talk_takes(st):
+    st.switch_body()
+    _run_puff(st)
+    _mood(st, Mood.TALKING)  # a briefing or an announcement
+    assert st.answer_since is None and st.clip("chibi").motion == "Talk"
+
+
+def test_flat_fall_and_answer_clips_exist():
+    rig = motion.load(PKG / "rigs" / "raphael_3d.toml")
+    clips = set(re.findall(r'"(\w+)": (?:true|false)', CLIPS_GD.read_text(encoding="utf-8")))
+    for k in ("falling_flat", "hard_landing", "hard_landing_up", "answer_point", "answer"):
+        assert rig.moods[k].motion in clips, k
+
+
+def test_dropped_from_the_torso_up_falls_and_lands_as_before(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.75)
+    st.release_at(*st.feet)
+    assert st.clip("chibi").motion == "Fall"
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.SOFT_LANDING  # a low drop (under half the screen): no dizziness
+
+
+def test_a_carried_drop_on_the_2d_art_lands_as_before(st):
+    _grab_at(st, 0.3)  # the 2D art has no carried clip, so no flat fall
+    st.release_at(*st.feet)
+    assert not st.fall_flat
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.SOFT_LANDING
+
+
+def test_a_high_drop_lands_hard_feet_first_on_the_3d_body(st):
+    st.switch_body()
+    _run_puff(st)
+    _grab_at(st, 0.75)
+    st.release_at(*st.feet)
+    st.physics.top_y = st.physics.y - 0.6 * 1080  # dropped from over half the screen's height
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.HARD_LANDING and st.clip("chibi").motion == "HardLand"
+    st.brain.since -= int(stage_mod.FLAT_IMPACT_S * 1000)
+    assert st.clip("chibi").motion == "HardLand"  # no FlatImpact/GetUp for an upright drop
+
+
+def test_only_a_throw_or_a_wall_slam_makes_her_cry(st):
+    _grab_at(st, 0.75)
+    st.drag_trail.clear()
+    st.drag_trail.extend([(st.feet[0], st.feet[1], time.monotonic() - 0.05),
+                          (st.feet[0] + 200, st.feet[1], time.monotonic())])  # 4000 px/s: a throw
+    st.release_at(*st.feet)
+    assert st.thrown
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.CRYING
+    st.brain.since -= 10_000
+    st.tick(st.feet)
+    _grab_at(st, 0.75)
+    st.release_at(*st.feet)  # put down gently...
+    st.physics.wall_hit = stage_mod.WALL_HURT  # ...but it slammed into the screen's edge
+    _land_next_tick(st)
+    assert st.brain.mood == Mood.CRYING
+
+
+def test_a_rig_without_held_low_just_hangs(st):
+    _grab_at(st, 0.3)  # the 2D art has a single held clip
+    assert st.grab_low and st.clip("chibi").motion == "Held"
+
+
+def test_3d_walk_pace_matches_the_walk_clip(st):
+    """She walks at the Mixamo walk's own pace (in her heights per second), not the chibi's 90 px/s."""
+    rig = motion.load(PKG / "rigs" / "raphael_3d.toml")
+    assert rig.walk_dip_s(90.0) == pytest.approx(0.5 * rig.height_dip)
+    sprites = motion.load(PKG / "rigs" / "raphael_sprites.toml")
+    assert sprites.walk_dip_s(90.0) == 90.0  # rigs without walk_speed keep the stage default
+    st.switch_body()
+    _run_puff(st)
+    st.physics.place(st.home[0] - 400, st.home[1])
+    st.brain.mood = Mood.WALKING
+    x0 = st.physics.x
+    st._t -= 0.05  # one 50 ms frame
+    st.tick((0, 0))
+    assert st.physics.x - x0 == pytest.approx(0.5 * 520 * 0.05, rel=0.05)
+
+
+def test_walk_speed_tweak_is_px_per_second_whatever_her_size():
+    from chibi_overlay import character
+    rig = motion.load(PKG / "rigs" / "raphael_3d.toml")
+    assert rig.walk_dip_s(90.0) == pytest.approx(260)  # the default: 0.5 heights/s at 520
+    tw = character.OutfitTweaks(height_dip=400, walk_px_s=200)
+    assert character.apply_to_map(rig, tw).walk_dip_s(90.0) == pytest.approx(200)
+    ch = character.Character(outfits={"rimuru": tw})
+    back = character.parse(__import__("tomllib").loads(character.dumps(ch)))
+    assert back.outfits["rimuru"].walk_px_s == 200
+
+
+def test_frames_carry_her_velocity(fake_bridge, monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr(godot3d.time, "monotonic", lambda: clock[0])
+    fb = (2000, 1000)
+    pup = _puppet(fb, dpr=1.0)
+    pup.configure(pup.model.geom(), fb)
+    pup.place(500, 1000)
+    pup.model.Update()
+    clock[0] += 1 / 60
+    pup.place(504, 1000)  # 240 px/s
+    pup.model.Update()
+    assert fake_bridge.sent[0]["vel"] == [0.0, 0.0]
+    assert fake_bridge.sent[1]["vel"][0] == pytest.approx(240, abs=1)
+
+
+def test_a_rig_path_can_name_its_model(tmp_path):
+    assert godot3d.split("D:/x/overlay3d") == ("D:/x/overlay3d", "raphael_teen.vrm")
+    assert godot3d.split("D:/x/overlay3d#raphael_teen_ruby.vrm") == ("D:/x/overlay3d", "raphael_teen_ruby.vrm")
+    (tmp_path / "project.godot").write_text("")
+    assert godot3d.missing(f"{tmp_path}#ruby.vrm") == [str(tmp_path / "models" / "ruby.vrm")]
+
+
+def test_switching_back_to_3d_wears_the_last_3d_variant(st):
+    assert st.wardrobe.outfits["ruby_3d"].body == "3d"
+    st.request_outfit("ruby_3d")
+    _run_puff(st)
+    assert st.outfit == "ruby_3d"
+    assert st.switch_body() == "casual_coat"
+    _run_puff(st)
+    assert st.switch_body() == "ruby_3d"  # not [overlay.bodies]' teen_3d: the variant she last wore
+
+
+def test_frames_carry_the_headset_choice(fake_bridge):
+    """The headset (overlay3d/props.gd) follows the stage's `headset`: "talk", "music" or ""."""
+    class W:
+        hwnd = 0
+        stage = type("S", (), {"headset": "talk"})()
+    m = godot3d.GodotModel("X:/nowhere", widget=W(), bridge=fake_bridge)
+    assert m.frame()["headset"] == "talk"
+    assert _puppet().model.frame()["headset"] == ""  # no window/stage: no headset
+
+
+def test_headset_only_for_a_spoken_conversation_or_media(st):
+    from chibi_shared.protocol import Lip, MoodReq
+    st.on_message(Lip(rms=0.5))  # a voice reaction, a briefing line...
+    assert st.headset == ""
+    st.on_message(MoodReq(mood="listening"))  # push-to-talk
+    for mood in ("thinking", "talking"):
+        st.on_message(MoodReq(mood=mood))
+        assert st.headset == "talk"
+    st.on_message(MoodReq(mood="idle"))  # her reply has been spoken
+    assert st.headset == ""
+    st.on_message(MoodReq(mood="thinking"))  # a typed question: no headset
+    assert st.headset == ""
+    st.media.playing = True
+    assert st.headset == "music"
+
+
+def test_middle_drag_turns_her_and_frames_carry_it(st, fake_bridge):
+    st.rotate_press(1000)
+    assert st.rotating
+    st.rotate_move(1100)  # 100 px right
+    assert st.yaw == pytest.approx(100 * stage_mod.ROTATE_DEG_PER_PX)
+    st.rotate_move(1000 + 500)  # wraps into -180..180
+    assert st.yaw == pytest.approx(-110)  # 250 degrees, wrapped into -180..180
+    st.rotate_release()
+    assert not st.rotating
+    st.rotate_move(0)  # no drag: no change
+    assert st.yaw == pytest.approx(-110)
+
+    class W:
+        hwnd = 0
+        stage = st
+    m = godot3d.GodotModel("X:/nowhere", widget=W(), bridge=fake_bridge)
+    assert m.frame()["yaw"] == pytest.approx(-110)
+
+
+def test_only_the_drawn_forms_3d_body_shows():
+    from types import SimpleNamespace
+    from chibi_overlay.window import MonitorWindow
+
+    class Body:
+        def __init__(self, bridge):
+            self.bridge, self.calls = bridge, []
+
+        def set_visible(self, on):
+            self.calls.append(on)
+
+    sprite = SimpleNamespace(model=object())  # a 2D chibi has no set_visible
+    serious = Body(bridge=object())
+    w = SimpleNamespace(puppets={"chibi": sprite, "serious": SimpleNamespace(model=serious)})
+    MonitorWindow._drawn_body_only(w, "chibi")
+    MonitorWindow._drawn_body_only(w, "chibi")
+    MonitorWindow._drawn_body_only(w, "serious")
+    assert serious.calls == [False, True]  # hidden while chibi, shown on the transform, once each
+
+    shared = object()  # both forms of a 3D outfit: one renderer, shown in either form
+    a, b = Body(shared), Body(shared)
+    w = SimpleNamespace(puppets={"chibi": SimpleNamespace(model=a), "serious": SimpleNamespace(model=b)})
+    MonitorWindow._drawn_body_only(w, "chibi")
+    assert (a.calls + b.calls) == [True]
+
+
+def test_godot_imports_a_fresh_project_and_newly_added_models(tmp_path):
+    real = REAL_NEEDS_IMPORT  # the autouse fixture patches the module's name
+    assert real(tmp_path)  # no import cache at all
+    (tmp_path / ".godot" / "imported").mkdir(parents=True)
+    (tmp_path / "models").mkdir()
+    assert not real(tmp_path)
+    (tmp_path / "models" / "raphael.vrm").write_bytes(b"")
+    assert real(tmp_path)  # dropped in, never imported
+    (tmp_path / "models" / "raphael.vrm.import").write_text("")
+    assert not real(tmp_path)

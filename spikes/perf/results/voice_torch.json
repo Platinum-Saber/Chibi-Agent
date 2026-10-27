@@ -1,0 +1,113 @@
+{
+ "label": "deploy-torch",
+ "dll_order": "torch",
+ "stages": {
+  "start": {
+   "vram_mb": 0,
+   "shared_gpu_mb": 0,
+   "private_mb": 10,
+   "working_set_mb": 17
+  },
+  "whisper_loaded": {
+   "vram_mb": 453,
+   "shared_gpu_mb": 76,
+   "private_mb": 1985,
+   "working_set_mb": 725,
+   "load_s": 4.85,
+   "device": "cuda"
+  },
+  "kokoro_loaded": {
+   "vram_mb": 453,
+   "shared_gpu_mb": 76,
+   "private_mb": 2256,
+   "working_set_mb": 1146,
+   "load_s": 2.36,
+   "synth": [
+    {
+     "text_chars": 45,
+     "synth_s": 1.741,
+     "audio_s": 2.56,
+     "rtf": 0.68
+    },
+    {
+     "text_chars": 65,
+     "synth_s": 1.705,
+     "audio_s": 3.26,
+     "rtf": 0.522
+    },
+    {
+     "text_chars": 60,
+     "synth_s": 1.673,
+     "audio_s": 3.18,
+     "rtf": 0.526
+    }
+   ]
+  },
+  "f5_loaded": {
+   "vram_mb": 1257,
+   "shared_gpu_mb": 126,
+   "private_mb": 5464,
+   "working_set_mb": 2699,
+   "torch_import_s": 3.6,
+   "load_s": 25.67,
+   "engine": "f5"
+  },
+  "all_loaded": {
+   "vram_mb": 1277,
+   "shared_gpu_mb": 126,
+   "private_mb": 5521,
+   "working_set_mb": 2732,
+   "cuda_copies": {
+    " $_.ModuleName + '": [
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName "
+    ]
+   }
+  }
+ },
+ "whisper": [
+  {
+   "audio_s": 2.56,
+   "transcribe_s": 0.539,
+   "text": "Answer I have opened Spotify for you Saber"
+  },
+  {
+   "audio_s": 3.26,
+   "transcribe_s": 0.3,
+   "text": "Notice you have two meetings this afternoon the first at 3."
+  },
+  {
+   "audio_s": 3.18,
+   "transcribe_s": 0.268,
+   "text": "Confirmed, the file has been moved to your documents folder"
+  }
+ ],
+ "f5": [
+  {
+   "text_chars": 45,
+   "synth_s": 1.297,
+   "audio_s": 2.92,
+   "rtf": 0.444
+  },
+  {
+   "text_chars": 65,
+   "synth_s": 1.025,
+   "audio_s": 4.23,
+   "rtf": 0.242
+  },
+  {
+   "text_chars": 60,
+   "synth_s": 1.061,
+   "audio_s": 3.9,
+   "rtf": 0.272
+  }
+ ],
+ "whisper_with_f5_loaded_s": [
+  0.218,
+  0.233,
+  0.252
+ ]
+}

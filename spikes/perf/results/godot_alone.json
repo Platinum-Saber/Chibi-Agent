@@ -1,0 +1,29 @@
+[
+  {
+    "label": "alone",
+    "render_scale": "2.0",
+    "msaa": "2",
+    "vram_mb": 580.0,
+    "gpu3d_pct_avg": 12.2,
+    "gpu3d_pct_max": 15.2,
+    "fps_line": "RAPHAEL3D fps_avg=59.2 frames=1184 seconds=20.0 clip=Talk"
+  },
+  {
+    "label": "alone",
+    "render_scale": "1.5",
+    "msaa": "2",
+    "vram_mb": 426.0,
+    "gpu3d_pct_avg": 12.2,
+    "gpu3d_pct_max": 13.8,
+    "fps_line": "RAPHAEL3D fps_avg=59.3 frames=1187 seconds=20.0 clip=Talk"
+  },
+  {
+    "label": "alone",
+    "render_scale": "1.0",
+    "msaa": "2",
+    "vram_mb": 295.0,
+    "gpu3d_pct_avg": 9.1,
+    "gpu3d_pct_max": 11.3,
+    "fps_line": "RAPHAEL3D fps_avg=59.3 frames=1187 seconds=20.0 clip=Talk"
+  }
+]

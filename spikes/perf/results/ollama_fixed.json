@@ -1,0 +1,157 @@
+{
+ "label": "fixed",
+ "model": "qwen3.5:4b",
+ "options": {
+  "num_ctx": 8192,
+  "temperature": 0.4
+ },
+ "system_chars": 3378,
+ "tools_all": 37,
+ "before": {
+  "ollama": {
+   "nomic-embed-text:latest": {
+    "vram_mb": 0,
+    "size_mb": 371,
+    "ctx": 2048
+   }
+  },
+  "gpu_used_mb": 2337,
+  "gpu_util_pct": 26
+ },
+ "cold_load_s": 8.95,
+ "loaded": {
+  "ollama": {
+   "nomic-embed-text:latest": {
+    "vram_mb": 0,
+    "size_mb": 371,
+    "ctx": 2048
+   },
+   "qwen3.5:4b": {
+    "vram_mb": 3209,
+    "size_mb": 3209,
+    "ctx": 8192
+   }
+  },
+  "gpu_used_mb": 6299,
+  "gpu_util_pct": 20
+ },
+ "runs": [
+  {
+   "user": "What time is it?",
+   "tools_sent": 5,
+   "ttft_s": 1.483,
+   "total_s": 1.504,
+   "prompt_tokens": 1398,
+   "prompt_tok_s": 1260.1,
+   "gen_tokens": 14,
+   "gen_tok_s": 41.1,
+   "load_s": 0.01,
+   "tool_calls": [
+    "get_time"
+   ],
+   "reply": ""
+  },
+  {
+   "user": "What time is it?",
+   "tools_sent": 5,
+   "ttft_s": 0.369,
+   "total_s": 0.389,
+   "prompt_tokens": 1398,
+   "prompt_tok_s": 17993.0,
+   "gen_tokens": 14,
+   "gen_tok_s": 49.5,
+   "load_s": 0.01,
+   "tool_calls": [
+    "get_time"
+   ],
+   "reply": ""
+  },
+  {
+   "user": "What time is it?",
+   "tools_sent": 37,
+   "ttft_s": 1.847,
+   "total_s": 1.868,
+   "prompt_tokens": 3772,
+   "prompt_tok_s": 2628.9,
+   "gen_tokens": 14,
+   "gen_tok_s": 46.5,
+   "load_s": 0.01,
+   "tool_calls": [
+    "get_time"
+   ],
+   "reply": ""
+  },
+  {
+   "user": "Tell me in two sentences what you can help me with.",
+   "tools_sent": 5,
+   "ttft_s": 0.774,
+   "total_s": 1.462,
+   "prompt_tokens": 1405,
+   "prompt_tok_s": 2494.6,
+   "gen_tokens": 33,
+   "gen_tok_s": 47.9,
+   "load_s": 0.01,
+   "tool_calls": [],
+   "reply": "Answer. I can manage your files, apps, and reminders on this PC. I can also chec"
+  },
+  {
+   "user": "Tell me in two sentences what you can help me with.",
+   "tools_sent": 5,
+   "ttft_s": 0.098,
+   "total_s": 0.759,
+   "prompt_tokens": 1405,
+   "prompt_tok_s": 18623.6,
+   "gen_tokens": 32,
+   "gen_tok_s": 48.5,
+   "load_s": 0.01,
+   "tool_calls": [],
+   "reply": "Answer. I can manage your files, apps, and system settings on this PC. I can als"
+  },
+  {
+   "user": "Open Spotify.",
+   "tools_sent": 37,
+   "ttft_s": 1.236,
+   "total_s": 1.257,
+   "prompt_tokens": 3770,
+   "prompt_tok_s": 7872.2,
+   "gen_tokens": 26,
+   "gen_tok_s": 45.4,
+   "load_s": 0.01,
+   "tool_calls": [
+    "open_app"
+   ],
+   "reply": ""
+  },
+  {
+   "user": "Open Spotify.",
+   "tools_sent": 37,
+   "ttft_s": 0.632,
+   "total_s": 0.652,
+   "prompt_tokens": 3770,
+   "prompt_tok_s": 54130.1,
+   "gen_tokens": 26,
+   "gen_tok_s": 48.8,
+   "load_s": 0.01,
+   "tool_calls": [
+    "open_app"
+   ],
+   "reply": ""
+  }
+ ],
+ "after": {
+  "ollama": {
+   "nomic-embed-text:latest": {
+    "vram_mb": 0,
+    "size_mb": 371,
+    "ctx": 2048
+   },
+   "qwen3.5:4b": {
+    "vram_mb": 3209,
+    "size_mb": 3209,
+    "ctx": 8192
+   }
+  },
+  "gpu_used_mb": 6311,
+  "gpu_util_pct": 85
+ }
+}

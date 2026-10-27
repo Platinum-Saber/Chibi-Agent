@@ -1,0 +1,117 @@
+{
+ "label": "deploy-wheels",
+ "dll_order": "wheels",
+ "stages": {
+  "start": {
+   "vram_mb": 0,
+   "shared_gpu_mb": 0,
+   "private_mb": 10,
+   "working_set_mb": 17
+  },
+  "whisper_loaded": {
+   "vram_mb": 453,
+   "shared_gpu_mb": 76,
+   "private_mb": 1987,
+   "working_set_mb": 725,
+   "load_s": 4.58,
+   "device": "cuda"
+  },
+  "kokoro_loaded": {
+   "vram_mb": 453,
+   "shared_gpu_mb": 76,
+   "private_mb": 2257,
+   "working_set_mb": 1147,
+   "load_s": 2.46,
+   "synth": [
+    {
+     "text_chars": 45,
+     "synth_s": 1.784,
+     "audio_s": 2.56,
+     "rtf": 0.697
+    },
+    {
+     "text_chars": 65,
+     "synth_s": 1.773,
+     "audio_s": 3.26,
+     "rtf": 0.543
+    },
+    {
+     "text_chars": 60,
+     "synth_s": 1.649,
+     "audio_s": 3.18,
+     "rtf": 0.519
+    }
+   ]
+  },
+  "f5_loaded": {
+   "vram_mb": 1257,
+   "shared_gpu_mb": 126,
+   "private_mb": 6082,
+   "working_set_mb": 3108,
+   "torch_import_s": 3.75,
+   "load_s": 25.28,
+   "engine": "f5"
+  },
+  "all_loaded": {
+   "vram_mb": 1277,
+   "shared_gpu_mb": 126,
+   "private_mb": 5770,
+   "working_set_mb": 2880,
+   "cuda_copies": {
+    " $_.ModuleName + '": [
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName "
+    ]
+   }
+  }
+ },
+ "whisper": [
+  {
+   "audio_s": 2.56,
+   "transcribe_s": 0.502,
+   "text": "Answer I have opened Spotify for you Saber"
+  },
+  {
+   "audio_s": 3.26,
+   "transcribe_s": 0.276,
+   "text": "Notice you have two meetings this afternoon the first at 3."
+  },
+  {
+   "audio_s": 3.18,
+   "transcribe_s": 0.266,
+   "text": "Confirmed, the file has been moved to your documents folder"
+  }
+ ],
+ "f5": [
+  {
+   "text_chars": 45,
+   "synth_s": 1.313,
+   "audio_s": 2.92,
+   "rtf": 0.449
+  },
+  {
+   "text_chars": 65,
+   "synth_s": 1.068,
+   "audio_s": 4.23,
+   "rtf": 0.252
+  },
+  {
+   "text_chars": 60,
+   "synth_s": 1.048,
+   "audio_s": 3.9,
+   "rtf": 0.268
+  }
+ ],
+ "whisper_with_f5_loaded_s": [
+  0.22,
+  0.273,
+  0.271
+ ]
+}

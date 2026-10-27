@@ -1,0 +1,133 @@
+# Raphael defaults (shipped with the app). Override any key in %APPDATA%\ChibiAgent\config.toml.
+# Paths may use %VARS% and ~; relative paths are relative to the app folder.
+
+[processes]
+overlay = true
+voice = true
+
+[ollama]
+url = "http://127.0.0.1:11434"
+exe = '%LOCALAPPDATA%\Programs\Ollama\ollama.exe'
+models_dir = ''          # set for the Ollama she starts only; '' = Ollama's own folder
+start_if_down = true
+model = "qwen3.5:4b"
+embed_model = "nomic-embed-text"
+embed_on_gpu = false    # memory/tool embeddings on the CPU (~35 ms): keeps VRAM for her voice
+num_ctx = 8192
+temperature = 0.4        # qwen3.5 defaults to 1.0, which made tool choice erratic
+keep_alive = "120s"
+
+[voice]
+hf_home = '%LOCALAPPDATA%\ChibiAgent\hf'
+# Kokoro (CPU, preset voices; tray -> Customize Raphael -> Voice) is the shipped voice:
+# kokoro-v1.0.onnx + voices-v1.0.bin from github.com/thewh1teagle/kokoro-onnx (setup downloads them).
+kokoro_dir = '%LOCALAPPDATA%\ChibiAgent\kokoro'
+# F5-TTS speaks with a voice of your own (docs/custom-voice.md): install the voice package's
+# `f5` extra, set f5 = true and point reference / reference_text at your clip and its transcript.
+f5 = false
+reference = ''
+reference_text = ''
+speed = 0.90             # F5's speed (Kokoro speaks at 1.0)
+nfe = 8
+stt_model = "small.en"
+
+[hotkeys]
+push_to_talk = "alt+1"
+look_at_screen = "ctrl+alt+s"
+
+[overlay]
+# The outfit she wears (one of [overlay.outfits.*]); outfits whose models are missing are skipped.
+outfit = "chibi"
+# Stay in the chibi form (no switch to serious while working/alerting); the HUD and confirm
+# buttons then show beside the chibi. Forced on while the outfit's serious model is missing.
+chibi_only = false
+# Switch to the serious form by herself while working, for alerts and confirms. Off: she changes
+# form only when asked ("serious mode" / "chibi mode"); outfits with one model never change.
+auto_serious = false
+# Extra fonts for her text panel; every .otf/.ttf here is loaded (Customize -> Add font file).
+fonts_dir = '%APPDATA%\ChibiAgent\fonts'
+# UI sounds: startup, appear, hover, click, close .wav. Tray -> "Sound effects" turns them off;
+# her voice reactions follow "Mute voice".
+sounds_dir = 'assets/sounds'
+sfx_volume = 0.6
+# Her bodies, one at a time (tray / Customize -> "Switch to 3D model" / "Switch to 2D art"):
+# the outfit each one wears. The choice is remembered in her Customize settings.
+bodies = { 2d = "chibi", 3d = "raphael" }
+# Godot 4.7 for the 3D body (overlay3d/); it draws her under this overlay's window.
+# Its render quality: supersampling (1.0-2.0) and MSAA (0/2/4/8). 2.0 + 2 keeps her face clear at
+# her normal size for ~580 MiB of GPU memory (2.0 + 4 = 800).
+render_scale = 2.0
+msaa = 2
+godot_exe = 'godot\Godot_v4.7.2-stable_win64.exe'
+
+# One model per outfit and form (docs/character.md -> Outfits).
+[overlay.outfits.chibi]
+# Her chibi: the casual-coat image pack (chibi_overlay/sprites.py). Serious: the 3D Raphael,
+# when overlay3d\models\raphael.vrm exists (docs/add-3d-model.md); else she stays chibi.
+chibi_rig = 'sprites:assets\chibi\casual-coat\v01'
+chibi_map = 'rigs/raphael_sprites.toml'
+serious_rig = 'godot:overlay3d#raphael.vrm'
+serious_map = 'rigs/raphael_3d.toml'
+
+[overlay.outfits.rimuru]
+# The 3D body in both forms (overlay3d\models\rimuru.vrm; not shipped).
+chibi_rig = 'godot:overlay3d#rimuru.vrm'
+chibi_map = 'rigs/raphael_3d.toml'
+serious_rig = 'godot:overlay3d#rimuru.vrm'
+serious_map = 'rigs/raphael_3d.toml'
+
+[overlay.outfits.raphael]
+# The ruby-eyed 3D body in both forms (overlay3d\models\raphael.vrm; not shipped).
+chibi_rig = 'godot:overlay3d#raphael.vrm'
+chibi_map = 'rigs/raphael_3d.toml'
+serious_rig = 'godot:overlay3d#raphael.vrm'
+serious_map = 'rigs/raphael_3d.toml'
+
+[memory_relief]
+# When physical RAM stays at or above `threshold` % (two samples in a row), she gives memory
+# back, cheapest first: F5 if it is loaded and she has been quiet, her Ollama model, working-set
+# trims of idle apps (and her own quiet voice process), then she names the largest idle app and
+# asks before closing it. Never system processes, the Claude app or the app in front.
+enabled = true
+threshold = 90        # Kryo, 2026-10-26 (was 75; 70 is this laptop's floor with Claude + Raphael open)
+hysteresis = 5          # "high" until RAM drops below threshold - hysteresis
+interval_s = 20
+cooldown_s = 600        # at most one intervention per 10 min while RAM stays high
+voice_idle_s = 180      # quiet this long before F5 goes / her voice process is trimmed
+voice_unload_pct = 95   # F5 goes only when RAM is at least this full (Saber, 2026-10-27)
+startup_grace_s = 600   # and never this soon after start (a cold F5 load + clip renders)
+llm_idle_s = 60         # no turn this long before her Ollama model is unloaded
+trim_working_sets = true
+trim_min_mb = 300
+offer_close = true
+close_min_mb = 700
+
+[tools]
+# Folders file tools may read and change (no deleting in v1).
+allowed_roots = ['~']
+# Per-turn tool selection (agent/chibi_agent/tools/select.py): send only the top
+# families for the request. select = false sends every tool, as before.
+select = true
+families = 3        # top families by embedding similarity
+margin = 0.03       # plus any family this close to the last one picked
+min_sim = 0.35      # below this the request is unclear: send every tool
+sticky_turns = 2    # families of tools called in the last N turns stay in
+
+[briefing]
+# Morning briefing: the first start after morning_after, or at morning_at if she was already running.
+morning_after = "06:00"
+morning_at = "07:30"
+# No unasked urgent-mail warnings between quiet_from and quiet_to (they wait for the briefing).
+quiet_from = "23:00"
+quiet_to = "07:00"
+poll_minutes = 5
+
+[notifications]
+# Windows toasts (tray -> Allow notification access). Polled, because the change event needs
+# package identity; one listing takes 6-9 s (Spike 4), so not more often than this.
+poll_seconds = 60
+# The model labels at most this many new toasts per poll; the rest get the rule labels.
+max_labels_per_poll = 5
+# Display names as Windows shows them. Mail apps are here because the mail watch covers mail.
+ignore_apps = ["Flow.Launcher", "NVIDIA App", "Claude", "ChatGPT", "Snipping Tool", "Camera",
+               "PowerToys (Preview)", "Notification Suggestions", "Outlook", "Mail", "Thunderbird"]

@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+spikes/**/out/
+spikes/**/samples/
+spikes/**/recordings/
+*.gguf
+*.onnx
+*.safetensors
+assets/rigs/
+
+# spike 1 (overlay)
+spikes/overlay/.venv311/
+spikes/overlay/assets/
+
+# spike: 3D (Blender -> VRM -> three-vrm)
+spikes/vrm/node_modules/
+*.vrm
+*.vrma
+*.blend
+*.blend1
+
+# Built and staged by packaging/build.ps1, not in git
+/dist/
+/assets/chibi/
+/godot/
+/bin/

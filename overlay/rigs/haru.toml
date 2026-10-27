@@ -1,0 +1,35 @@
+# Mood -> motion/expression map for the Haru sample (chibi-form placeholder).
+# A clip is { motion = "<group>", index = <n> (omit for random), expression = "<name>" }.
+# Moods missing here fall back to `idle`. Swap this file when her real rig lands.
+height_dip = 300
+
+[moods]
+idle         = { motion = "Idle" }
+surprised    = { motion = "TapBody", index = 0, expression = "F06" }
+pout         = { motion = "TapBody", index = 3, expression = "F04" }
+crying       = { motion = "TapBody", index = 1, expression = "F03" }
+happy        = { motion = "TapBody", index = 2, expression = "F05" }
+held         = { expression = "F06" }
+falling      = { expression = "F06" }
+soft_landing = { expression = "F05" }
+hard_landing = { expression = "F05" }  # a high drop
+dizzy        = { expression = "F08" }
+walking      = { motion = "Idle", index = 0 }
+wander       = { motion = "Idle", index = 0 }
+sleeping     = { expression = "F02" }
+dancing      = { motion = "Idle", index = 1, expression = "F05" }
+cursor_near  = { expression = "F05" }
+cursor_far   = { expression = "F01" }
+talking      = { expression = "F01" }
+thinking     = { expression = "F07" }
+working      = { expression = "F01" }
+alert        = { expression = "F04" }
+
+[moments]
+look_around = { motion = "Idle", index = 1 }
+stretch     = { motion = "TapBody", index = 2 }
+analyse     = { expression = "F07" }
+sit         = { expression = "F02" }
+wave        = { motion = "TapBody", index = 0, expression = "F05" }
+curious     = { expression = "F07" }
+thinking    = { expression = "F07" }

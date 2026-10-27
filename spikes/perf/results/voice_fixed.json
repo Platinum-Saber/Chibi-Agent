@@ -1,0 +1,113 @@
+{
+ "label": "fixed",
+ "dll_order": "torch",
+ "stages": {
+  "start": {
+   "vram_mb": 0,
+   "shared_gpu_mb": 0,
+   "private_mb": 10,
+   "working_set_mb": 17
+  },
+  "whisper_loaded": {
+   "vram_mb": 453,
+   "shared_gpu_mb": 76,
+   "private_mb": 1987,
+   "working_set_mb": 725,
+   "load_s": 5.98,
+   "device": "cuda"
+  },
+  "kokoro_loaded": {
+   "vram_mb": 453,
+   "shared_gpu_mb": 76,
+   "private_mb": 2257,
+   "working_set_mb": 1146,
+   "load_s": 2.91,
+   "synth": [
+    {
+     "text_chars": 45,
+     "synth_s": 1.978,
+     "audio_s": 2.56,
+     "rtf": 0.772
+    },
+    {
+     "text_chars": 65,
+     "synth_s": 1.765,
+     "audio_s": 3.26,
+     "rtf": 0.541
+    },
+    {
+     "text_chars": 60,
+     "synth_s": 1.759,
+     "audio_s": 3.18,
+     "rtf": 0.553
+    }
+   ]
+  },
+  "f5_loaded": {
+   "vram_mb": 1257,
+   "shared_gpu_mb": 126,
+   "private_mb": 5471,
+   "working_set_mb": 2699,
+   "torch_import_s": 4.84,
+   "load_s": 31.9,
+   "engine": "f5"
+  },
+  "all_loaded": {
+   "vram_mb": 1277,
+   "shared_gpu_mb": 126,
+   "private_mb": 5529,
+   "working_set_mb": 2732,
+   "cuda_copies": {
+    " $_.ModuleName + '": [
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName ",
+     "' + $_.FileName "
+    ]
+   }
+  }
+ },
+ "whisper": [
+  {
+   "audio_s": 2.56,
+   "transcribe_s": 0.434,
+   "text": "Answer I have opened Spotify for you Saber"
+  },
+  {
+   "audio_s": 3.26,
+   "transcribe_s": 0.334,
+   "text": "Notice you have two meetings this afternoon the first at 3."
+  },
+  {
+   "audio_s": 3.18,
+   "transcribe_s": 0.308,
+   "text": "Confirmed, the file has been moved to your documents folder"
+  }
+ ],
+ "f5": [
+  {
+   "text_chars": 45,
+   "synth_s": 1.431,
+   "audio_s": 2.92,
+   "rtf": 0.489
+  },
+  {
+   "text_chars": 65,
+   "synth_s": 1.354,
+   "audio_s": 4.23,
+   "rtf": 0.32
+  },
+  {
+   "text_chars": 60,
+   "synth_s": 1.338,
+   "audio_s": 3.9,
+   "rtf": 0.343
+  }
+ ],
+ "whisper_with_f5_loaded_s": [
+  0.258,
+  0.314,
+  0.336
+ ]
+}
