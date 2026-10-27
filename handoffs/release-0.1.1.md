@@ -9,14 +9,11 @@
 - **Release:** a local build plus a git tag; nothing is published.
 - **No 2D serious rig:** the 3D body is her serious form.
 
-## Saber's machine (to do by hand)
-1. Copy his settings (writes from the Claude app to AppData are virtualized):
-   ```
-   copy D:\Projects\Chibi-Agent-Project\ChibiAgent\config-saber.toml %APPDATA%\ChibiAgent\config.toml
-   ```
-2. Rename the VRMs in `overlay3d\models\`: `raphael_teen.vrm` → `rimuru.vrm`, `raphael_teen_ruby.vrm` → `raphael.vrm` (along with their `.import` files, or just delete those and Godot re-imports).
-3. Voice venv: `uv sync --extra f5` in `voice\` (plain `uv sync` now removes torch/F5). The venv still has torch; the new nvidia wheels come with that sync.
-4. Restart Raphael.
+## Saber's machine (done 2026-10-27)
+- He runs the deployment `D:\Projects\Chibi-Agent-Project\Deployments\Raphael` from Start menu → Raphael (no desktop shortcut, his call). `packaging\deploy.ps1` builds it: the shipped app + `raphael.vrm`/`rimuru.vrm`, the Mixamo motions, F5 (`voice\extras.txt`), Godot import. Re-run it to update (quit Raphael first).
+- `%APPDATA%\ChibiAgent\config.toml` now holds only outside-the-app paths (Ollama models, voice refs, hf, Kokoro, fonts); a backup of the old one is `config.toml.bak-0.1.1`, the copy is `ChibiAgent\config-saber.toml`. Running from the repo needs the commented godot_exe / chibi_rig lines.
+- The repo's own `overlay3d\models` VRMs are renamed (`rimuru.vrm`, `raphael.vrm`).
+- Duplicate Kokoro/Whisper downloads in `%LOCALAPPDATA%\ChibiAgent` deleted.
 
 ## Files
 - `launcher/raphael.py`: Raphael.exe.

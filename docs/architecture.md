@@ -279,6 +279,8 @@ sequenceDiagram
 - `launcher/raphael.py` → `Raphael.exe` (PyInstaller): runs `packaging/setup.ps1` until `%LOCALAPPDATA%\ChibiAgent\setup-<VERSION>.done` exists, then starts the agent with `pythonw`.
 - `packaging/setup.ps1`: `uv sync --frozen --no-dev` per package, Ollama (winget) + model pulls, Kokoro files, Whisper `small.en`.
 - `packaging/build.ps1`: stages tracked files plus the sprite pack, `bin/uv.exe` and Godot 4.7.2, refuses private files (VRM, Blender, fonts, voice references, Mixamo takes), builds `Raphael.exe`, then `packaging/raphael.iss` (Inno Setup, per-user install to `%LOCALAPPDATA%\Programs\Raphael`) → `dist/Raphael-<version>-setup.exe`.
+- `packaging/deploy.ps1` (not shipped): Saber's own install in `Deployments\Raphael`: the staged app (`build.ps1 -NoInstaller`), both VRMs, the Mixamo motions, `voice\extras.txt` = f5, setup, a Godot `--import` pass and a Start menu shortcut. Re-running updates in place and keeps venvs, Godot's cache, models and motions.
+- Setup reads a package's `extras.txt` (voice: `f5`) so re-runs keep extras, and puts Kokoro/Whisper where the merged config says.
 - User guides: `README.md`, `docs/custom-voice.md`, `docs/add-3d-model.md`; release notes in `CHANGELOG.md`.
 
 ## Repo layout

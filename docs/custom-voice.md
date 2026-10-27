@@ -8,11 +8,12 @@ Raphael ships with Kokoro, a fast CPU voice with 54 presets (tray → Customize 
 Close Raphael (tray → Quit), then in a terminal:
 
 ```bash
-cd "%LOCALAPPDATA%\Programs\Raphael\voice"
-..\bin\uv.exe sync --frozen --no-dev --extra f5
+cd "%LOCALAPPDATA%\Programs\Raphael"
+echo f5> voice\extras.txt
+powershell -ExecutionPolicy Bypass -File packaging\setup.ps1
 ```
 
-(From a repo checkout: `uv sync --extra f5` in `voice/`.)
+`voice\extras.txt` tells setup to install F5 too, now and whenever setup runs again (Start → Raphael setup (repair), or an update). (From a repo checkout: `uv sync --extra f5` in `voice/`.)
 
 ## 2. Make a reference clip
 - **Length:** 6–10 seconds of one person speaking. Stop at the end of a sentence.

@@ -26,7 +26,8 @@ Budget: keep this file under ~500 tokens.
 ## Commands
 - Run her: `python chibi.py` (agent starts Ollama, overlay, voice). One instance only (mutex).
 - Setup: `uv sync` in `shared/`, `agent/`, `overlay/`; `uv sync --extra f5` in `voice/` (plain `uv sync` there removes torch/F5). Saber's machine paths: `%APPDATA%\ChibiAgent\config.toml` (copy: `ChibiAgent\config-saber.toml`).
-- Release: `packaginguild.ps1` → `dist\Raphael-<VERSION>-setup.exe` (README, CHANGELOG). Never ship VRMs, voice refs, fonts or Mixamo takes (the build refuses them).
+- Saber runs the deployed app (`D:\Projects\Chibi-Agent-Project\Deployments\Raphael`, Start menu → Raphael), built by `packaging\deploy.ps1` (shipped app + VRMs, Mixamo, F5). Re-run it after changes; quit Raphael first.
+- Release: `packaging\build.ps1` → `dist\Raphael-<VERSION>-setup.exe` (README, CHANGELOG). Never ship VRMs, voice refs, fonts or Mixamo takes (the build refuses them).
 - Tests: `uv run pytest` in each package; `agent/tests/test_cases_live.py` needs Ollama.
 - Google (M5): Kryo saves the Desktop OAuth client JSON as `%APPDATA%\ChibiAgent\google_client.json`, then tray → Google accounts → Add Google account… once per account. Refresh tokens in Credential Manager (`ChibiAgent`, `google:<email>` + `google:accounts`).
 - Debug: `python -m chibi_agent --without voice|overlay`; `python -m chibi_overlay --debug-throw VX,VY`.
