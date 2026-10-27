@@ -18,7 +18,7 @@ def test_no_cuda_wheel_means_cpu(monkeypatch):
     assert env.cuda_dll_dirs() == [] and env.load_cuda_dlls() is False
 
 
-def test_nvidia_wheels_come_before_torch(monkeypatch, tmp_path):
+def test_torch_comes_first_so_whisper_and_f5_share_one_copy(monkeypatch, tmp_path):
     from types import SimpleNamespace
     nv, torch = tmp_path / "nvidia", tmp_path / "torch"
     for d in (nv / "cublas" / "bin", nv / "cudnn" / "bin", torch / "lib"):
@@ -26,4 +26,6 @@ def test_nvidia_wheels_come_before_torch(monkeypatch, tmp_path):
     specs = {"nvidia": SimpleNamespace(submodule_search_locations=[str(nv)], origin=None),
              "torch": SimpleNamespace(submodule_search_locations=None, origin=str(torch / "__init__.py"))}
     monkeypatch.setattr("importlib.util.find_spec", specs.get)
-    assert env.cuda_dll_dirs() == [nv / "cublas" / "bin", nv / "cudnn" / "bin", torch / "lib"]
+    assert env.cuda_dll_dirs() == [torch / "lib", nv / "cublas" / "bin", nv / "cudnn" / "bin"]
+    specs["torch"] = None  # the shipped voice: no torch, NVIDIA's wheels only
+    assert env.cuda_dll_dirs() == [nv / "cublas" / "bin", nv / "cudnn" / "bin"]

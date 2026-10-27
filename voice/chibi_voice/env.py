@@ -32,17 +32,19 @@ CUDA_DLLS = ("cudart64_12.dll", "cublasLt64_12.dll", "cublas64_12.dll", "cudnn64
 
 
 def cuda_dll_dirs() -> list[Path]:
-    """Where those DLLs may be: NVIDIA's own wheels (nvidia-cublas-cu12, nvidia-cudnn-cu12,
-    nvidia-cuda-runtime-cu12: the shipped voice has no torch), then torch's wheel (F5 installed)."""
+    """Where those DLLs may be: torch's wheel first when F5 is installed, so Whisper and F5
+    share one copy (Whisper on NVIDIA's wheels and F5 on torch's loaded cuBLAS, cuDNN and the
+    runtime twice: +0.3-0.6 GB private, measured 2026-10-27); else NVIDIA's own wheels
+    (nvidia-cublas-cu12, nvidia-cudnn-cu12, nvidia-cuda-runtime-cu12: the shipped voice)."""
     import importlib.util
 
     dirs = []
-    spec = importlib.util.find_spec("nvidia")
-    for root in (spec.submodule_search_locations or []) if spec else []:
-        dirs += [Path(root) / pkg / "bin" for pkg in ("cuda_runtime", "cublas", "cudnn")]
     spec = importlib.util.find_spec("torch")
     if spec is not None and spec.origin is not None:
         dirs.append(Path(spec.origin).parent / "lib")
+    spec = importlib.util.find_spec("nvidia")
+    for root in (spec.submodule_search_locations or []) if spec else []:
+        dirs += [Path(root) / pkg / "bin" for pkg in ("cuda_runtime", "cublas", "cudnn")]
     return [d for d in dirs if d.is_dir()]
 
 

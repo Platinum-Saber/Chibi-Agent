@@ -1,0 +1,141 @@
+{
+ "label": "alone",
+ "model": "qwen3.5:4b",
+ "options": {
+  "num_ctx": 8192,
+  "temperature": 0.4
+ },
+ "system_chars": 3378,
+ "tools_all": 37,
+ "before": {
+  "ollama": {},
+  "gpu_used_mb": 545,
+  "gpu_util_pct": 34
+ },
+ "cold_load_s": 8.17,
+ "loaded": {
+  "ollama": {
+   "qwen3.5:4b": {
+    "vram_mb": 3209,
+    "size_mb": 3209,
+    "ctx": 8192
+   }
+  },
+  "gpu_used_mb": 4502,
+  "gpu_util_pct": 23
+ },
+ "runs": [
+  {
+   "user": "What time is it?",
+   "tools_sent": 5,
+   "ttft_s": 1.102,
+   "total_s": 1.119,
+   "prompt_tokens": 1398,
+   "prompt_tok_s": 1739.9,
+   "gen_tokens": 14,
+   "gen_tok_s": 48.1,
+   "load_s": 0.01,
+   "tool_calls": [
+    "get_time"
+   ],
+   "reply": ""
+  },
+  {
+   "user": "What time is it?",
+   "tools_sent": 5,
+   "ttft_s": 0.323,
+   "total_s": 0.341,
+   "prompt_tokens": 1398,
+   "prompt_tok_s": 18834.9,
+   "gen_tokens": 14,
+   "gen_tok_s": 57.5,
+   "load_s": 0.01,
+   "tool_calls": [
+    "get_time"
+   ],
+   "reply": ""
+  },
+  {
+   "user": "What time is it?",
+   "tools_sent": 37,
+   "ttft_s": 1.616,
+   "total_s": 1.634,
+   "prompt_tokens": 3772,
+   "prompt_tok_s": 3053.3,
+   "gen_tokens": 14,
+   "gen_tok_s": 55.9,
+   "load_s": 0.01,
+   "tool_calls": [
+    "get_time"
+   ],
+   "reply": ""
+  },
+  {
+   "user": "Tell me in two sentences what you can help me with.",
+   "tools_sent": 5,
+   "ttft_s": 0.762,
+   "total_s": 1.314,
+   "prompt_tokens": 1405,
+   "prompt_tok_s": 2791.1,
+   "gen_tokens": 31,
+   "gen_tok_s": 56.2,
+   "load_s": 0.01,
+   "tool_calls": [],
+   "reply": "Answer. I can manage your files, apps, and media on this PC. I can also check yo"
+  },
+  {
+   "user": "Tell me in two sentences what you can help me with.",
+   "tools_sent": 5,
+   "ttft_s": 0.09,
+   "total_s": 0.698,
+   "prompt_tokens": 1405,
+   "prompt_tok_s": 22531.6,
+   "gen_tokens": 34,
+   "gen_tok_s": 56.0,
+   "load_s": 0.01,
+   "tool_calls": [],
+   "reply": "Answer. I can manage your files, apps, and reminders on this PC. I can also look"
+  },
+  {
+   "user": "Open Spotify.",
+   "tools_sent": 37,
+   "ttft_s": 1.079,
+   "total_s": 1.097,
+   "prompt_tokens": 3770,
+   "prompt_tok_s": 8959.0,
+   "gen_tokens": 26,
+   "gen_tok_s": 54.7,
+   "load_s": 0.01,
+   "tool_calls": [
+    "open_app"
+   ],
+   "reply": ""
+  },
+  {
+   "user": "Open Spotify.",
+   "tools_sent": 37,
+   "ttft_s": 0.593,
+   "total_s": 0.611,
+   "prompt_tokens": 3770,
+   "prompt_tok_s": 47845.1,
+   "gen_tokens": 26,
+   "gen_tok_s": 55.6,
+   "load_s": 0.01,
+   "tool_calls": [
+    "open_app"
+   ],
+   "reply": ""
+  }
+ ],
+ "after": {
+  "ollama": {
+   "qwen3.5:4b": {
+    "vram_mb": 3209,
+    "size_mb": 3209,
+    "ctx": 8192
+   }
+  },
+  "gpu_used_mb": 4514,
+  "gpu_util_pct": 81
+ }
+}

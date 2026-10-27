@@ -1,0 +1,86 @@
+[
+  {
+    "name": "llama-server",
+    "pid": 5948,
+    "kind": "vram",
+    "MB": 3976.0
+  },
+  {
+    "name": "python",
+    "pid": 33112,
+    "kind": "vram",
+    "MB": 1277.0
+  },
+  {
+    "name": "dwm",
+    "pid": 2260,
+    "kind": "vram",
+    "MB": 925.0
+  },
+  {
+    "name": "NVIDIA Overlay",
+    "pid": 14160,
+    "kind": "vram",
+    "MB": 773.0
+  },
+  {
+    "name": "llama-server",
+    "pid": 5948,
+    "kind": "shared",
+    "MB": 634.0
+  },
+  {
+    "name": "Godot_v4.7.2-stable_win64",
+    "pid": 20964,
+    "kind": "vram",
+    "MB": 580.0
+  },
+  {
+    "name": "dwm",
+    "pid": 2260,
+    "kind": "shared",
+    "MB": 507.0
+  },
+  {
+    "name": "llama-server",
+    "pid": 22532,
+    "kind": "vram",
+    "MB": 433.0
+  },
+  {
+    "name": "llama-server",
+    "pid": 22532,
+    "kind": "shared",
+    "MB": 158.0
+  },
+  {
+    "name": "python",
+    "pid": 33112,
+    "kind": "shared",
+    "MB": 126.0
+  },
+  {
+    "name": "csrss",
+    "pid": 1796,
+    "kind": "vram",
+    "MB": 78.0
+  },
+  {
+    "name": "explorer",
+    "pid": 11048,
+    "kind": "vram",
+    "MB": 73.0
+  },
+  {
+    "name": "NVIDIA Overlay",
+    "pid": 15896,
+    "kind": "vram",
+    "MB": 59.0
+  },
+  {
+    "name": "claude",
+    "pid": 5416,
+    "kind": "vram",
+    "MB": 57.0
+  }
+]
